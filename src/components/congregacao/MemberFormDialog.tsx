@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ChangeEvent, FormEvent } from 'react';
@@ -51,7 +52,11 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
       
       setMemberData({ ...memberToEdit, permissoesBase: currentPermissoes });
     } else if (!isOpen) {
-      setMemberData(initialMemberState); // Reset form when dialog closes if not editing
+      // Only reset if not editing AND dialog is closing
+      // This prevents data loss if dialog is closed then reopened for a new member while edit data was present
+      if (!memberToEdit) {
+        setMemberData(initialMemberState);
+      }
     }
   }, [memberToEdit, isOpen]);
 
@@ -113,14 +118,17 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) setMemberData(initialMemberState); // Reset on close
+      onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{memberToEdit ? 'Editar Membro' : 'Adicionar Novo Membro'}</DialogTitle>
           {memberToEdit && <DialogDescription>Modifique os dados do membro.</DialogDescription>}
         </DialogHeader>
-        <ScrollArea className="flex-grow pr-6 -mr-6">
-          <form onSubmit={handleSubmit} className="space-y-6 py-4">
+        <ScrollArea className="flex-grow min-h-0"> {/* Ensure ScrollArea can shrink and grow */}
+          <form onSubmit={handleSubmit} id="member-form-dialog" className="space-y-6 py-4 pr-3"> {/* Added id for submit button */}
             <div>
               <Label htmlFor="nomeMembro">Nome do Membro</Label>
               <Input id="nomeMembro" name="nome" value={memberData.nome} onChange={handleInputChange} required />
@@ -133,17 +141,17 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
                 <Button type="button" variant="outline" size="sm" onClick={() => toggleTodasPermissoes(false)}>Desmarcar Todas</Button>
               </div>
               {Object.entries(agrupamentosPermissoes).map(([grupo, permissoes]) => (
-                <div key={grupo} className="p-3 border rounded-md">
+                <div key={grupo} className="p-2 border rounded-md"> {/* Reduced padding from p-3 */}
                   <h4 className="font-semibold mb-2 text-foreground">{grupo}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1"> {/* More columns on md, adjusted gap */}
                     {permissoes.map((p: PermissaoBase) => (
-                      <div key={p.id} className="flex items-center space-x-2">
+                      <div key={p.id} className="flex items-center space-x-1.5"> {/* Reduced space-x from 2 */}
                         <Checkbox
-                          id={p.id}
+                          id={`perm-${p.id}`} // Ensure unique ID for checkbox
                           checked={memberData.permissoesBase[p.id] || false}
                           onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)}
                         />
-                        <Label htmlFor={p.id} className="font-normal">{p.nome}</Label>
+                        <Label htmlFor={`perm-${p.id}`} className="font-normal">{p.nome}</Label>
                       </div>
                     ))}
                   </div>
@@ -212,10 +220,11 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
               Opções Avançadas
             </Button>
           )}
-          <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="submit" form="member-form" onClick={handleSubmit}>Salvar Membro</Button>
+          <Button variant="outline" type="button" onClick={() => { onOpenChange(false); }}>Cancelar</Button>
+          <Button type="submit" form="member-form-dialog" onClick={handleSubmit}>Salvar Membro</Button> {/* Matched form id */}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
