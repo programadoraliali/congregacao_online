@@ -16,12 +16,12 @@ export const DIAS_REUNIAO: DiasReuniao = {
 };
 
 export const PERMISSOES_BASE: PermissaoBase[] = [
-  { id: 'indicadorQui', nome: 'Indicador (Qui)', grupo: 'Indicadores' },
-  { id: 'indicadorDom', nome: 'Indicador (Dom)', grupo: 'Indicadores' },
-  { id: 'volanteQui', nome: 'Volante (Qui)', grupo: 'Volantes' },
-  { id: 'volanteDom', nome: 'Volante (Dom)', grupo: 'Volantes' },
-  { id: 'leitorQui', nome: 'Leitor (Qui)', grupo: 'Leitura/Presidência' },
-  { id: 'leitorDom', nome: 'Leitor (Dom)', grupo: 'Leitura/Presidência' },
+  { id: 'indicadorQui', nome: 'Indicador Quinta', grupo: 'Indicadores' },
+  { id: 'indicadorDom', nome: 'Indicador Domingo', grupo: 'Indicadores' },
+  { id: 'volanteQui', nome: 'Volante Quinta', grupo: 'Volantes' },
+  { id: 'volanteDom', nome: 'Volante Domingo', grupo: 'Volantes' },
+  { id: 'leitorQui', nome: 'Leitor Quinta', grupo: 'Leitura/Presidência' },
+  { id: 'leitorDom', nome: 'Leitor Domingo', grupo: 'Leitura/Presidência' },
   { id: 'presidente', nome: 'Presidente', grupo: 'Leitura/Presidência' },
 ];
 
@@ -47,14 +47,13 @@ export const LOCAL_STORAGE_KEY_MEMBROS = 'congregacao_membros';
 export const LOCAL_STORAGE_KEY_SCHEDULE_CACHE = 'congregacao_schedule_cache';
 
 export const BADGE_COLORS: Record<string, string> = {
-  Indicadores: "bg-blue-100 text-blue-800",
-  Volantes: "bg-green-100 text-green-800",
-  "Leitura/Presidência": "bg-purple-100 text-purple-800",
-  // Mantendo grupos antigos caso sejam usados em algum lugar, mas podem ser removidos se não
-  "Partes Meio de Semana": "bg-yellow-100 text-yellow-800",
-  "Demonstrações": "bg-indigo-100 text-indigo-800",
-  "Outras Funções": "bg-pink-100 text-pink-800",
-  default: "bg-gray-100 text-gray-800",
+  Indicadores: "bg-blue-100 text-blue-700 border-blue-300",
+  Volantes: "bg-green-100 text-green-700 border-green-300",
+  "Leitura/Presidência": "bg-purple-100 text-purple-700 border-purple-300",
+  "Partes Meio de Semana": "bg-yellow-100 text-yellow-700 border-yellow-300",
+  "Demonstrações": "bg-indigo-100 text-indigo-700 border-indigo-300",
+  "Outras Funções": "bg-pink-100 text-pink-700 border-pink-300",
+  default: "bg-gray-100 text-gray-700 border-gray-300",
 };
 
 export const DIAS_SEMANA_REUNIAO_CORES = {
@@ -62,3 +61,4 @@ export const DIAS_SEMANA_REUNIAO_CORES = {
   publica: "bg-primary text-primary-foreground",    // Ochre
   outroDia: "bg-muted text-muted-foreground",
 };
+

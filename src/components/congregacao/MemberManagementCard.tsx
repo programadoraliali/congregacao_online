@@ -61,7 +61,7 @@ export function MemberManagementCard({
       
       const badgeColor = BADGE_COLORS[p.grupo] || BADGE_COLORS.default;
       return (
-         <Badge key={p.id} variant="outline" className={`mr-1 mb-1 text-xs ${badgeColor}`}>
+         <Badge key={p.id} className={`mr-1 mb-1 ${badgeColor}`}>
           {displayName}
         </Badge>
       );
@@ -136,3 +136,4 @@ export function MemberManagementCard({
     </Card>
   );
 }
+
