@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef } from 'react';
@@ -47,21 +48,21 @@ export function MemberManagementCard({
     const activePermissions = PERMISSOES_BASE.filter(p => member.permissoesBase[p.id]);
     if (activePermissions.length === 0) return <span className="text-muted-foreground text-xs">Nenhuma</span>;
     
-    // Group permissions by their base name (e.g. Indicador, Volante)
-    const groupedDisplay: Record<string, string[]> = {};
-    activePermissions.forEach(p => {
-      const baseName = p.grupo; // Or a more generic part of p.nome
-      if (!groupedDisplay[baseName]) groupedDisplay[baseName] = [];
-      if (p.nome.includes('(Qui)')) groupedDisplay[baseName].push('Qui');
-      if (p.nome.includes('(Dom)')) groupedDisplay[baseName].push('Dom');
-    });
-
-    return Object.entries(groupedDisplay).map(([groupName, days]) => {
-      const uniqueDays = [...new Set(days)]; // Ensure unique days like Qui, Dom
-      const badgeColor = BADGE_COLORS[groupName] || BADGE_COLORS.default;
+    return activePermissions.map(p => {
+      let displayName = p.nome;
+      // Nomes encurtados
+      if (p.id === 'indicadorQui') displayName = 'Ind (Qui)';
+      else if (p.id === 'indicadorDom') displayName = 'Ind (Dom)';
+      else if (p.id === 'volanteQui') displayName = 'Vol (Qui)';
+      else if (p.id === 'volanteDom') displayName = 'Vol (Dom)';
+      else if (p.id === 'leitorQui') displayName = 'Lei (Qui)';
+      else if (p.id === 'leitorDom') displayName = 'Lei (Dom)';
+      else if (p.id === 'presidente') displayName = 'Pres';
+      
+      const badgeColor = BADGE_COLORS[p.grupo] || BADGE_COLORS.default;
       return (
-         <Badge key={groupName} variant="outline" className={`mr-1 mb-1 text-xs ${badgeColor}`}>
-          {groupName} {uniqueDays.length > 0 && `(${uniqueDays.join('/')})`}
+         <Badge key={p.id} variant="outline" className={`mr-1 mb-1 text-xs ${badgeColor}`}>
+          {displayName}
         </Badge>
       );
     });
@@ -106,7 +107,7 @@ export function MemberManagementCard({
                         {member.nome}
                       </button>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">{getMemberPermissionsBadges(member)}</TableCell>
+                    <TableCell>{getMemberPermissionsBadges(member)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
