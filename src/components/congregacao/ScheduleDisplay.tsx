@@ -93,7 +93,7 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano }: Schedu
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col gap-6"> {/* Changed from lg:flex-row */}
         <ScheduleTable title="Indicadores" data={dadosIndicadores.data} columns={dadosIndicadores.columns} />
         <ScheduleTable title="Volantes" data={dadosVolantes.data} columns={dadosVolantes.columns} />
       </div>
