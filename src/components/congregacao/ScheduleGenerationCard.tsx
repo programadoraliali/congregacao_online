@@ -1,12 +1,12 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { NOMES_MESES, APP_NAME } from '@/lib/congregacao/constants';
+import { NOMES_MESES } from '@/lib/congregacao/constants';
 import type { DesignacoesFeitas, Membro } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
@@ -16,17 +16,17 @@ import { CalendarCheck, FileText, AlertTriangle, Loader2 } from 'lucide-react';
 interface ScheduleGenerationCardProps {
   membros: Membro[];
   onScheduleGenerated: (designacoes: DesignacoesFeitas, mes: number, ano: number) => void;
-  currentSchedule: DesignacoesFeitas | null;
-  currentMes: number | null;
-  currentAno: number | null;
+  currentSchedule: DesignacoesFeitas | null; // Last successfully generated/cached schedule
+  currentMes: number | null; // Month of the currentSchedule
+  currentAno: number | null; // Year of the currentSchedule
 }
 
 export function ScheduleGenerationCard({ 
   membros, 
   onScheduleGenerated, 
-  currentSchedule,
-  currentMes,
-  currentAno 
+  currentSchedule, // This prop is now only for initial selection
+  currentMes,     // This prop is now only for initial selection
+  currentAno      // This prop is now only for initial selection
 }: ScheduleGenerationCardProps) {
   const [selectedMes, setSelectedMes] = useState<string>(currentMes !== null ? currentMes.toString() : new Date().getMonth().toString());
   const [selectedAno, setSelectedAno] = useState<string>(currentAno !== null ? currentAno.toString() : new Date().getFullYear().toString());
@@ -34,14 +34,29 @@ export function ScheduleGenerationCard({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // New state to hold the schedule data that should be displayed
+  const [displayedScheduleData, setDisplayedScheduleData] = useState<{
+    schedule: DesignacoesFeitas;
+    mes: number;
+    ano: number;
+  } | null>(null);
+
+  // Effect to clear displayed schedule and errors when selected month/year changes
+  useEffect(() => {
+    setDisplayedScheduleData(null);
+    setError(null);
+  }, [selectedMes, selectedAno]);
+
   const handleGenerateSchedule = async () => {
     setError(null);
     setIsLoading(true);
+    setDisplayedScheduleData(null); // Clear previous display before generating new
     const mes = parseInt(selectedMes, 10);
     const ano = parseInt(selectedAno, 10);
 
     if (membros.length === 0) {
-      setError("Não é possível gerar designações pois não há membros cadastrados.");
+      const errMsg = "Não é possível gerar designações pois não há membros cadastrados.";
+      setError(errMsg);
       setIsLoading(false);
       toast({ title: "Erro", description: "Adicione membros primeiro.", variant: "destructive" });
       return;
@@ -53,12 +68,14 @@ export function ScheduleGenerationCard({
         setError(result.error);
         toast({ title: "Erro ao Gerar Designações", description: result.error, variant: "destructive" });
       } else {
-        onScheduleGenerated(result.designacoesFeitas, mes, ano);
+        onScheduleGenerated(result.designacoesFeitas, mes, ano); // Update parent cache
+        setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano }); // Set schedule for display
         toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
       }
     } catch (e: any) {
       console.error("Erro ao gerar designações:", e);
-      setError(e.message || "Ocorreu um erro desconhecido ao gerar o cronograma.");
+      const errMsg = e.message || "Ocorreu um erro desconhecido ao gerar o cronograma.";
+      setError(errMsg);
       toast({ title: "Erro Crítico", description: "Falha ao contatar o serviço de IA ou processar os dados.", variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -75,13 +92,6 @@ export function ScheduleGenerationCard({
 
   const currentYear = new Date().getFullYear();
   const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-
-  // Display schedule for currently selected month/year if it matches cached ones
-  const displaySchedule = currentSchedule && parseInt(selectedMes) === currentMes && parseInt(selectedAno) === currentAno 
-                          ? currentSchedule : null;
-  const displayMes = displaySchedule ? parseInt(selectedMes) : null;
-  const displayAno = displaySchedule ? parseInt(selectedAno) : null;
-
 
   return (
     <Card>
@@ -137,12 +147,17 @@ export function ScheduleGenerationCard({
               <p className="text-muted-foreground">Gerando designações, por favor aguarde...</p>
             </div>
           )}
-          {!isLoading && displaySchedule && displayMes !== null && displayAno !== null && (
+          {!isLoading && displayedScheduleData && (
             <>
               <h3 className="text-xl font-semibold mb-4 text-center text-foreground">
-                Designações para {NOMES_MESES[displayMes]} de {displayAno}
+                Designações para {NOMES_MESES[displayedScheduleData.mes]} de {displayedScheduleData.ano}
               </h3>
-              <ScheduleDisplay designacoesFeitas={displaySchedule} membros={membros} mes={displayMes} ano={displayAno} />
+              <ScheduleDisplay 
+                designacoesFeitas={displayedScheduleData.schedule} 
+                membros={membros} 
+                mes={displayedScheduleData.mes} 
+                ano={displayedScheduleData.ano} 
+              />
               <div className="mt-6 text-center">
                 <Button variant="outline" onClick={handleExportPDF}>
                   <FileText className="mr-2 h-4 w-4" /> Exportar como PDF (em breve)
@@ -150,7 +165,7 @@ export function ScheduleGenerationCard({
               </div>
             </>
           )}
-          {!isLoading && !displaySchedule && !error && (
+          {!isLoading && !displayedScheduleData && !error && (
             <p className="text-muted-foreground text-center py-4">
               Selecione o mês e ano e clique em "Gerar Cronograma" para ver as designações.
             </p>
@@ -160,3 +175,4 @@ export function ScheduleGenerationCard({
     </Card>
   );
 }
+
