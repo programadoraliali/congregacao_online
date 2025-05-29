@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -26,57 +27,91 @@ function prepararDadosTabela(
   tipoTabela: 'Indicadores' | 'Volantes' | 'LeitorPresidente'
 ): { data: Designacao[], columns: { key: string; label: string }[] } {
   
-  const funcoesDaTabela = FUNCOES_DESIGNADAS.filter(f => f.tabela === tipoTabela);
-  const columns: { key: string; label: string }[] = [{ key: 'data', label: 'Data' }];
-  
-  funcoesDaTabela.forEach(f => {
-    columns.push({ key: f.id, label: f.nome });
-  });
-
+  let columns: { key: string; label: string }[];
   const dataTabela: Designacao[] = [];
   const datasNoMesComReuniao: Set<string> = new Set();
 
-  // Collect all dates that have any assignments in designacoesFeitas
+  // Collect all dates that have any assignments in designacoesFeitas for the current month/year and are meeting days
   Object.keys(designacoesFeitas).forEach(dataStr => {
     const dataObj = new Date(dataStr + 'T00:00:00'); // Ensure local timezone
     if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
-        const diaSemana = dataObj.getDay();
+        const diaSemana = dataObj.getDay(); // 0 for Sunday, 4 for Thursday etc.
         if(diaSemana === DIAS_REUNIAO.meioSemana || diaSemana === DIAS_REUNIAO.publica) {
              datasNoMesComReuniao.add(dataStr);
         }
     }
   });
 
-
-  // Create rows for each meeting day
+  // Create rows for each meeting day, sorted
   const sortedDates = Array.from(datasNoMesComReuniao).sort();
 
-  sortedDates.forEach(dataStr => {
-    const dataObj = new Date(dataStr + 'T00:00:00');
-    const dia = dataObj.getDate();
-    const diaSemanaIndex = dataObj.getDay();
-    const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
-    
-    let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
-    if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
-    else if (diaSemanaIndex === DIAS_REUNIAO.publica) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.publica;
+  if (tipoTabela === 'Indicadores') {
+    columns = [
+      { key: 'data', label: 'Data' },
+      { key: 'indicador1', label: 'Indicador 1' },
+      { key: 'indicador2', label: 'Indicador 2' },
+    ];
 
-    const row: Designacao = {
-      data: `${dia} ${diaAbrev}`,
-      diaSemanaBadgeColor: badgeColorClass,
-    };
+    sortedDates.forEach(dataStr => {
+      const dataObj = new Date(dataStr + 'T00:00:00');
+      const dia = dataObj.getDate();
+      const diaSemanaIndex = dataObj.getDay();
+      const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
+      
+      let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
+      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
+      else if (diaSemanaIndex === DIAS_REUNIAO.publica) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.publica;
 
-    const designacoesDoDia = designacoesFeitas[dataStr] || {};
-    funcoesDaTabela.forEach(funcao => {
-      const tipoReuniaoAtual = diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
-      if (funcao.tipoReuniao.includes(tipoReuniaoAtual)) {
-        row[funcao.id] = getNomeMembro(designacoesDoDia[funcao.id], membros);
-      } else {
-        row[funcao.id] = null; // Function not applicable for this meeting type
+      const row: Designacao = {
+        data: `${dia} ${diaAbrev}`,
+        diaSemanaBadgeColor: badgeColorClass,
+      };
+      
+      const designacoesDoDia = designacoesFeitas[dataStr] || {};
+      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) { // Quinta
+        row['indicador1'] = getNomeMembro(designacoesDoDia['indicadorExternoQui'], membros);
+        row['indicador2'] = getNomeMembro(designacoesDoDia['indicadorPalcoQui'], membros);
+      } else if (diaSemanaIndex === DIAS_REUNIAO.publica) { // Domingo
+        row['indicador1'] = getNomeMembro(designacoesDoDia['indicadorExternoDom'], membros);
+        row['indicador2'] = getNomeMembro(designacoesDoDia['indicadorPalcoDom'], membros);
       }
+      dataTabela.push(row);
     });
-    dataTabela.push(row);
-  });
+
+  } else { // Volantes & LeitorPresidente
+    const funcoesDaTabela = FUNCOES_DESIGNADAS.filter(f => f.tabela === tipoTabela);
+    columns = [{ key: 'data', label: 'Data' }];
+    funcoesDaTabela.forEach(f => {
+      columns.push({ key: f.id, label: f.nome });
+    });
+
+    sortedDates.forEach(dataStr => {
+      const dataObj = new Date(dataStr + 'T00:00:00');
+      const dia = dataObj.getDate();
+      const diaSemanaIndex = dataObj.getDay();
+      const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
+      
+      let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
+      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
+      else if (diaSemanaIndex === DIAS_REUNIAO.publica) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.publica;
+
+      const row: Designacao = {
+        data: `${dia} ${diaAbrev}`,
+        diaSemanaBadgeColor: badgeColorClass,
+      };
+
+      const designacoesDoDia = designacoesFeitas[dataStr] || {};
+      funcoesDaTabela.forEach(funcao => {
+        const tipoReuniaoAtual = diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
+        if (funcao.tipoReuniao.includes(tipoReuniaoAtual)) {
+          row[funcao.id] = getNomeMembro(designacoesDoDia[funcao.id], membros);
+        } else {
+          row[funcao.id] = null; // Function not applicable for this meeting type
+        }
+      });
+      dataTabela.push(row);
+    });
+  }
   
   return { data: dataTabela, columns };
 }
@@ -103,3 +138,4 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano }: Schedu
     </div>
   );
 }
+
