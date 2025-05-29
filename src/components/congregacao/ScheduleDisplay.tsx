@@ -78,7 +78,39 @@ function prepararDadosTabela(
       dataTabela.push(row);
     });
 
-  } else { // Volantes & LeitorPresidente
+  } else if (tipoTabela === 'Volantes') {
+    columns = [
+      { key: 'data', label: 'Data' },
+      { key: 'volante1', label: 'Volante 1' },
+      { key: 'volante2', label: 'Volante 2' },
+    ];
+
+    sortedDates.forEach(dataStr => {
+      const dataObj = new Date(dataStr + 'T00:00:00');
+      const dia = dataObj.getDate();
+      const diaSemanaIndex = dataObj.getDay();
+      const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
+      
+      let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
+      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
+      else if (diaSemanaIndex === DIAS_REUNIAO.publica) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.publica;
+
+      const row: Designacao = {
+        data: `${dia} ${diaAbrev}`,
+        diaSemanaBadgeColor: badgeColorClass,
+      };
+      
+      const designacoesDoDia = designacoesFeitas[dataStr] || {};
+      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) { // Quinta
+        row['volante1'] = getNomeMembro(designacoesDoDia['volante1Qui'], membros);
+        row['volante2'] = getNomeMembro(designacoesDoDia['volante2Qui'], membros);
+      } else if (diaSemanaIndex === DIAS_REUNIAO.publica) { // Domingo
+        row['volante1'] = getNomeMembro(designacoesDoDia['volante1Dom'], membros);
+        row['volante2'] = getNomeMembro(designacoesDoDia['volante2Dom'], membros);
+      }
+      dataTabela.push(row);
+    });
+  } else { // LeitorPresidente (ou qualquer outro tipo de tabela no futuro)
     const funcoesDaTabela = FUNCOES_DESIGNADAS.filter(f => f.tabela === tipoTabela);
     columns = [{ key: 'data', label: 'Data' }];
     funcoesDaTabela.forEach(f => {
@@ -128,7 +160,7 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano }: Schedu
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-6"> {/* Changed from lg:flex-row */}
+      <div className="flex flex-col gap-6">
         <ScheduleTable title="Indicadores" data={dadosIndicadores.data} columns={dadosIndicadores.columns} />
         <ScheduleTable title="Volantes" data={dadosVolantes.data} columns={dadosVolantes.columns} />
       </div>
