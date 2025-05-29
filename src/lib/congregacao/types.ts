@@ -18,7 +18,7 @@ export interface Membro {
   nome: string;
   permissoesBase: Record<string, boolean>; // Keys are id from PERMISSOES_BASE
   historicoDesignacoes: Record<string, string>; // Key: "YYYY-MM-DD", Value: idFuncao
-  impedimentos: string[]; // Format: "YYYY-MM"
+  impedimentos: string[]; // Format: "YYYY-MM-DD"
 }
 
 export interface Designacao {

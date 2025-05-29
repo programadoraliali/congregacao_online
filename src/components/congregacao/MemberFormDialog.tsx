@@ -15,11 +15,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { Membro, PermissaoBase } from '@/lib/congregacao/types';
 import { PERMISSOES_BASE, NOMES_MESES } from '@/lib/congregacao/constants';
-import { agruparPermissoes, formatarDataParaChave } from '@/lib/congregacao/utils';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { agruparPermissoes, formatarDataCompleta as formatarDataParaStorage } from '@/lib/congregacao/utils';
+import { PlusCircle, Trash2, CalendarIcon } from 'lucide-react';
 
 interface MemberFormDialogProps {
   isOpen: boolean;
@@ -38,8 +42,7 @@ const initialMemberState: Omit<Membro, 'id'> = {
 
 export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, onOpenAdvancedOptions }: MemberFormDialogProps) {
   const [memberData, setMemberData] = useState<Omit<Membro, 'id'> & { id?: string }>(initialMemberState);
-  const [impedimentoMes, setImpedimentoMes] = useState<string>(new Date().getMonth().toString());
-  const [impedimentoAno, setImpedimentoAno] = useState<string>(new Date().getFullYear().toString());
+  const [impedimentoDia, setImpedimentoDia] = useState<Date | undefined>();
 
   useEffect(() => {
     if (memberToEdit && isOpen) {
@@ -50,9 +53,11 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
       
       setMemberData({ ...memberToEdit, permissoesBase: currentPermissoes });
     } else if (!isOpen) {
-      if (!memberToEdit) {
+      // Reset form state when dialog closes, unless it was closed after opening for edit
+      if (!memberToEdit) { 
         setMemberData(initialMemberState);
       }
+      setImpedimentoDia(undefined); // Always reset impediment date picker
     }
   }, [memberToEdit, isOpen]);
 
@@ -76,19 +81,18 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
   };
   
   const adicionarImpedimento = () => {
-    const ano = parseInt(impedimentoAno, 10);
-    const mes = parseInt(impedimentoMes, 10);
-    if (isNaN(ano) || isNaN(mes) || mes < 0 || mes > 11) {
-      alert("Por favor, selecione um mês e ano válidos para o impedimento.");
+    if (!impedimentoDia) {
+      alert("Por favor, selecione uma data para o impedimento.");
       return;
     }
-    const impedimentoStr = formatarDataParaChave(new Date(ano, mes)); // YYYY-MM
+    const impedimentoStr = formatarDataParaStorage(impedimentoDia); // "YYYY-MM-DD"
     if (!memberData.impedimentos.includes(impedimentoStr)) {
       setMemberData(prev => ({
         ...prev,
         impedimentos: [...prev.impedimentos, impedimentoStr].sort(),
       }));
     }
+    setImpedimentoDia(undefined); // Reset picker after adding
   };
 
   const removerImpedimento = (impedimentoARemover: string) => {
@@ -109,13 +113,16 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
   };
 
   const agrupamentosPermissoes = agruparPermissoes(PERMISSOES_BASE);
-  const currentYear = new Date().getFullYear();
-  const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) setMemberData(initialMemberState); 
+      if (!open) {
+        // If closing and not just opened for edit, reset fully
+        if (!memberToEdit || (memberToEdit && !isOpen)) { 
+          setMemberData(initialMemberState);
+        }
+        setImpedimentoDia(undefined);
+      }
       onOpenChange(open);
     }}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
@@ -123,11 +130,10 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
           <DialogTitle>{memberToEdit ? 'Editar Membro' : 'Adicionar Novo Membro'}</DialogTitle>
           {memberToEdit && <DialogDescription>Modifique os dados do membro.</DialogDescription>}
         </DialogHeader>
-        {/* Conteúdo do formulário agora é diretamente rolável */}
         <form 
           onSubmit={handleSubmit} 
           id="member-form-dialog" 
-          className="flex-1 min-h-0 overflow-y-auto space-y-6 py-4 px-2 sm:px-4" // Adicionado px para espaçamento lateral responsivo
+          className="flex-1 min-h-0 overflow-y-auto space-y-6 py-4 px-2 sm:px-4"
         >
           <div>
             <Label htmlFor="nomeMembro">Nome do Membro</Label>
@@ -143,15 +149,15 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
             {Object.entries(agrupamentosPermissoes).map(([grupo, permissoes]) => (
               <div key={grupo} className="p-2 border rounded-md">
                 <h4 className="font-semibold mb-2 text-foreground">{grupo}</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-2 gap-y-1"> {/* Ajustado gap-x */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-2 gap-y-1">
                   {permissoes.map((p: PermissaoBase) => (
-                    <div key={p.id} className="flex items-center space-x-1"> {/* Ajustado space-x */}
+                    <div key={p.id} className="flex items-center space-x-1">
                       <Checkbox
                         id={`perm-${p.id}`}
                         checked={memberData.permissoesBase[p.id] || false}
                         onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)}
                       />
-                      <Label htmlFor={`perm-${p.id}`} className="font-normal text-sm">{p.nome}</Label> {/* Ajustado font-normal e text-sm */}
+                      <Label htmlFor={`perm-${p.id}`} className="font-normal text-sm">{p.nome}</Label>
                     </div>
                   ))}
                 </div>
@@ -160,48 +166,52 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-lg font-medium">Impedimentos Temporários (Mês Indisponível)</h3>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2"> {/* Alterado para gap-2 e items-stretch no mobile */}
-              <div className="flex-1 min-w-[120px] sm:min-w-0"> {/* Adicionado min-w para melhor layout em mobile */}
-                <Label htmlFor="impedimentoMes">Mês</Label>
-                <Select value={impedimentoMes} onValueChange={setImpedimentoMes}>
-                  <SelectTrigger id="impedimentoMes">
-                    <SelectValue placeholder="Selecione o mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NOMES_MESES.map((nome, index) => (
-                      <SelectItem key={index} value={index.toString()}>{nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <h3 className="text-lg font-medium">Impedimentos Temporários (Dias Específicos)</h3>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
+              <div className="flex-1 min-w-[150px] sm:min-w-0">
+                <Label htmlFor="impedimentoDataPicker">Data do Impedimento</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="impedimentoDataPicker"
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !impedimentoDia && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {impedimentoDia ? format(impedimentoDia, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={impedimentoDia}
+                      onSelect={setImpedimentoDia}
+                      initialFocus
+                      locale={ptBR}
+                      disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} // Disable past dates
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-              <div className="flex-1 min-w-[80px] sm:min-w-0"> {/* Adicionado min-w para melhor layout em mobile */}
-                <Label htmlFor="impedimentoAno">Ano</Label>
-                 <Select value={impedimentoAno} onValueChange={setImpedimentoAno}>
-                  <SelectTrigger id="impedimentoAno">
-                    <SelectValue placeholder="Ano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {yearsForSelect.map(year => (
-                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="button" variant="outline" onClick={adicionarImpedimento} className="shrink-0 mt-2 sm:mt-0"> {/* Adicionado margin top no mobile */}
+              <Button type="button" variant="outline" onClick={adicionarImpedimento} className="shrink-0 mt-2 sm:mt-0">
                 <PlusCircle className="mr-2 h-4 w-4" /> Adicionar
               </Button>
             </div>
             {memberData.impedimentos.length > 0 && (
-              <div className="space-y-1 pt-2"> {/* Adicionado pt-2 */}
+              <div className="space-y-1 pt-2">
                 <Label>Impedimentos adicionados:</Label>
-                <ul className="list-disc list-inside pl-1 text-sm max-h-32 overflow-y-auto"> {/* Adicionado max-h e overflow */}
+                <ul className="list-disc list-inside pl-1 text-sm max-h-32 overflow-y-auto">
                   {memberData.impedimentos.map(imp => {
-                      const [year, monthNum] = imp.split('-');
-                      const monthName = NOMES_MESES[parseInt(monthNum,10)-1];
+                      // imp is "YYYY-MM-DD"
+                      const dateParts = imp.split('-').map(Number);
+                      // Create date as UTC to avoid timezone shifts when only displaying
+                      const dateObj = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
                       return (
-                          <li key={imp} className="flex justify-between items-center py-0.5"> {/* Ajustado py */}
-                              <span>{monthName} de {year}</span>
+                          <li key={imp} className="flex justify-between items-center py-0.5">
+                              <span>{format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
                               <Button variant="ghost" size="sm" onClick={() => removerImpedimento(imp)} aria-label={`Remover impedimento ${imp}`}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
@@ -220,7 +230,7 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
             </Button>
           )}
           <Button variant="outline" type="button" onClick={() => { onOpenChange(false); }}>Cancelar</Button>
-          <Button type="submit" form="member-form-dialog">Salvar Membro</Button> {/* onClick foi removido pois o form já tem onSubmit */}
+          <Button type="submit" form="member-form-dialog">Salvar Membro</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

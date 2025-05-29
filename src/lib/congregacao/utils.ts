@@ -60,7 +60,7 @@ export function validarEstruturaMembro(membro: Partial<Membro>, gerarIdSeAusente
   const impedimentos: string[] = [];
   if (Array.isArray(membro.impedimentos)) {
     membro.impedimentos.forEach(imp => {
-      if (typeof imp === 'string' && /^\d{4}-\d{2}$/.test(imp)) {
+      if (typeof imp === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(imp)) { // Updated regex for YYYY-MM-DD
         impedimentos.push(imp);
       } else {
         // console.warn(`Impedimento inválido ${imp}, pulando.`);
@@ -104,16 +104,13 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
             return 'volanteDom';
         case 'leitorASentinelaDom':
             return 'leitorDom';
-        // Se uma função para 'Leitor (Qui)' for adicionada em FUNCOES_DESIGNADAS,
-        // por exemplo com id 'leitorBibliaQui', um case seria:
-        // case 'leitorBibliaQui':
+        // Adicionar case para leitorQui se existir função correspondente
+        // case 'leitorBibliaQui': // Exemplo
         //     return 'leitorQui';
         case 'presidenteReuniaoPublicaDom':
         case 'presidenteMeioSemana':
             return 'presidente';
         default:
-            // Se a função não mapear para uma permissão específica das novas,
-            // pode ser que não precise de permissão ou a lógica precise ser revisada.
             return undefined;
     }
 }
