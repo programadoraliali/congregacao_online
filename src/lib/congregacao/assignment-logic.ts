@@ -2,70 +2,173 @@
 'use server'; 
 
 import type { Membro, FuncaoDesignada, DesignacoesFeitas, DiasReuniao } from './types';
-import { FUNCOES_DESIGNADAS, DIAS_REUNIAO as DIAS_REUNIAO_CONFIG } from './constants';
+import { FUNCOES_DESIGNADAS, DIAS_REUNIAO as DIAS_REUNIAO_CONFIG, NOMES_DIAS_SEMANA_ABREV } from './constants';
 import { formatarDataCompleta, getPermissaoRequerida } from './utils';
-import { suggestBestAssignment, type SuggestBestAssignmentInput } from '@/ai/flows/suggest-best-assignment';
+// AI import removido pois a lógica de sugestão será determinística
+// import { suggestBestAssignment, type SuggestBestAssignmentInput } from '@/ai/flows/suggest-best-assignment';
+
+// --- Funções Auxiliares para Priorização ---
+
+function encontrarDataReuniaoAnterior(
+  dataAtual: Date,
+  tipoReuniaoAtual: 'meioSemana' | 'publica',
+  datasDeReuniaoNoMes: Date[],
+  DIAS_REUNIAO: DiasReuniao
+): Date | null {
+  const diaSemanaAlvo = tipoReuniaoAtual === 'meioSemana' ? DIAS_REUNIAO.meioSemana : DIAS_REUNIAO.publica;
+  let dataAnterior: Date | null = null;
+  for (const dataCand of datasDeReuniaoNoMes) {
+    if (dataCand < dataAtual && dataCand.getDay() === diaSemanaAlvo) {
+      if (dataAnterior === null || dataCand > dataAnterior) {
+        dataAnterior = new Date(dataCand); // Garante nova instância
+      }
+    }
+  }
+  return dataAnterior;
+}
+
+function fezFuncaoNaReuniaoAnterior(
+  membroId: string,
+  funcaoId: string,
+  dataReuniaoAnteriorStr: string | null,
+  designacoesFeitasNoMesAtual: DesignacoesFeitas
+): boolean {
+  if (!dataReuniaoAnteriorStr) return false;
+  const designacoesDoDiaAnterior = designacoesFeitasNoMesAtual[dataReuniaoAnteriorStr];
+  if (!designacoesDoDiaAnterior) return false;
+  // Verifica se o membro fez especificamente esta função (ou uma equivalente com o mesmo base ID, ex: indicadorExternoQui vs indicadorPalcoQui)
+  // Para simplificar, vamos considerar a funcaoId exata.
+  // Se a regra fosse "qualquer função de indicador", a lógica seria mais complexa aqui.
+  return designacoesDoDiaAnterior[funcaoId] === membroId;
+}
+
+function contarUsoFuncaoNoMes(
+  membroId: string,
+  funcaoId: string,
+  designacoesFeitasNoMesAtual: DesignacoesFeitas,
+  dataAtualStr: string // Para não contar a designação que estamos prestes a fazer
+): number {
+  let count = 0;
+  for (const dataStr in designacoesFeitasNoMesAtual) {
+    if (dataStr >= dataAtualStr) continue; // Considera apenas designações já feitas
+    const funcoesDoDia = designacoesFeitasNoMesAtual[dataStr];
+    if (funcoesDoDia && funcoesDoDia[funcaoId] === membroId) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function contarUsoGeralNoMes(
+  membroId: string,
+  designacoesFeitasNoMesAtual: DesignacoesFeitas,
+  dataAtualStr: string // Para não contar a designação que estamos prestes a fazer
+): number {
+  let count = 0;
+  for (const dataStr in designacoesFeitasNoMesAtual) {
+    if (dataStr >= dataAtualStr) continue; // Considera apenas designações já feitas
+    const funcoesDoDia = designacoesFeitasNoMesAtual[dataStr];
+    if (funcoesDoDia) {
+      for (const funcId in funcoesDoDia) {
+        if (funcoesDoDia[funcId] === membroId) {
+          count++;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+function contarUsoFuncaoNoHistorico(
+  membroId: string,
+  funcaoId: string,
+  membro: Membro
+): number {
+  let count = 0;
+  for (const dataStr in membro.historicoDesignacoes) {
+    if (membro.historicoDesignacoes[dataStr] === funcaoId) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function getDataUltimaVezFuncao(
+  membroId: string,
+  funcaoId: string,
+  membro: Membro
+): string | null {
+  let ultimaData: string | null = null;
+  for (const dataStr in membro.historicoDesignacoes) {
+    if (membro.historicoDesignacoes[dataStr] === funcaoId) {
+      if (ultimaData === null || dataStr > ultimaData) {
+        ultimaData = dataStr;
+      }
+    }
+  }
+  return ultimaData;
+}
+
+// --- Lógica Principal de Geração ---
 
 export async function calcularDesignacoesAction(
   mes: number, // 0-11
   ano: number,
   membros: Membro[] 
-): Promise<{ htmlTabelas?: string; designacoesFeitas: DesignacoesFeitas } | { error: string }> {
+): Promise<{ designacoesFeitas: DesignacoesFeitas } | { error: string }> {
   
   const DIAS_REUNIAO: DiasReuniao = DIAS_REUNIAO_CONFIG;
-  const designacoesFeitas: DesignacoesFeitas = {};
-  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[]; // Deep copy
+  const designacoesFeitasNoMesAtual: DesignacoesFeitas = {};
+  
+  // Usar uma cópia para não modificar os objetos originais, especialmente o histórico
+  // que será usado para consulta do "passado" antes deste mês.
+  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[];
 
   const datasDeReuniaoNoMes: Date[] = [];
-  const primeiroDiaDoMes = new Date(ano, mes, 1);
-  const ultimoDiaDoMes = new Date(ano, mes + 1, 0);
+  const primeiroDiaDoMes = new Date(Date.UTC(ano, mes, 1));
+  const ultimoDiaDoMes = new Date(Date.UTC(ano, mes + 1, 0));
 
-  for (let dia = new Date(primeiroDiaDoMes); dia <= ultimoDiaDoMes; dia.setDate(dia.getDate() + 1)) {
-    const diaDaSemana = dia.getDay();
+  for (let dia = new Date(primeiroDiaDoMes); dia <= ultimoDiaDoMes; dia.setUTCDate(dia.getUTCDate() + 1)) {
+    const diaDaSemana = dia.getUTCDay(); // Use UTC days
     if (diaDaSemana === DIAS_REUNIAO.meioSemana || diaDaSemana === DIAS_REUNIAO.publica) {
-      datasDeReuniaoNoMes.push(new Date(dia));
+      datasDeReuniaoNoMes.push(new Date(dia)); // Salva uma cópia da data
     }
   }
 
   if (datasDeReuniaoNoMes.length === 0) {
     return { error: "Nenhuma data de reunião encontrada para este mês." };
   }
-  
-  const memberAssignmentHistoryGlobal: Record<string, Record<string, string>> = {};
-  for (const membro of membros) {
-    memberAssignmentHistoryGlobal[membro.id] = { ...membro.historicoDesignacoes };
-  }
+  // Ordenar as datas de reunião cronologicamente (já deve estar, mas para garantir)
+  datasDeReuniaoNoMes.sort((a, b) => a.getTime() - b.getTime());
 
   for (const dataReuniao of datasDeReuniaoNoMes) {
     const dataReuniaoStr = formatarDataCompleta(dataReuniao); // "YYYY-MM-DD"
-    designacoesFeitas[dataReuniaoStr] = {};
+    designacoesFeitasNoMesAtual[dataReuniaoStr] = {};
     
-    const tipoReuniaoAtual = dataReuniao.getDay() === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
+    const tipoReuniaoAtual = dataReuniao.getUTCDay() === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
     const funcoesParaEsteTipoReuniao = FUNCOES_DESIGNADAS.filter(f => f.tipoReuniao.includes(tipoReuniaoAtual));
 
     const membrosDesignadosNesteDia: Set<string> = new Set();
 
+    const dataReuniaoAnteriorObj = encontrarDataReuniaoAnterior(dataReuniao, tipoReuniaoAtual, datasDeReuniaoNoMes, DIAS_REUNIAO);
+    const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
+
+
     for (const funcao of funcoesParaEsteTipoReuniao) {
+      // 4.2. Regras de Elegibilidade
       let membrosElegiveis = membrosDisponiveis.filter(membro => {
-        const permissaoNecessaria = getPermissaoRequerida(funcao.id, tipoReuniaoAtual);
-        if (permissaoNecessaria && !membro.permissoesBase[permissaoNecessaria]) {
+        // Condição de Permissão
+        const permissaoNecessariaId = getPermissaoRequerida(funcao.id, tipoReuniaoAtual);
+        if (!permissaoNecessariaId || !membro.permissoesBase[permissaoNecessariaId]) {
           return false;
         }
 
-        // Check for impediments based on date ranges
-        let estaImpedidoNesteDia = false;
-        for (const impedimento of membro.impedimentos) {
-          // dataReuniaoStr is "YYYY-MM-DD"
-          // impedimento.from and impedimento.to are also "YYYY-MM-DD"
-          if (dataReuniaoStr >= impedimento.from && dataReuniaoStr <= impedimento.to) {
-            estaImpedidoNesteDia = true;
-            break;
-          }
-        }
-        if (estaImpedidoNesteDia) {
+        // Condição de Impedimento
+        if (membro.impedimentos.some(imp => dataReuniaoStr >= imp.from && dataReuniaoStr <= imp.to)) {
           return false;
         }
 
+        // Condição de Designação Única por Dia
         if (membrosDesignadosNesteDia.has(membro.id)) {
           return false;
         }
@@ -73,80 +176,66 @@ export async function calcularDesignacoesAction(
       });
 
       if (membrosElegiveis.length === 0) {
-        designacoesFeitas[dataReuniaoStr][funcao.id] = null;
+        designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
         continue;
       }
-      
-      const aiInput: SuggestBestAssignmentInput = {
-        taskId: funcao.id,
-        taskName: funcao.nome,
-        date: dataReuniaoStr,
-        availableMemberIds: membrosElegiveis.map(m => m.id),
-        memberAssignmentHistory: memberAssignmentHistoryGlobal,
-      };
 
-      try {
-        const aiSuggestion = await suggestBestAssignment(aiInput);
-        const suggestedMemberId = aiSuggestion.suggestedMemberId;
+      // 4.3. Sistema de Priorização
+      membrosElegiveis.sort((membroA, membroB) => {
+        // Prioridade 1: Anti-Repetição Imediata
+        const fezAFuncaoAnterior = fezFuncaoNaReuniaoAnterior(membroA.id, funcao.id, dataReuniaoAnteriorStr, designacoesFeitasNoMesAtual);
+        const fezBFuncaoAnterior = fezFuncaoNaReuniaoAnterior(membroB.id, funcao.id, dataReuniaoAnteriorStr, designacoesFeitasNoMesAtual);
+        if (fezAFuncaoAnterior && !fezBFuncaoAnterior) return 1; 
+        if (!fezAFuncaoAnterior && fezBFuncaoAnterior) return -1;
 
-        if (suggestedMemberId && membrosElegiveis.find(m => m.id === suggestedMemberId)) {
-          designacoesFeitas[dataReuniaoStr][funcao.id] = suggestedMemberId;
-          membrosDesignadosNesteDia.add(suggestedMemberId); 
+        // Prioridade 2: Uso na Função no Mês (considerando designações já feitas neste ciclo)
+        const usoFuncaoMesA = contarUsoFuncaoNoMes(membroA.id, funcao.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+        const usoFuncaoMesB = contarUsoFuncaoNoMes(membroB.id, funcao.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+        if (usoFuncaoMesA !== usoFuncaoMesB) return usoFuncaoMesA - usoFuncaoMesB;
 
-          if (memberAssignmentHistoryGlobal[suggestedMemberId]) {
-            memberAssignmentHistoryGlobal[suggestedMemberId][dataReuniaoStr] = funcao.id;
-          } else {
-            memberAssignmentHistoryGlobal[suggestedMemberId] = { [dataReuniaoStr]: funcao.id };
-          }
+        // Prioridade 3: Uso Geral no Mês (considerando designações já feitas neste ciclo)
+        const usoGeralMesA = contarUsoGeralNoMes(membroA.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+        const usoGeralMesB = contarUsoGeralNoMes(membroB.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+        if (usoGeralMesA !== usoGeralMesB) return usoGeralMesA - usoGeralMesB;
+        
+        // Para as prioridades 4 e 5, usamos o histórico original do membro (membros[findIndex])
+        const membroOriginalA = membros.find(m => m.id === membroA.id)!;
+        const membroOriginalB = membros.find(m => m.id === membroB.id)!;
 
-        } else {
-          // Fallback if AI fails or doesn't suggest a valid member from the eligible list
-          const fallbackMember = membrosElegiveis.sort((a,b) => { // Simple sort: prefer those who did this task longest ago or never
-            const lastTimeA = Object.entries(a.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
-            const lastTimeB = Object.entries(b.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
-            if(!lastTimeA && lastTimeB) return -1;
-            if(lastTimeA && !lastTimeB) return 1;
-            if(!lastTimeA && !lastTimeB) return 0;
-            return lastTimeA!.localeCompare(lastTimeB!);
-          })[0];
+        // Prioridade 4: Uso na Função no Histórico Passado
+        const usoFuncaoHistA = contarUsoFuncaoNoHistorico(membroA.id, funcao.id, membroOriginalA);
+        const usoFuncaoHistB = contarUsoFuncaoNoHistorico(membroB.id, funcao.id, membroOriginalB);
+        if (usoFuncaoHistA !== usoFuncaoHistB) return usoFuncaoHistA - usoFuncaoHistB;
 
-          if (fallbackMember) {
-            designacoesFeitas[dataReuniaoStr][funcao.id] = fallbackMember.id;
-            membrosDesignadosNesteDia.add(fallbackMember.id);
-            if (memberAssignmentHistoryGlobal[fallbackMember.id]) {
-                memberAssignmentHistoryGlobal[fallbackMember.id][dataReuniaoStr] = funcao.id;
-            } else {
-                memberAssignmentHistoryGlobal[fallbackMember.id] = { [dataReuniaoStr]: funcao.id };
-            }
-          } else {
-             designacoesFeitas[dataReuniaoStr][funcao.id] = null;
-          }
+        // Prioridade 5: Data da Última Vez (Histórico Passado)
+        const ultimaVezA = getDataUltimaVezFuncao(membroA.id, funcao.id, membroOriginalA);
+        const ultimaVezB = getDataUltimaVezFuncao(membroB.id, funcao.id, membroOriginalB);
+
+        if (ultimaVezA === null && ultimaVezB !== null) return -1; // A (nunca fez) tem prioridade
+        if (ultimaVezA !== null && ultimaVezB === null) return 1;  // B (nunca fez) tem prioridade
+        if (ultimaVezA && ultimaVezB && ultimaVezA !== ultimaVezB) {
+          return ultimaVezA.localeCompare(ultimaVezB); // Data mais antiga (menor string) tem prioridade
         }
-      } catch (error) {
-        console.error(`Error calling AI for task ${funcao.nome} on ${dataReuniaoStr}:`, error);
-        // Fallback strategy if AI call fails
-         const fallbackMember = membrosElegiveis.sort((a,b) => {
-            const lastTimeA = Object.entries(a.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
-            const lastTimeB = Object.entries(b.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
-            if(!lastTimeA && lastTimeB) return -1;
-            if(lastTimeA && !lastTimeB) return 1;
-            if(!lastTimeA && !lastTimeB) return 0;
-            return lastTimeA!.localeCompare(lastTimeB!);
-          })[0];
-        if (fallbackMember) {
-            designacoesFeitas[dataReuniaoStr][funcao.id] = fallbackMember.id;
-            membrosDesignadosNesteDia.add(fallbackMember.id);
-             if (memberAssignmentHistoryGlobal[fallbackMember.id]) {
-                memberAssignmentHistoryGlobal[fallbackMember.id][dataReuniaoStr] = funcao.id;
-            } else {
-                memberAssignmentHistoryGlobal[fallbackMember.id] = { [dataReuniaoStr]: funcao.id };
-            }
-        } else {
-            designacoesFeitas[dataReuniaoStr][funcao.id] = null;
-        }
+        
+        // Desempate Final: Aleatório
+        return Math.random() - 0.5;
+      });
+
+      const membroEscolhido = membrosElegiveis[0];
+      if (membroEscolhido) {
+        designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = membroEscolhido.id;
+        membrosDesignadosNesteDia.add(membroEscolhido.id);
+        // O histórico do membro (membro.historicoDesignacoes) não é atualizado aqui.
+        // Isso será feito na page.tsx após o retorno desta função,
+        // para garantir que as prioridades 4 e 5 usem o histórico *antes* deste mês.
+      } else {
+        // Isso não deveria acontecer se membrosElegiveis.length > 0
+        designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
       }
     }
   }
   
-  return { designacoesFeitas };
+  return { designacoesFeitas: designacoesFeitasNoMesAtual };
 }
+
+    
