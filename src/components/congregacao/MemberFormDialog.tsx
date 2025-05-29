@@ -127,8 +127,8 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
           <DialogTitle>{memberToEdit ? 'Editar Membro' : 'Adicionar Novo Membro'}</DialogTitle>
           {memberToEdit && <DialogDescription>Modifique os dados do membro.</DialogDescription>}
         </DialogHeader>
-        <ScrollArea className="flex-grow min-h-0"> {/* Ensure ScrollArea can shrink and grow */}
-          <form onSubmit={handleSubmit} id="member-form-dialog" className="space-y-6 py-4 pr-3"> {/* Added id for submit button */}
+        <ScrollArea className="flex-1 min-h-0"> {/* Ensure ScrollArea can shrink and grow, and take available space */}
+          <form onSubmit={handleSubmit} id="member-form-dialog" className="space-y-6 py-4 pr-4"> {/* Adjusted padding for scrollbar */}
             <div>
               <Label htmlFor="nomeMembro">Nome do Membro</Label>
               <Input id="nomeMembro" name="nome" value={memberData.nome} onChange={handleInputChange} required />
@@ -141,13 +141,13 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
                 <Button type="button" variant="outline" size="sm" onClick={() => toggleTodasPermissoes(false)}>Desmarcar Todas</Button>
               </div>
               {Object.entries(agrupamentosPermissoes).map(([grupo, permissoes]) => (
-                <div key={grupo} className="p-2 border rounded-md"> {/* Reduced padding from p-3 */}
+                <div key={grupo} className="p-2 border rounded-md">
                   <h4 className="font-semibold mb-2 text-foreground">{grupo}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1"> {/* More columns on md, adjusted gap */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
                     {permissoes.map((p: PermissaoBase) => (
-                      <div key={p.id} className="flex items-center space-x-1.5"> {/* Reduced space-x from 2 */}
+                      <div key={p.id} className="flex items-center space-x-1.5">
                         <Checkbox
-                          id={`perm-${p.id}`} // Ensure unique ID for checkbox
+                          id={`perm-${p.id}`}
                           checked={memberData.permissoesBase[p.id] || false}
                           onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)}
                         />
@@ -221,7 +221,7 @@ export function MemberFormDialog({ isOpen, onOpenChange, onSave, memberToEdit, o
             </Button>
           )}
           <Button variant="outline" type="button" onClick={() => { onOpenChange(false); }}>Cancelar</Button>
-          <Button type="submit" form="member-form-dialog" onClick={handleSubmit}>Salvar Membro</Button> {/* Matched form id */}
+          <Button type="submit" form="member-form-dialog" onClick={handleSubmit}>Salvar Membro</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
