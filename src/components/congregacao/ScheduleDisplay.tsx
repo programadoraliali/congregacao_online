@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -24,7 +23,7 @@ function prepararDadosTabela(
   membros: Membro[],
   mes: number,
   ano: number,
-  tipoTabela: 'Indicadores' | 'Volantes' | 'LeitorPresidente'
+  tipoTabela: 'Indicadores' | 'Volantes' // Removido 'LeitorPresidente' daqui
 ): { data: Designacao[], columns: { key: string; label: string }[] } {
   
   let columns: { key: string; label: string }[];
@@ -110,39 +109,43 @@ function prepararDadosTabela(
       }
       dataTabela.push(row);
     });
-  } else { // LeitorPresidente (ou qualquer outro tipo de tabela no futuro)
-    const funcoesDaTabela = FUNCOES_DESIGNADAS.filter(f => f.tabela === tipoTabela);
-    columns = [{ key: 'data', label: 'Data' }];
-    funcoesDaTabela.forEach(f => {
-      columns.push({ key: f.id, label: f.nome });
-    });
+  } else { 
+    // Anteriormente, este bloco era para 'LeitorPresidente'.
+    // Como removemos, ele não será mais atingido se chamarmos prepararDadosTabela apenas para 'Indicadores' e 'Volantes'.
+    // Se for necessário, podemos lançar um erro ou retornar dados vazios.
+    columns = []; // Definir colunas vazias como fallback
+    // const funcoesDaTabela = FUNCOES_DESIGNADAS.filter(f => f.tabela === tipoTabela);
+    // columns = [{ key: 'data', label: 'Data' }];
+    // funcoesDaTabela.forEach(f => {
+    //   columns.push({ key: f.id, label: f.nome });
+    // });
 
-    sortedDates.forEach(dataStr => {
-      const dataObj = new Date(dataStr + 'T00:00:00');
-      const dia = dataObj.getDate();
-      const diaSemanaIndex = dataObj.getDay();
-      const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
+    // sortedDates.forEach(dataStr => {
+    //   const dataObj = new Date(dataStr + 'T00:00:00');
+    //   const dia = dataObj.getDate();
+    //   const diaSemanaIndex = dataObj.getDay();
+    //   const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
       
-      let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
-      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
-      else if (diaSemanaIndex === DIAS_REUNIAO.publica) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.publica;
+    //   let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
+    //   if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
+    //   else if (diaSemanaIndex === DIAS_REUNIAO.publica) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.publica;
 
-      const row: Designacao = {
-        data: `${dia} ${diaAbrev}`,
-        diaSemanaBadgeColor: badgeColorClass,
-      };
+    //   const row: Designacao = {
+    //     data: `${dia} ${diaAbrev}`,
+    //     diaSemanaBadgeColor: badgeColorClass,
+    //   };
 
-      const designacoesDoDia = designacoesFeitas[dataStr] || {};
-      funcoesDaTabela.forEach(funcao => {
-        const tipoReuniaoAtual = diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
-        if (funcao.tipoReuniao.includes(tipoReuniaoAtual)) {
-          row[funcao.id] = getNomeMembro(designacoesDoDia[funcao.id], membros);
-        } else {
-          row[funcao.id] = null; // Function not applicable for this meeting type
-        }
-      });
-      dataTabela.push(row);
-    });
+    //   const designacoesDoDia = designacoesFeitas[dataStr] || {};
+    //   funcoesDaTabela.forEach(funcao => {
+    //     const tipoReuniaoAtual = diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
+    //     if (funcao.tipoReuniao.includes(tipoReuniaoAtual)) {
+    //       row[funcao.id] = getNomeMembro(designacoesDoDia[funcao.id], membros);
+    //     } else {
+    //       row[funcao.id] = null; // Function not applicable for this meeting type
+    //     }
+    //   });
+    //   dataTabela.push(row);
+    // });
   }
   
   return { data: dataTabela, columns };
@@ -156,7 +159,8 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano }: Schedu
 
   const dadosIndicadores = prepararDadosTabela(designacoesFeitas, membros, mes, ano, 'Indicadores');
   const dadosVolantes = prepararDadosTabela(designacoesFeitas, membros, mes, ano, 'Volantes');
-  const dadosLeitorPresidente = prepararDadosTabela(designacoesFeitas, membros, mes, ano, 'LeitorPresidente');
+  // Removida a preparação de dados para LeitorPresidente
+  // const dadosLeitorPresidente = prepararDadosTabela(designacoesFeitas, membros, mes, ano, 'LeitorPresidente');
 
   return (
     <div className="space-y-6">
@@ -164,9 +168,12 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano }: Schedu
         <ScheduleTable title="Indicadores" data={dadosIndicadores.data} columns={dadosIndicadores.columns} />
         <ScheduleTable title="Volantes" data={dadosVolantes.data} columns={dadosVolantes.columns} />
       </div>
+      {/* Removida a renderização da tabela LeitorPresidente */}
+      {/* 
       <div>
         <ScheduleTable title="Leitor & Presidente" data={dadosLeitorPresidente.data} columns={dadosLeitorPresidente.columns} />
       </div>
+      */}
     </div>
   );
 }
