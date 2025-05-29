@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Trash2, History } from 'lucide-react';
+import { Trash2, History, Users, CalendarCheck as CalendarCheckIcon } from 'lucide-react'; // Renamed to avoid conflict
 
 export default function Home() {
   const [membros, setMembros] = useState<Membro[]>([]);
@@ -37,9 +37,9 @@ export default function Home() {
     // For now, let's assume cache is for *any* month. Better would be to store month/year with it.
     // For this simple implementation, we'll just load it. The Generate Card will handle showing it.
     // A more robust cache would involve storing { schedule: DesignacoesFeitas, mes: number, ano: number }
-    if (cachedSchedule) { // Simplified cache loading
-        setDesignacoesMensaisCache(cachedSchedule.schedule);
-        setCachedScheduleInfo({mes: cachedSchedule.mes, ano: cachedSchedule.ano});
+    if (cachedSchedule && typeof cachedSchedule === 'object' && 'schedule' in cachedSchedule && 'mes' in cachedSchedule && 'ano' in cachedSchedule) { // Simplified cache loading
+        setDesignacoesMensaisCache((cachedSchedule as any).schedule);
+        setCachedScheduleInfo({mes: (cachedSchedule as any).mes, ano: (cachedSchedule as any).ano});
     }
   }, []);
 
@@ -239,7 +239,7 @@ export default function Home() {
         <Accordion type="multiple" defaultValue={['item-1', 'item-2']} className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
-                Gerenciar Membros
+                <Users className="mr-2 h-5 w-5 text-primary" /> {/* Icon Added */}
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <MemberManagementCard
@@ -255,7 +255,7 @@ export default function Home() {
           </AccordionItem>
           <AccordionItem value="item-2">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
-                Gerar Designações Mensais
+                 <CalendarCheckIcon className="mr-2 h-5 w-5 text-primary" /> {/* Icon Added */}
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <ScheduleGenerationCard 
