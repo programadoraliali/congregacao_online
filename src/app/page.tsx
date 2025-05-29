@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Trash2, History, Users, CalendarCheck as CalendarCheckIcon } from 'lucide-react'; // Renamed to avoid conflict
+import { Trash2, History } from 'lucide-react';
 
 export default function Home() {
   const [membros, setMembros] = useState<Membro[]>([]);
@@ -239,7 +239,7 @@ export default function Home() {
         <Accordion type="multiple" defaultValue={['item-1', 'item-2']} className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
-                <Users className="mr-2 h-5 w-5 text-primary" /> {/* Icon Added */}
+                {/* Icon Removed */}
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <MemberManagementCard
@@ -255,7 +255,7 @@ export default function Home() {
           </AccordionItem>
           <AccordionItem value="item-2">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
-                 <CalendarCheckIcon className="mr-2 h-5 w-5 text-primary" /> {/* Icon Added */}
+                 {/* Icon Removed */}
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <ScheduleGenerationCard 
