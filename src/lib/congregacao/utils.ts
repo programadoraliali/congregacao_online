@@ -1,3 +1,4 @@
+
 import { type Membro, type PermissaoBase } from './types';
 import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV } from './constants';
 
@@ -40,14 +41,9 @@ export function validarEstruturaMembro(membro: Partial<Membro>, gerarIdSeAusente
   }
 
   const permissoesBase: Record<string, boolean> = {};
-  if (membro.permissoesBase && typeof membro.permissoesBase === 'object') {
-    for (const p of PERMISSOES_BASE) {
-      permissoesBase[p.id] = !!membro.permissoesBase[p.id];
-    }
-  } else {
-     for (const p of PERMISSOES_BASE) {
-      permissoesBase[p.id] = false;
-    }
+  // Initialize with all new PERMISSOES_BASE, defaulting to false
+  for (const p of PERMISSOES_BASE) {
+    permissoesBase[p.id] = (membro.permissoesBase && typeof membro.permissoesBase === 'object') ? !!membro.permissoesBase[p.id] : false;
   }
   
   const historicoDesignacoes: Record<string, string> = {};
@@ -93,15 +89,31 @@ export function agruparPermissoes(permissoes: PermissaoBase[]): Record<string, P
 }
 
 export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana' | 'publica'): string | undefined {
-    if (funcaoId.includes('Indicador')) {
-        return tipoReuniao === 'meioSemana' ? 'indicadorQui' : 'indicadorDom';
+    switch (funcaoId) {
+        case 'indicadorExternoQui':
+        case 'indicadorPalcoQui':
+            return 'indicadorQui';
+        case 'indicadorExternoDom':
+        case 'indicadorPalcoDom':
+            return 'indicadorDom';
+        case 'volante1Qui':
+        case 'volante2Qui':
+            return 'volanteQui';
+        case 'volante1Dom':
+        case 'volante2Dom':
+            return 'volanteDom';
+        case 'leitorASentinelaDom':
+            return 'leitorDom';
+        // Se uma função para 'Leitor (Qui)' for adicionada em FUNCOES_DESIGNADAS,
+        // por exemplo com id 'leitorBibliaQui', um case seria:
+        // case 'leitorBibliaQui':
+        //     return 'leitorQui';
+        case 'presidenteReuniaoPublicaDom':
+        case 'presidenteMeioSemana':
+            return 'presidente';
+        default:
+            // Se a função não mapear para uma permissão específica das novas,
+            // pode ser que não precise de permissão ou a lógica precise ser revisada.
+            return undefined;
     }
-    if (funcaoId.includes('Volante')) {
-        return tipoReuniao === 'meioSemana' ? 'volanteQui' : 'volanteDom';
-    }
-    if (funcaoId === 'leitorASentinelaDom') return 'leitor';
-    if (funcaoId === 'presidenteReuniaoPublicaDom') return 'presidente';
-    if (funcaoId === 'presidenteMeioSemana') return 'presidenteMeioSemana';
-    // Add more specific mappings if PERMISSOES_BASE ids are more granular
-    return undefined;
 }
