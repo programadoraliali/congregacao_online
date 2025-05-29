@@ -3,7 +3,7 @@
 
 import type { Membro, FuncaoDesignada, DesignacoesFeitas, DiasReuniao } from './types';
 import { FUNCOES_DESIGNADAS, DIAS_REUNIAO as DIAS_REUNIAO_CONFIG } from './constants';
-import { formatarDataCompleta, getPermissaoRequerida } from './utils'; // formatarDataParaChave removed if not used
+import { formatarDataCompleta, getPermissaoRequerida } from './utils';
 import { suggestBestAssignment, type SuggestBestAssignmentInput } from '@/ai/flows/suggest-best-assignment';
 
 export async function calcularDesignacoesAction(
@@ -14,7 +14,7 @@ export async function calcularDesignacoesAction(
   
   const DIAS_REUNIAO: DiasReuniao = DIAS_REUNIAO_CONFIG;
   const designacoesFeitas: DesignacoesFeitas = {};
-  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[];
+  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[]; // Deep copy
 
   const datasDeReuniaoNoMes: Date[] = [];
   const primeiroDiaDoMes = new Date(ano, mes, 1);
@@ -51,10 +51,21 @@ export async function calcularDesignacoesAction(
         if (permissaoNecessaria && !membro.permissoesBase[permissaoNecessaria]) {
           return false;
         }
-        // Check specific day impediment
-        if (membro.impedimentos.includes(dataReuniaoStr)) {
+
+        // Check for impediments based on date ranges
+        let estaImpedidoNesteDia = false;
+        for (const impedimento of membro.impedimentos) {
+          // dataReuniaoStr is "YYYY-MM-DD"
+          // impedimento.from and impedimento.to are also "YYYY-MM-DD"
+          if (dataReuniaoStr >= impedimento.from && dataReuniaoStr <= impedimento.to) {
+            estaImpedidoNesteDia = true;
+            break;
+          }
+        }
+        if (estaImpedidoNesteDia) {
           return false;
         }
+
         if (membrosDesignadosNesteDia.has(membro.id)) {
           return false;
         }
@@ -89,7 +100,16 @@ export async function calcularDesignacoesAction(
           }
 
         } else {
-          const fallbackMember = membrosElegiveis[0]; 
+          // Fallback if AI fails or doesn't suggest a valid member from the eligible list
+          const fallbackMember = membrosElegiveis.sort((a,b) => { // Simple sort: prefer those who did this task longest ago or never
+            const lastTimeA = Object.entries(a.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
+            const lastTimeB = Object.entries(b.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
+            if(!lastTimeA && lastTimeB) return -1;
+            if(lastTimeA && !lastTimeB) return 1;
+            if(!lastTimeA && !lastTimeB) return 0;
+            return lastTimeA!.localeCompare(lastTimeB!);
+          })[0];
+
           if (fallbackMember) {
             designacoesFeitas[dataReuniaoStr][funcao.id] = fallbackMember.id;
             membrosDesignadosNesteDia.add(fallbackMember.id);
@@ -104,7 +124,15 @@ export async function calcularDesignacoesAction(
         }
       } catch (error) {
         console.error(`Error calling AI for task ${funcao.nome} on ${dataReuniaoStr}:`, error);
-        const fallbackMember = membrosElegiveis[0];
+        // Fallback strategy if AI call fails
+         const fallbackMember = membrosElegiveis.sort((a,b) => {
+            const lastTimeA = Object.entries(a.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
+            const lastTimeB = Object.entries(b.historicoDesignacoes).filter(([_,fid]) => fid === funcao.id).map(([date])=>date).sort().pop();
+            if(!lastTimeA && lastTimeB) return -1;
+            if(lastTimeA && !lastTimeB) return 1;
+            if(!lastTimeA && !lastTimeB) return 0;
+            return lastTimeA!.localeCompare(lastTimeB!);
+          })[0];
         if (fallbackMember) {
             designacoesFeitas[dataReuniaoStr][funcao.id] = fallbackMember.id;
             membrosDesignadosNesteDia.add(fallbackMember.id);

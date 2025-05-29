@@ -1,5 +1,5 @@
 
-import { type Membro, type PermissaoBase } from './types';
+import { type Membro, type PermissaoBase, type Impedimento } from './types';
 import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV } from './constants';
 
 export function gerarIdMembro(): string {
@@ -41,7 +41,6 @@ export function validarEstruturaMembro(membro: Partial<Membro>, gerarIdSeAusente
   }
 
   const permissoesBase: Record<string, boolean> = {};
-  // Initialize with all new PERMISSOES_BASE, defaulting to false
   for (const p of PERMISSOES_BASE) {
     permissoesBase[p.id] = (membro.permissoesBase && typeof membro.permissoesBase === 'object') ? !!membro.permissoesBase[p.id] : false;
   }
@@ -51,29 +50,32 @@ export function validarEstruturaMembro(membro: Partial<Membro>, gerarIdSeAusente
     for (const dataKey in membro.historicoDesignacoes) {
       if (typeof dataKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dataKey) && typeof membro.historicoDesignacoes[dataKey] === 'string') {
         historicoDesignacoes[dataKey] = membro.historicoDesignacoes[dataKey];
-      } else {
-        // console.warn(`Chave ou valor de histórico inválido para ${dataKey}, pulando.`);
       }
     }
   }
 
-  const impedimentos: string[] = [];
+  const impedimentos: Impedimento[] = [];
   if (Array.isArray(membro.impedimentos)) {
     membro.impedimentos.forEach(imp => {
-      if (typeof imp === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(imp)) { // Updated regex for YYYY-MM-DD
-        impedimentos.push(imp);
+      if (typeof imp === 'object' && imp !== null &&
+          typeof imp.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(imp.from) &&
+          typeof imp.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(imp.to) &&
+          imp.from <= imp.to) { // Garante que 'from' não seja posterior a 'to'
+        impedimentos.push({ from: imp.from, to: imp.to });
       } else {
-        // console.warn(`Impedimento inválido ${imp}, pulando.`);
+        // console.warn(`Impedimento inválido ${JSON.stringify(imp)}, pulando.`);
       }
     });
   }
+  // Ordenar impedimentos por data de início
+  impedimentos.sort((a, b) => a.from.localeCompare(b.from));
 
   return {
     id: id,
     nome: membro.nome.trim(),
     permissoesBase: permissoesBase,
     historicoDesignacoes: historicoDesignacoes,
-    impedimentos: impedimentos.sort(),
+    impedimentos: impedimentos,
   };
 }
 
@@ -105,12 +107,15 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
         case 'leitorASentinelaDom':
             return 'leitorDom';
         // Adicionar case para leitorQui se existir função correspondente
-        // case 'leitorBibliaQui': // Exemplo
+        // case 'leitorBibliaQui': // Exemplo, supondo uma função que use 'leitorQui'
         //     return 'leitorQui';
         case 'presidenteReuniaoPublicaDom':
         case 'presidenteMeioSemana':
             return 'presidente';
         default:
+            // Tentativa de mapeamento genérico para funções não listadas explicitamente
+            if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'meioSemana') return 'leitorQui';
+            if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'publica') return 'leitorDom';
             return undefined;
     }
 }

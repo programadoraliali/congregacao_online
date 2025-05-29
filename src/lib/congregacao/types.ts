@@ -13,12 +13,17 @@ export interface FuncaoDesignada {
   permissaoRequeridaBase?: string; // e.g., 'indicador', 'volante', 'leitor', 'presidente' - base permission part
 }
 
+export interface Impedimento {
+  from: string; // YYYY-MM-DD
+  to: string;   // YYYY-MM-DD
+}
+
 export interface Membro {
   id: string;
   nome: string;
   permissoesBase: Record<string, boolean>; // Keys are id from PERMISSOES_BASE
   historicoDesignacoes: Record<string, string>; // Key: "YYYY-MM-DD", Value: idFuncao
-  impedimentos: string[]; // Format: "YYYY-MM-DD"
+  impedimentos: Impedimento[]; // Array de objetos de impedimento
 }
 
 export interface Designacao {
