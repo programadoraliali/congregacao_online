@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, type FormEvent } from 'react';
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from "@/hooks/use-toast";
 
 interface BulkAddDialogProps {
   isOpen: boolean;
@@ -21,16 +23,25 @@ interface BulkAddDialogProps {
 
 export function BulkAddDialog({ isOpen, onOpenChange, onSaveBulk }: BulkAddDialogProps) {
   const [namesText, setNamesText] = useState('');
+  const { toast } = useToast();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const names = namesText.split('\n').map(name => name.trim()).filter(name => name.length > 0);
+    const names = namesText
+      .split(',')
+      .map(name => name.trim())
+      .filter(name => name.length > 0);
+      
     if (names.length > 0) {
       onSaveBulk(names);
       setNamesText(''); // Clear textarea after save
       onOpenChange(false);
     } else {
-      alert('Por favor, insira pelo menos um nome.');
+      toast({
+        title: "Nenhum nome válido",
+        description: "Por favor, insira pelo menos um nome separado por vírgula.",
+        variant: "default",
+      });
     }
   };
 
@@ -40,18 +51,20 @@ export function BulkAddDialog({ isOpen, onOpenChange, onSaveBulk }: BulkAddDialo
         <DialogHeader>
           <DialogTitle>Adicionar Membros em Massa</DialogTitle>
           <DialogDescription>
-            Cole os nomes dos membros, um por linha. Membros com nomes duplicados (já existentes ou na lista) não serão adicionados.
+            Insira os nomes dos membros separados por vírgula. 
+            Membros com nomes duplicados (já existentes ou na lista) não serão adicionados.
+            Novos membros são adicionados sem permissões.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} id="bulk-add-form" className="py-4 space-y-4">
           <div>
-            <Label htmlFor="bulkNames">Nomes dos Membros (um por linha)</Label>
+            <Label htmlFor="bulkNames">Nomes dos Membros (separados por vírgula)</Label>
             <Textarea
               id="bulkNames"
               value={namesText}
               onChange={(e) => setNamesText(e.target.value)}
-              rows={10}
-              placeholder="João Silva\nMaria Oliveira\nPedro Santos"
+              rows={6}
+              placeholder="João Silva,Maria Oliveira,Pedro Santos"
             />
           </div>
         </form>
