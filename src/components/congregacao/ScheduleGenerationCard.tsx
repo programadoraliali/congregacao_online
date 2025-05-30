@@ -11,7 +11,7 @@ import type { DesignacoesFeitas, Membro, SubstitutionDetails } from '@/lib/congr
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, FileText, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileText, AlertTriangle, Loader2 } from 'lucide-react'; // Removido CalendarCheck
 
 interface ScheduleGenerationCardProps {
   membros: Membro[];
@@ -42,42 +42,42 @@ export function ScheduleGenerationCard({
     ano: number;
   } | null>(null);
 
-  useEffect(() => {
-    const numSelectedMes = parseInt(selectedMes, 10);
-    const numSelectedAno = parseInt(selectedAno, 10);
+useEffect(() => {
+  const numSelectedMes = parseInt(selectedMes, 10);
+  const numSelectedAno = parseInt(selectedAno, 10);
 
-    // If selection has changed and no longer matches the effective current schedule from props,
-    // clear the displayed data. User must click "Generate" for the new selection.
-    if (currentMes !== numSelectedMes || currentAno !== numSelectedAno) {
-      if (displayedScheduleData !== null) { // Avoid unnecessary setState if already null
-        setDisplayedScheduleData(null);
-        setError(null); // Clear error when selection changes causing display to clear
+  // Se o mês/ano selecionado no card é diferente dos dados atuais do pai (currentMes/Ano)
+  if (currentMes !== numSelectedMes || currentAno !== numSelectedAno) {
+    // Limpa o cronograma exibido, pois o usuário selecionou um novo período e precisa clicar em "Gerar"
+    if (displayedScheduleData !== null) { // Apenas atualiza se não for nulo para evitar renderização desnecessária
+      setDisplayedScheduleData(null);
+      setError(null); // Limpa qualquer erro anterior
+    }
+  } else {
+    // O mês/ano selecionado no card CORRESPONDE aos dados do pai
+    if (currentSchedule) {
+      // Se há um cronograma do pai para esta seleção
+      // Atualiza o cronograma exibido SOMENTE SE ele for realmente diferente do que já está sendo mostrado
+      if (
+        !displayedScheduleData || // Se nada estiver sendo exibido
+        displayedScheduleData.mes !== currentMes || // Ou se o mês for diferente
+        displayedScheduleData.ano !== currentAno || // Ou se o ano for diferente
+        JSON.stringify(displayedScheduleData.schedule) !== JSON.stringify(currentSchedule) // Ou se o conteúdo do cronograma for diferente
+      ) {
+        setDisplayedScheduleData({
+          schedule: currentSchedule,
+          mes: currentMes,
+          ano: currentAno,
+        });
       }
     } else {
-      // Selection matches currentMes/currentAno (from props).
-      // This branch handles initial load with matching cache, or updates from parent (e.g., substitution).
-      if (currentSchedule) {
-        // If there's a schedule from props, and it's different from what's displayed, update.
-        if (
-            !displayedScheduleData ||
-            displayedScheduleData.schedule !== currentSchedule || 
-            displayedScheduleData.mes !== currentMes ||
-            displayedScheduleData.ano !== currentAno
-          ) {
-          setDisplayedScheduleData({
-            schedule: currentSchedule,
-            mes: currentMes,
-            ano: currentAno,
-          });
-        }
-      } else {
-        // No currentSchedule from props for this selection (e.g., cache was cleared in parent)
-        if (displayedScheduleData !== null) { // Avoid unnecessary setState
-          setDisplayedScheduleData(null);
-        }
+      // Não há cronograma do pai para esta seleção (mesmo que mês/ano coincidam)
+      if (displayedScheduleData !== null) { // Apenas atualiza se não for nulo
+        setDisplayedScheduleData(null);
       }
     }
-  }, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno]);
+  }
+}, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno]);
 
 
   const handleGenerateSchedule = async () => {
@@ -160,7 +160,7 @@ export function ScheduleGenerationCard({
             </Select>
           </div>
           <Button onClick={handleGenerateSchedule} disabled={isLoading} className="w-full sm:w-auto">
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarCheck className="mr-2 h-4 w-4" />}
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />} {/* Ícone alterado */}
             {isLoading ? 'Gerando...' : 'Gerar Cronograma'}
           </Button>
         </div>
