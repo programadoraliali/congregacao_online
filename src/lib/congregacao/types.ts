@@ -78,10 +78,18 @@ export interface AllPublicMeetingAssignments {
 }
 
 // Tipos para a nova aba "NVMC"
-export interface NVMCParticipantAssignment {
-  customTitle?: string;       // User-defined title for the part (e.g., theme of FMM part)
+export interface NVMCParticipantDynamic {
+  id: string; // Unique ID for this part instance
+  customTitle?: string;
+  needsAssistant?: boolean;
   participantId?: string | null;
-  assistantId?: string | null;    // For demonstrations/parts with two people
+  assistantId?: string | null;
+}
+
+export interface NVCVidaCristaDynamicPart {
+  id: string; // Unique ID for this part instance
+  customTitle: string;
+  participantId?: string | null;
 }
 
 export interface NVMCDailyAssignments {
@@ -92,13 +100,11 @@ export interface NVMCDailyAssignments {
   tesourosDiscursoId?: string | null;
   joiasEspirituaisId?: string | null;
   leituraBibliaId?: string | null;
-  // Faça Seu Melhor no Ministério (example for 3 flexible parts)
-  fmmParte1?: NVMCParticipantAssignment;
-  fmmParte2?: NVMCParticipantAssignment;
-  fmmParte3?: NVMCParticipantAssignment;
-  // Nossa Vida Cristã
-  vidaCristaParte1CustomTitle?: string; // e.g., "Necessidades Locais" or specific article
-  vidaCristaParte1Id?: string | null;
+  // Faça Seu Melhor no Ministério (dynamic parts)
+  fmmParts?: NVMCParticipantDynamic[];
+  // Nossa Vida Cristã (dynamic parts for talks/items)
+  vidaCristaParts?: NVCVidaCristaDynamicPart[];
+  // EBC (fixed within VC section)
   ebcDirigenteId?: string | null;
   ebcLeitorId?: string | null;
   oracaoFinalId?: string | null;
