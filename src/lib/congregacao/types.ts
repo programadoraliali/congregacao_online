@@ -1,5 +1,4 @@
 
-
 export interface PermissaoBase {
   id: string;
   nome: string;
@@ -81,8 +80,8 @@ export interface AllPublicMeetingAssignments {
 // Tipos para a nova aba "NVMC"
 export interface NVMCParticipantDynamic {
   id: string;
-  partName: string; // Ex: "Iniciando conversas", "Fazendo discípulos" - Extraído, não editável diretamente na lista
-  partTheme?: string; // Ex: "(3 min) DE CASA EM CASA..." - Editável
+  partName: string; 
+  partTheme?: string; 
   needsAssistant?: boolean;
   participantId?: string | null;
   assistantId?: string | null;
@@ -90,8 +89,8 @@ export interface NVMCParticipantDynamic {
 
 export interface NVCVidaCristaDynamicPart {
   id: string;
-  partName: string; // Ex: "Podemos ter um coração alegre..." - Extraído, não editável diretamente
-  partTheme?: string; // Ex: "(15 min) Consideração." - Editável
+  partName: string;
+  partTheme?: string;
   participantId?: string | null;
 }
 
@@ -114,6 +113,8 @@ export interface NVMCDailyAssignments {
   ebcDirigenteId?: string | null;
   ebcLeitorId?: string | null;
   ebcCustomTitle?: string;
+  // Encerramento
+  comentariosFinaisDetalhes?: string; // Para " (3 min) | Cântico X e oração"
   oracaoFinalId?: string | null;
 }
 
@@ -138,6 +139,5 @@ export interface ParsedNvmcProgram {
   ebcTema?: string;
   tesourosDiscursoTema?: string;
   joiasEspirituaisTema?: string;
+  comentariosFinaisDetalhes?: string;
 }
-
-    

@@ -129,29 +129,46 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     ebcTema: undefined,
     tesourosDiscursoTema: undefined,
     joiasEspirituaisTema: undefined,
+    comentariosFinaisDetalhes: undefined,
   };
 
   let currentSection: 'TESOUROS' | 'FMM' | 'VC' | null = null;
+  let ebcLines: string[] = [];
+  let captureEbcTheme = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     if (line.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS')) {
       currentSection = 'TESOUROS';
+      captureEbcTheme = false;
       continue;
     }
     if (line.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO')) {
       currentSection = 'FMM';
+      captureEbcTheme = false;
       continue;
     }
     if (line.toUpperCase().includes('NOSSA VIDA CRISTÃ')) {
       currentSection = 'VC';
+      captureEbcTheme = false;
       continue;
     }
-    if (line.toUpperCase().startsWith('CÂNTICO') && line.includes('ORAÇÃO')) continue;
-    if (line.toUpperCase().startsWith('CÂNTICO')) continue;
+    if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) {
+      result.comentariosFinaisDetalhes = line;
+      currentSection = null; // Encerra a captura para outras seções
+      captureEbcTheme = false;
+      continue;
+    }
+    if (line.toUpperCase().startsWith('CÂNTICO') && (line.includes('ORAÇÃO') || lines[i-1]?.toUpperCase().startsWith('COMENTÁRIOS FINAIS'))) {
+      // Parte dos comentários finais ou cântico inicial
+      continue;
+    }
+     if (line.toUpperCase().startsWith('CÂNTICO')) {
+      captureEbcTheme = false; // Para de capturar para o EBC se encontrar um cântico solto
+      continue;
+    }
     if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
-    if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) continue;
     
     if (line.match(/^\s*Quando nossos irmãos/i) ||
         line.match(/^\s*Seja hospitaleiro/i) ||
@@ -164,70 +181,71 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
        ) {
       continue;
     }
-    
+
     const partRegex = /^\s*(\d+)\.\s*(.*)/;
     const partMatch = line.match(partRegex);
 
     if (partMatch) {
-        const fullTitleFromLine = partMatch[2].trim();
-        const partNumber = parseInt(partMatch[1], 10);
+      const partNumber = parseInt(partMatch[1], 10);
+      const fullTitleFromLine = partMatch[2].trim();
+      
+      let partName = "";
+      let partTheme: string | undefined = undefined;
 
-        let partName = "";
-        let partTheme: string | undefined = undefined;
+      const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i;
+      const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
 
-        const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i;
-        const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
+      if (timeMatchResult && timeMatchResult.index !== undefined) {
+          partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
+          partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
+      } else {
+          partName = fullTitleFromLine;
+      }
+      
+      let nextLineIndex = i + 1;
+      while (nextLineIndex < lines.length) {
+          const nextLine = lines[nextLineIndex].trim();
+          const isNewPart = nextLine.match(/^\s*(\d+)\.\s*/);
+          const isSectionHeader = nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
+                                  nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
+                                  nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
+          const isChantOrPrayer = nextLine.toUpperCase().startsWith('CÂNTICO') || nextLine.toUpperCase().startsWith('ORAÇÃO');
+          const isCommentOrQuestion = nextLine.toLowerCase().startsWith('sua resposta') || 
+                                      nextLine.toLowerCase().startsWith('pergunto-se:') ||
+                                      nextLine.match(/ijwbq artigo/i) ||
+                                      nextLine.match(/Que joias espirituais você encontrou/i);
+          const isInstructionalForNextLine = nextLine.match(/^\s*Quando nossos irmãos/i) || 
+                                             nextLine.match(/^\s*Seja hospitaleiro/i) || 
+                                             nextLine.match(/^\s*“Um olhar animado”/i) || 
+                                             nextLine.match(/^\s*Um jovem casal/i) || 
+                                             nextLine.match(/^\s*Mostre o VÍDEO/i) || 
+                                             nextLine.match(/^\s*O que você aprendeu/i);
+          const isFinalComments = nextLine.toUpperCase().startsWith('COMENTÁRIOS FINAIS');
 
-        if (timeMatchResult && timeMatchResult.index !== undefined) {
-            partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
-            partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
-        } else {
-            partName = fullTitleFromLine;
-        }
-        
-        let nextLineIndex = i + 1;
-        while (nextLineIndex < lines.length) {
-            const nextLine = lines[nextLineIndex].trim();
-            const isNewPart = nextLine.match(/^\s*(\d+)\.\s*/);
-            const isSectionHeader = nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
-                                    nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
-                                    nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
-            const isChantOrPrayer = nextLine.toUpperCase().startsWith('CÂNTICO') || nextLine.toUpperCase().startsWith('ORAÇÃO');
-            const isCommentOrQuestion = nextLine.toLowerCase().startsWith('sua resposta') || 
-                                        nextLine.toLowerCase().startsWith('pergunto-se:') ||
-                                        nextLine.match(/ijwbq artigo/i) ||
-                                        nextLine.match(/Que joias espirituais você encontrou/i);
-            const isInstructionalForNextLine = nextLine.match(/^\s*Quando nossos irmãos/i) || 
-                                               nextLine.match(/^\s*Seja hospitaleiro/i) || 
-                                               nextLine.match(/^\s*“Um olhar animado”/i) || 
-                                               nextLine.match(/^\s*Um jovem casal/i) || 
-                                               nextLine.match(/^\s*Mostre o VÍDEO/i) || 
-                                               nextLine.match(/^\s*O que você aprendeu/i);
-
-            if (isNewPart || isSectionHeader || isChantOrPrayer || isCommentOrQuestion || isInstructionalForNextLine) {
-                break; 
-            }
-            
-            if (partTheme === undefined) {
-                partTheme = nextLine;
-            } else { 
-                partTheme += ` ${nextLine}`;
-            }
-            i = nextLineIndex; 
-            nextLineIndex++;
-        }
-        partTheme = partTheme?.trim();
-
-        if (!partName && partTheme) {
-          const themeTimeMatch = partTheme.match(timeMatchRegex);
-          if (themeTimeMatch && themeTimeMatch.index !== undefined && themeTimeMatch.index > 0) {
-              partName = partTheme.substring(0, themeTimeMatch.index).trim();
-              partTheme = partTheme.substring(themeTimeMatch.index).trim();
-          } else if (!themeTimeMatch) { 
-              partName = partTheme;
-              partTheme = undefined;
+          if (isNewPart || isSectionHeader || isChantOrPrayer || isCommentOrQuestion || isInstructionalForNextLine || isFinalComments) {
+              break; 
           }
+          
+          if (partTheme === undefined) {
+              partTheme = nextLine;
+          } else { 
+              partTheme += ` ${nextLine}`;
+          }
+          i = nextLineIndex; 
+          nextLineIndex++;
+      }
+      partTheme = partTheme?.trim();
+
+      if (!partName && partTheme) {
+        const themeTimeMatch = partTheme.match(timeMatchRegex);
+        if (themeTimeMatch && themeTimeMatch.index !== undefined && themeTimeMatch.index > 0) {
+            partName = partTheme.substring(0, themeTimeMatch.index).trim();
+            partTheme = partTheme.substring(themeTimeMatch.index).trim();
+        } else if (!themeTimeMatch) { 
+            partName = partTheme;
+            partTheme = undefined;
         }
+      }
 
       partName = partName.replace(/:$/, '').trim();
       const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
@@ -245,12 +263,14 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       } else if (currentSection === 'VC') {
         if (extractedPart.partName.toLowerCase().includes('estudo bíblico de congregação')) {
           result.ebcTema = extractedPart.partTheme || extractedPart.partName.replace(/estudo bíblico de congregação/i, '').trim();
+          captureEbcTheme = false; // Termina a captura específica para EBC
         } else {
           if(extractedPart.partName) result.vidaCristaParts.push(extractedPart);
         }
       }
+    } else if (captureEbcTheme && currentSection === 'VC') { // Se não for uma parte numerada, mas estamos capturando para EBC
+        ebcLines.push(line);
     }
   }
   return result;
 }
-
