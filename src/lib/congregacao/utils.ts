@@ -153,12 +153,16 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
     if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) continue;
     
+    // Ignorar linhas de instrução/vídeo específicas que não são títulos de partes
     if (line.match(/^\s*Quando nossos irmãos/i) ||
         line.match(/^\s*Seja hospitaleiro/i) ||
         line.match(/^\s*“Um olhar animado”/i) ||
         line.match(/^\s*Um jovem casal/i) ||
         line.match(/^\s*Mostre o VÍDEO/i) ||
-        line.match(/^\s*O que você aprendeu/i)) {
+        line.match(/^\s*O que você aprendeu/i) ||
+        line.match(/ijwbq artigo/i) || // Linha de referência para Joias Espirituais
+        line.match(/Que joias espirituais você encontrou/i) // Pergunta de Joias Espirituais
+       ) {
       continue;
     }
     
@@ -166,72 +170,95 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     const partMatch = line.match(partRegex);
 
     if (partMatch) {
-      const fullTitleFromLine = partMatch[2].trim();
-      const partNumber = parseInt(partMatch[1], 10);
-      let partName = "";
-      let partTheme: string | undefined = undefined;
+        const fullTitleFromLine = partMatch[2].trim();
+        const partNumber = parseInt(partMatch[1], 10);
 
-      const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i; // Regex para o tempo, case-insensitive
-      const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
+        let partName = "";
+        let partTheme: string | undefined = undefined;
 
-      if (timeMatchResult && timeMatchResult.index !== undefined) {
-        partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
-        partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
-      } else {
-        partName = fullTitleFromLine;
-      }
-      
-      let nextLineIndex = i + 1;
-      while (nextLineIndex < lines.length) {
-          const nextLine = lines[nextLineIndex].trim();
-          const isNewPart = nextLine.match(/^\s*(\d+)\.\s*/);
-          const isSectionHeader = nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
-                                  nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
-                                  nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
-          const isChantOrPrayer = nextLine.toUpperCase().startsWith('CÂNTICO') || nextLine.toUpperCase().startsWith('ORAÇÃO');
-          const isComment = nextLine.toLowerCase().startsWith('sua resposta') || nextLine.toLowerCase().startsWith('pergunto-se:');
-          const isInstructionalForNextLine = nextLine.match(/^\s*Quando nossos irmãos/i) || nextLine.match(/^\s*Seja hospitaleiro/i) || nextLine.match(/^\s*“Um olhar animado”/i) || nextLine.match(/^\s*Um jovem casal/i) || nextLine.match(/^\s*Mostre o VÍDEO/i) || nextLine.match(/^\s*O que você aprendeu/i);
+        const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i;
+        const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
 
-          if (isNewPart || isSectionHeader || isChantOrPrayer || isComment || isInstructionalForNextLine) {
-              break; 
-          }
-          
-          if (partTheme === undefined) {
-              partTheme = nextLine;
-          } else {
-              partTheme += ` ${nextLine}`;
-          }
-          i = nextLineIndex; 
-          nextLineIndex++;
-      }
-      partTheme = partTheme?.trim();
-
-      if (!partName && partTheme && !partTheme.match(/^\s*\(\s*\d+(?:-\d+)?\s*min\s*\)\s*$/i)) {
-        const themeTimeMatch = partTheme.match(timeMatchRegex);
-        if (themeTimeMatch && themeTimeMatch.index !== undefined) {
-            partName = partTheme.substring(0, themeTimeMatch.index).trim();
-            partTheme = partTheme.substring(themeTimeMatch.index).trim();
+        if (timeMatchResult && timeMatchResult.index !== undefined) {
+            partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
+            partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
         } else {
-            partName = partTheme;
-            partTheme = undefined;
+            partName = fullTitleFromLine;
         }
-      }
+        
+        // Consumir linhas subsequentes que fazem parte do tema/descrição
+        let nextLineIndex = i + 1;
+        while (nextLineIndex < lines.length) {
+            const nextLine = lines[nextLineIndex].trim();
+            const isNewPart = nextLine.match(/^\s*(\d+)\.\s*/);
+            const isSectionHeader = nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
+                                    nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
+                                    nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
+            const isChantOrPrayer = nextLine.toUpperCase().startsWith('CÂNTICO') || nextLine.toUpperCase().startsWith('ORAÇÃO');
+            const isCommentOrQuestion = nextLine.toLowerCase().startsWith('sua resposta') || 
+                                        nextLine.toLowerCase().startsWith('pergunto-se:') ||
+                                        nextLine.match(/ijwbq artigo/i) ||
+                                        nextLine.match(/Que joias espirituais você encontrou/i);
+            const isInstructionalForNextLine = nextLine.match(/^\s*Quando nossos irmãos/i) || 
+                                               nextLine.match(/^\s*Seja hospitaleiro/i) || 
+                                               nextLine.match(/^\s*“Um olhar animado”/i) || 
+                                               nextLine.match(/^\s*Um jovem casal/i) || 
+                                               nextLine.match(/^\s*Mostre o VÍDEO/i) || 
+                                               nextLine.match(/^\s*O que você aprendeu/i);
 
-      const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
+            if (isNewPart || isSectionHeader || isChantOrPrayer || isCommentOrQuestion || isInstructionalForNextLine) {
+                break; 
+            }
+            
+            // Se partTheme ainda não foi definido (ou seja, o tempo não estava na primeira linha da parte)
+            // e partName já tem algo, então esta linha é o início do partTheme
+            if (partName && partTheme === undefined) {
+                partTheme = nextLine;
+            } else if (partTheme !== undefined) { // Se partTheme já existe, anexe
+                partTheme += ` ${nextLine}`;
+            } else if (!partName && nextLine) { // Se partName está vazio, esta linha pode ser o partName
+                 const potentialTimeMatch = nextLine.match(timeMatchRegex);
+                 if(potentialTimeMatch && potentialTimeMatch.index !== undefined) {
+                    partName = nextLine.substring(0, potentialTimeMatch.index).trim();
+                    partTheme = nextLine.substring(potentialTimeMatch.index).trim();
+                 } else {
+                    partName = nextLine;
+                 }
+            }
+            i = nextLineIndex; 
+            nextLineIndex++;
+        }
+        partTheme = partTheme?.trim();
+
+        // Se partName ainda estiver vazio, mas partTheme tem texto que não é só tempo/ref,
+        // tente extrair partName de partTheme.
+        if (!partName && partTheme && !partTheme.match(/^\s*\(\s*\d+(?:-\d+)?\s*min\s*\)\s*([\w\s.:§]+)?$/i)) {
+          const themeTimeMatch = partTheme.match(timeMatchRegex);
+          if (themeTimeMatch && themeTimeMatch.index !== undefined && themeTimeMatch.index > 0) { // Garante que há texto antes do tempo
+              partName = partTheme.substring(0, themeTimeMatch.index).trim();
+              partTheme = partTheme.substring(themeTimeMatch.index).trim();
+          } else if (!themeTimeMatch) { // Se não há tempo, partTheme é o nome
+              partName = partTheme;
+              partTheme = undefined;
+          }
+        }
+
+      const extractedPart: ParsedNvmcPart = { partName: partName.replace(/:$/, '').trim(), partTheme: partTheme || undefined };
 
       if (currentSection === 'TESOUROS') {
-        if (partName.toLowerCase().includes('leitura da bíblia')) {
-          result.leituraBibliaTema = extractedPart.partTheme || partName.replace(/leitura da bíblia/i, '').trim();
-        } else if (partName.toLowerCase().includes('joias espirituais')) {
-           result.joiasEspirituaisTema = extractedPart.partTheme || "Perguntas e respostas sobre a leitura da Bíblia.";
+        if (extractedPart.partName.toLowerCase().includes('leitura da bíblia')) {
+          result.leituraBibliaTema = extractedPart.partTheme || extractedPart.partName.replace(/leitura da bíblia/i, '').trim();
+        } else if (extractedPart.partName.toLowerCase().includes('joias espirituais')) {
+           // Não preenchemos um "tema" para joias, pois é uma seção de perguntas e respostas
+           result.joiasEspirituaisTema = "Perguntas e respostas"; // Placeholder ou deixar undefined
         } else if (partNumber === 1) { 
-            result.tesourosDiscursoTema = extractedPart.partName + (extractedPart.partTheme ? ` ${extractedPart.partTheme}` : "");
+            result.tesourosDiscursoTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + extractedPart.partName;
         }
       } else if (currentSection === 'FMM') {
         if(extractedPart.partName) result.fmmParts.push(extractedPart);
       } else if (currentSection === 'VC') {
-        if (partName.toLowerCase().includes('estudo bíblico de congregação')) {
-          result.ebcTema = extractedPart.partTheme || partName.replace(/estudo bíblico de congregação/i, '').trim();
+        if (extractedPart.partName.toLowerCase().includes('estudo bíblico de congregação')) {
+          result.ebcTema = extractedPart.partTheme || extractedPart.partName.replace(/estudo bíblico de congregação/i, '').trim();
         } else {
           if(extractedPart.partName) result.vidaCristaParts.push(extractedPart);
         }
@@ -240,3 +267,4 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   }
   return result;
 }
+
