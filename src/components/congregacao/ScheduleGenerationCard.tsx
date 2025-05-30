@@ -11,21 +11,21 @@ import type { DesignacoesFeitas, Membro, SubstitutionDetails } from '@/lib/congr
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
 import { useToast } from "@/hooks/use-toast";
-import { FileText, AlertTriangle, Loader2 } from 'lucide-react'; // Removido CalendarCheck
+import { FileText, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface ScheduleGenerationCardProps {
   membros: Membro[];
   onScheduleGenerated: (designacoes: DesignacoesFeitas, mes: number, ano: number) => void;
-  currentSchedule: DesignacoesFeitas | null;
-  currentMes: number | null;
-  currentAno: number | null;
+  currentSchedule: DesignacoesFeitas | null; // Cache from parent
+  currentMes: number | null; // Cache from parent
+  currentAno: number | null; // Cache from parent
   onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
 }
 
 export function ScheduleGenerationCard({
   membros,
   onScheduleGenerated,
-  currentSchedule,
+  currentSchedule, // This prop might be less relevant for initial display now
   currentMes,
   currentAno,
   onOpenSubstitutionModal
@@ -36,54 +36,27 @@ export function ScheduleGenerationCard({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // This state will hold the schedule data that is actually displayed in the UI.
+  // It's only populated after a successful "Gerar Cronograma" click.
   const [displayedScheduleData, setDisplayedScheduleData] = useState<{
     schedule: DesignacoesFeitas;
     mes: number;
     ano: number;
   } | null>(null);
 
-useEffect(() => {
-  const numSelectedMes = parseInt(selectedMes, 10);
-  const numSelectedAno = parseInt(selectedAno, 10);
-
-  // Se o mês/ano selecionado no card é diferente dos dados atuais do pai (currentMes/Ano)
-  if (currentMes !== numSelectedMes || currentAno !== numSelectedAno) {
-    // Limpa o cronograma exibido, pois o usuário selecionou um novo período e precisa clicar em "Gerar"
-    if (displayedScheduleData !== null) { // Apenas atualiza se não for nulo para evitar renderização desnecessária
-      setDisplayedScheduleData(null);
-      setError(null); // Limpa qualquer erro anterior
-    }
-  } else {
-    // O mês/ano selecionado no card CORRESPONDE aos dados do pai
-    if (currentSchedule) {
-      // Se há um cronograma do pai para esta seleção
-      // Atualiza o cronograma exibido SOMENTE SE ele for realmente diferente do que já está sendo mostrado
-      if (
-        !displayedScheduleData || // Se nada estiver sendo exibido
-        displayedScheduleData.mes !== currentMes || // Ou se o mês for diferente
-        displayedScheduleData.ano !== currentAno || // Ou se o ano for diferente
-        JSON.stringify(displayedScheduleData.schedule) !== JSON.stringify(currentSchedule) // Ou se o conteúdo do cronograma for diferente
-      ) {
-        setDisplayedScheduleData({
-          schedule: currentSchedule,
-          mes: currentMes,
-          ano: currentAno,
-        });
-      }
-    } else {
-      // Não há cronograma do pai para esta seleção (mesmo que mês/ano coincidam)
-      if (displayedScheduleData !== null) { // Apenas atualiza se não for nulo
-        setDisplayedScheduleData(null);
-      }
-    }
-  }
-}, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno]);
+  // When the selected month or year changes in the dropdowns,
+  // clear any currently displayed schedule and errors.
+  // The user must click "Gerar Cronograma" again for the new period.
+  useEffect(() => {
+    setDisplayedScheduleData(null);
+    setError(null);
+  }, [selectedMes, selectedAno]);
 
 
   const handleGenerateSchedule = async () => {
     setError(null);
     setIsLoading(true);
-    setDisplayedScheduleData(null); 
+    setDisplayedScheduleData(null); // Clear previous display before starting new generation
     const mes = parseInt(selectedMes, 10);
     const ano = parseInt(selectedAno, 10);
 
@@ -101,8 +74,8 @@ useEffect(() => {
         setError(result.error);
         toast({ title: "Erro ao Gerar Designações", description: result.error, variant: "destructive" });
       } else {
-        onScheduleGenerated(result.designacoesFeitas, mes, ano);
-        setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano });
+        onScheduleGenerated(result.designacoesFeitas, mes, ano); // Update parent cache
+        setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano }); // Set data for display
         toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
       }
     } catch (e: any) {
@@ -122,13 +95,12 @@ useEffect(() => {
     });
   };
 
-  const currentYear = new Date().getFullYear();
-  const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const currentYearValue = new Date().getFullYear();
+  const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYearValue - 2 + i);
 
   return (
     <Card>
       <CardHeader>
-        {/* CardTitle removido, nome da aba é suficiente */}
         <CardDescription>Selecione o mês e ano para gerar o cronograma de designações.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -160,7 +132,7 @@ useEffect(() => {
             </Select>
           </div>
           <Button onClick={handleGenerateSchedule} disabled={isLoading} className="w-full sm:w-auto">
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />} {/* Ícone alterado */}
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
             {isLoading ? 'Gerando...' : 'Gerar Cronograma'}
           </Button>
         </div>
