@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Membro, DesignacoesFeitas } from './types';
@@ -29,13 +30,23 @@ export function salvarMembrosLocalmente(membros: Membro[]): void {
 }
 
 
-export function carregarCacheDesignacoes(): DesignacoesFeitas | null {
+export function carregarCacheDesignacoes(): { schedule: DesignacoesFeitas, mes: number, ano: number } | null {
   if (typeof window === 'undefined') return null;
   try {
     const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE);
     if (dadosSalvos) {
-      // Add more robust validation if needed for DesignacoesFeitas structure
-      return JSON.parse(dadosSalvos) as DesignacoesFeitas;
+      const parsedData = JSON.parse(dadosSalvos);
+      // Adicionar validação básica da estrutura
+      if (parsedData && typeof parsedData === 'object' && 
+          'schedule' in parsedData && 'mes' in parsedData && 'ano' in parsedData &&
+          typeof parsedData.schedule === 'object' && 
+          typeof parsedData.mes === 'number' && typeof parsedData.ano === 'number') {
+        return parsedData as { schedule: DesignacoesFeitas, mes: number, ano: number };
+      } else {
+        console.warn("Cache de designações encontrado, mas com estrutura inválida. Limpando.");
+        localStorage.removeItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE); // Limpa cache inválido
+        return null;
+      }
     }
   } catch (error) {
     console.error("Erro ao carregar cache de designações:", error);
@@ -43,11 +54,10 @@ export function carregarCacheDesignacoes(): DesignacoesFeitas | null {
   return null;
 }
 
-export function salvarCacheDesignacoes(designacoes: DesignacoesFeitas, mes: number, ano: number): void {
+export function salvarCacheDesignacoes(data: { schedule: DesignacoesFeitas, mes: number, ano: number }): void {
   if (typeof window === 'undefined') return;
   try {
-    // Could also store mes/ano with cache to validate if it's for current selection
-    localStorage.setItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE, JSON.stringify(designacoes));
+    localStorage.setItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE, JSON.stringify(data));
   } catch (error) {
     console.error("Erro ao salvar cache de designações:", error);
   }
@@ -61,3 +71,4 @@ export function limparCacheDesignacoes(): void {
     console.error("Erro ao limpar cache de designações:", error);
   }
 }
+

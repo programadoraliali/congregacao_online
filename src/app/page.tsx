@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Trash2, History, UserCog } from 'lucide-react';
+import { Trash2, History, UserCog, UserPlus, ListChecks, Users, Settings2 } from 'lucide-react';
 
 
 export default function Home() {
@@ -40,10 +40,10 @@ export default function Home() {
 
   useEffect(() => {
     setMembros(carregarMembrosLocalmente());
-    const cachedData = carregarCacheDesignacoes(); 
-    if (cachedData && typeof cachedData === 'object' && 'schedule' in cachedData && 'mes' in cachedData && 'ano' in cachedData) {
-        setDesignacoesMensaisCache((cachedData as any).schedule);
-        setCachedScheduleInfo({mes: (cachedData as any).mes, ano: (cachedData as any).ano});
+    const cachedScheduleObject = carregarCacheDesignacoes(); 
+    if (cachedScheduleObject) {
+        setDesignacoesMensaisCache(cachedScheduleObject.schedule);
+        setCachedScheduleInfo({ mes: cachedScheduleObject.mes, ano: cachedScheduleObject.ano });
     }
   }, []);
 
@@ -176,6 +176,8 @@ export default function Home() {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
+                        // Se outro membro estava designado para esta função nesta data e este não é ele,
+                        // E este membro tinha esta designação no histórico, remove (cenário de troca ou limpeza)
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -186,7 +188,7 @@ export default function Home() {
         return membroAtualizado;
     });
     persistMembros(novosMembros);
-    salvarCacheDesignacoes({schedule: designacoes, mes, ano}); // Passa o objeto completo
+    salvarCacheDesignacoes({schedule: designacoes, mes, ano});
   };
 
   const limparResultadoMensal = () => {
@@ -245,6 +247,7 @@ export default function Home() {
     if (novasDesignacoes[date]) {
       novasDesignacoes[date][functionId] = newMemberId;
     } else {
+      // Isso não deveria acontecer se a substituição é de uma designação existente
       novasDesignacoes[date] = { [functionId]: newMemberId };
     }
     setDesignacoesMensaisCache(novasDesignacoes);
@@ -253,9 +256,7 @@ export default function Home() {
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
       if (m.id === originalMemberId) {
-        // Se o membro original tinha esta designação no histórico, remover/alterar.
-        // No contexto de substituição, assumimos que ele estava designado, então removemos.
-        // Se ele não estivesse (o que seria estranho), nada acontece aqui.
+        // Se o membro original tinha esta designação no histórico, remover.
         if (membroModificado.historicoDesignacoes[date] === functionId) {
              delete membroModificado.historicoDesignacoes[date];
         }
@@ -290,6 +291,7 @@ export default function Home() {
         <Accordion type="multiple" defaultValue={['item-1', 'item-2']} className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
+                <Users className="mr-3 h-6 w-6 text-primary" />
                 Gerenciar Membros
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
@@ -306,6 +308,7 @@ export default function Home() {
           </AccordionItem>
           <AccordionItem value="item-2">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
+                 <ListChecks className="mr-3 h-6 w-6 text-primary" />
                  Gerar Designações
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
@@ -315,7 +318,7 @@ export default function Home() {
                 currentSchedule={designacoesMensaisCache}
                 currentMes={cachedScheduleInfo?.mes ?? null}
                 currentAno={cachedScheduleInfo?.ano ?? null}
-                onOpenSubstitutionModal={handleOpenSubstitutionModal} // Passa a função
+                onOpenSubstitutionModal={handleOpenSubstitutionModal} 
               />
             </AccordionContent>
           </AccordionItem>
@@ -323,7 +326,10 @@ export default function Home() {
         
         <Card>
             <CardHeader>
-                <CardTitle>Opções de Limpeza de Dados</CardTitle>
+                <CardTitle className="flex items-center">
+                    <Settings2 className="mr-3 h-6 w-6 text-primary" />
+                    Opções de Limpeza de Dados
+                </CardTitle>
                 <CardDescription>Use com cuidado. Estas ações são irreversíveis.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col sm:flex-row gap-2">
@@ -375,3 +381,4 @@ export default function Home() {
     </div>
   );
 }
+
