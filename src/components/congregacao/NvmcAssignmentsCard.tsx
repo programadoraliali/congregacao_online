@@ -502,7 +502,7 @@ export function NvmcAssignmentsCard({
                   {renderFixedPart(dateStr, 'oracaoInicialId', NVMC_FIXED_PARTS_CONFIG.oracaoInicialId)}
                   {dailyAssignments.comentariosIniciaisDetalhes && (
                     <p className="text-sm text-muted-foreground mt-2 mb-2 ml-1 pl-1"> 
-                      {dailyAssignments.comentariosIniciaisDetalhes} Comentários Iniciais
+                      {dailyAssignments.comentariosIniciaisDetalhes} | Comentários Iniciais
                     </p>
                   )}
                 </div>
@@ -522,7 +522,7 @@ export function NvmcAssignmentsCard({
                 <div>
                   <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.VIDA_CRISTA}</h4>
                   {dailyAssignments.vidaCristaParts.map(part => renderVidaCristaPart(dateStr, part))}
-                  {dailyAssignments.vidaCristaCantico && (
+                   {dailyAssignments.vidaCristaCantico && (
                      <p className="text-sm text-muted-foreground mt-2 mb-2 ml-1 pl-1"> 
                       {dailyAssignments.vidaCristaCantico}
                     </p>
@@ -596,3 +596,4 @@ export function NvmcAssignmentsCard({
     </Card>
   );
 }
+

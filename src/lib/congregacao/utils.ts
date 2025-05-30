@@ -141,8 +141,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Identificar Cântico Inicial e Comentários Iniciais
-    if (!isInitialCommentLineProcessed && line.toUpperCase().includes('CÂNTICO') && line.toUpperCase().includes('ORAÇÃO') && line.toUpperCase().includes('COMENTÁRIOS INICIAIS')) {
+    if (!isInitialCommentLineProcessed && line.toUpperCase().includes('CÂNTICO') && line.toUpperCase().includes('ORAÇÃO') && (line.toUpperCase().includes('COMENTÁRIOS INICIAIS') || line.toUpperCase().includes('COMENTÁRIOS INTRODUTÓRIOS'))) {
       const canticoMatch = line.match(/Cântico\s+\d+/i);
       if (canticoMatch) {
         result.canticoInicialNumero = canticoMatch[0];
@@ -151,17 +150,19 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       const parts = line.split('|');
       if (parts.length > 1) {
         const commentPart = parts.slice(1).join('|').trim();
-         if (commentPart.toLowerCase().startsWith('comentários iniciais')) {
-             result.comentariosIniciaisDetalhes = commentPart.substring('comentários iniciais'.length).trim().replace(/[()]/g, ''); // Remove parentheses
+         if (commentPart.toLowerCase().startsWith('comentários iniciais') || commentPart.toLowerCase().startsWith('comentários introdutórios')) {
+             const introText = commentPart.toLowerCase().startsWith('comentários iniciais') ? 'comentários iniciais' : 'comentários introdutórios';
+             result.comentariosIniciaisDetalhes = commentPart.substring(introText.length).trim();
          } else {
-            result.comentariosIniciaisDetalhes = commentPart.replace(/[()]/g, ''); // Remove parentheses
+            result.comentariosIniciaisDetalhes = commentPart;
          }
       }
       isInitialCommentLineProcessed = true;
       continue; 
     }
-    if (!isInitialCommentLineProcessed && line.toLowerCase().startsWith('comentários iniciais')) {
-        result.comentariosIniciaisDetalhes = line.substring('comentários iniciais'.length).trim().replace(/[()]/g, ''); // Remove parentheses
+    if (!isInitialCommentLineProcessed && (line.toLowerCase().startsWith('comentários iniciais') || line.toLowerCase().startsWith('comentários introdutórios'))) {
+        const introText = line.toLowerCase().startsWith('comentários iniciais') ? 'comentários iniciais' : 'comentários introdutórios';
+        result.comentariosIniciaisDetalhes = line.substring(introText.length).trim();
         isInitialCommentLineProcessed = true; 
         continue;
     }
@@ -188,18 +189,16 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       currentSection = null; 
       continue;
     }
-    // Tratar Cântico intermediário em VC ou Cântico final com oração
-    if (line.toUpperCase().startsWith('CÂNTICO')) {
-      if (currentSection === 'VC' && !line.toUpperCase().includes('ORAÇÃO')) {
-        result.vidaCristaCantico = line; // Armazena apenas o cântico intermediário
-        continue; // Não processar como parte designável
-      } else if (currentSection === null && line.toUpperCase().includes('ORAÇÃO')) {
-        // Cântico final com oração é parte dos comentários finais, já tratado
-        continue;
-      }
-    }
     
-    // Skip instructional lines
+    if (line.toUpperCase().startsWith('CÂNTICO') && currentSection === 'VC' && !line.toUpperCase().includes('ORAÇÃO')) {
+        result.vidaCristaCantico = line; 
+        continue; 
+    } else if (line.toUpperCase().startsWith('CÂNTICO') && (currentSection === null || line.toUpperCase().includes('ORAÇÃO'))) {
+        // Cântico final com oração é parte dos comentários finais, já tratado ou será se estiver na linha de comentários finais.
+        // Ou se for o cântico inicial já tratado
+        continue;
+    }
+        
     if (line.match(/^\s*Quando nossos irmãos/i) ||
         line.match(/^\s*Seja hospitaleiro/i) ||
         line.match(/^\s*“Um olhar animado”/i) ||
@@ -242,7 +241,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
                                   nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
                                   nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
           const isFinalCommentOrChant = nextLine.toUpperCase().startsWith('COMENTÁRIOS FINAIS') || 
-                                        (nextLine.toUpperCase().startsWith('CÂNTICO') && nextLine.includes('ORAÇÃO'));
+                                        (nextLine.toUpperCase().startsWith('CÂNTICO') && (nextLine.toUpperCase().includes('ORAÇÃO') || currentSection !== 'VC'));
           const isInstruction = nextLine.toLowerCase().startsWith('sua resposta') || 
                                 nextLine.toLowerCase().startsWith('pergunto-se:') ||
                                 nextLine.match(/ijwbq artigo/i) ||
@@ -273,7 +272,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       
       if (currentSection === 'TESOUROS') {
         if (extractedPart.partName.toLowerCase().includes('leitura da bíblia')) {
-          result.leituraBibliaTema = extractedPart.partTheme || extractedPart.partName.replace(/leitura da bíblia/i, '').trim();
+          result.leituraBibliaTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + extractedPart.partName.replace(/leitura da bíblia/i, '').trim();
         } else if (extractedPart.partName.toLowerCase().includes('joias espirituais')) {
            result.joiasEspirituaisTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + "Perguntas e respostas";
         } else if (partNumber === 1) { 
@@ -283,14 +282,15 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
         if(extractedPart.partName) result.fmmParts.push(extractedPart);
       } else if (currentSection === 'VC') {
         if (extractedPart.partName.toLowerCase().includes('estudo bíblico de congregação')) {
-          result.ebcTema = extractedPart.partTheme || extractedPart.partName.replace(/estudo bíblico de congregação/i, '').trim();
+          result.ebcTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + extractedPart.partName.replace(/estudo bíblico de congregação/i, '').trim();
         } else {
           if(extractedPart.partName) result.vidaCristaParts.push(extractedPart);
         }
       }
-    } else if (currentSection === 'VC' && line.toLowerCase().startsWith('bt cap')) { 
+    } else if (currentSection === 'VC' && (line.toLowerCase().startsWith('bt cap') || line.toLowerCase().startsWith('lff lição'))) { 
         result.ebcTema = line;
     }
   }
   return result;
 }
+
