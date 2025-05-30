@@ -6,23 +6,11 @@ import type { Membro, DesignacoesFeitas, Designacao, SubstitutionDetails } from 
 import { FUNCOES_DESIGNADAS, NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO, DIAS_SEMANA_REUNIAO_CORES } from '@/lib/congregacao/constants';
 import { ScheduleTable } from './ScheduleTable';
 
-interface ScheduleDisplayProps {
-  designacoesFeitas: DesignacoesFeitas | null;
-  membros: Membro[];
-  mes: number; // 0-11
-  ano: number;
-  onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
-}
-
-function getNomeMembro(idMembro: string | null, membros: Membro[]): string | null {
-  if (!idMembro) return null;
-  const membro = membros.find(m => m.id === idMembro);
-  return membro ? membro.nome : 'Desconhecido';
-}
+// getNomeMembro foi removido pois ScheduleTable tem sua própria lógica de resolução de nome.
 
 function prepararDadosTabela(
   designacoesFeitas: DesignacoesFeitas,
-  membros: Membro[],
+  // membros: Membro[], // Não é mais necessário aqui, ScheduleTable resolve os nomes
   mes: number,
   ano: number,
   tipoTabela: 'Indicadores' | 'Volantes'
@@ -49,8 +37,8 @@ function prepararDadosTabela(
   if (tipoTabela === 'Indicadores') {
     columns = [
       { key: 'data', label: 'Data' },
-      { key: 'indicador1', label: 'Indicador 1' },
-      { key: 'indicador2', label: 'Indicador 2' },
+      { key: FUNCOES_DESIGNADAS.find(f => f.id.startsWith('indicadorExterno'))!.id, label: 'Indicador 1' }, 
+      { key: FUNCOES_DESIGNADAS.find(f => f.id.startsWith('indicadorPalco'))!.id, label: 'Indicador 2' }, 
     ];
 
     sortedDates.forEach(dataStr => {
@@ -69,35 +57,23 @@ function prepararDadosTabela(
       };
       
       const designacoesDoDia = designacoesFeitas[dataStr] || {};
-      // A função designada para Indicador 1 pode ser indicadorExternoQui ou indicadorExternoDom
-      // A função designada para Indicador 2 pode ser indicadorPalcoQui ou indicadorPalcoDom
-      // O `col.key` em ScheduleTable será 'indicador1' ou 'indicador2'.
-      // Precisamos mapear isso de volta para o ID da função real para substituição.
-      // Vamos usar o ID da função real como chave na linha de dados aqui.
 
       if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) { // Quinta
-        row['indicadorExternoQui'] = getNomeMembro(designacoesDoDia['indicadorExternoQui'], membros); // Coluna "Indicador 1" usará este ID de função
-        row['indicadorPalcoQui'] = getNomeMembro(designacoesDoDia['indicadorPalcoQui'], membros);   // Coluna "Indicador 2" usará este ID de função
+        row['indicadorExternoQui'] = designacoesDoDia['indicadorExternoQui']; 
+        row['indicadorPalcoQui'] = designacoesDoDia['indicadorPalcoQui'];   
       } else if (diaSemanaIndex === DIAS_REUNIAO.publica) { // Domingo
-        row['indicadorExternoDom'] = getNomeMembro(designacoesDoDia['indicadorExternoDom'], membros);
-        row['indicadorPalcoDom'] = getNomeMembro(designacoesDoDia['indicadorPalcoDom'], membros);
+        row['indicadorExternoDom'] = designacoesDoDia['indicadorExternoDom'];
+        row['indicadorPalcoDom'] = designacoesDoDia['indicadorPalcoDom'];
       }
       dataTabela.push(row);
     });
-     // Ajustar as colunas para corresponder às chaves que podem ser clicadas na ScheduleTable
-     columns = [
-        { key: 'data', label: 'Data' },
-        { key: FUNCOES_DESIGNADAS.find(f => f.id.startsWith('indicadorExterno'))!.id, label: 'Indicador 1' }, // Usará 'indicadorExternoQui' ou 'indicadorExternoDom' como key
-        { key: FUNCOES_DESIGNADAS.find(f => f.id.startsWith('indicadorPalco'))!.id, label: 'Indicador 2' }, // Usará 'indicadorPalcoQui' ou 'indicadorPalcoDom' como key
-      ];
-      // Reconstruir as chaves de dados para que a ScheduleTable possa usar uma chave consistente para as colunas
-      // mas ainda precisamos dos nomes dos membros. A ScheduleTable passará a chave da coluna (functionId real)
+    
       const MAPPED_COL_KEYS_INDICADORES = {
         indicador1: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom',
         indicador2: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom',
       }
-      const remappedDataIndicadores = dataTabela.map(row => {
-        const dataObj = new Date(sortedDates[dataTabela.indexOf(row)] + 'T00:00:00');
+      const remappedDataIndicadores = dataTabela.map((row, index) => {
+        const dataObj = new Date(sortedDates[index] + 'T00:00:00');
         const diaSemanaIndex = dataObj.getDay();
         return {
             ...row,
@@ -113,7 +89,6 @@ function prepararDadosTabela(
 
 
   } else if (tipoTabela === 'Volantes') {
-    // Lógica similar para volantes
     const MAPPED_COL_KEYS_VOLANTES = {
         volante1: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'volante1Qui' : 'volante1Dom',
         volante2: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'volante2Qui' : 'volante2Dom',
@@ -131,12 +106,18 @@ function prepararDadosTabela(
       const designacoesDoDia = designacoesFeitas[dataStr] || {};
       const row: Designacao = { data: `${dia} ${diaAbrev}`, diaSemanaBadgeColor: badgeColorClass };
       
-      row[MAPPED_COL_KEYS_VOLANTES.volante1(diaSemanaIndex)] = getNomeMembro(designacoesDoDia[MAPPED_COL_KEYS_VOLANTES.volante1(diaSemanaIndex)], membros);
-      row[MAPPED_COL_KEYS_VOLANTES.volante2(diaSemanaIndex)] = getNomeMembro(designacoesDoDia[MAPPED_COL_KEYS_VOLANTES.volante2(diaSemanaIndex)], membros);
+      if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) {
+        row['volante1Qui'] = designacoesDoDia['volante1Qui'];
+        row['volante2Qui'] = designacoesDoDia['volante2Qui'];
+      } else if (diaSemanaIndex === DIAS_REUNIAO.publica) {
+        row['volante1Dom'] = designacoesDoDia['volante1Dom'];
+        row['volante2Dom'] = designacoesDoDia['volante2Dom'];
+      }
       dataTabelaVolantes.push(row);
     });
-     const remappedDataVolantes = dataTabelaVolantes.map(row => {
-        const dataObj = new Date(sortedDates[dataTabelaVolantes.indexOf(row)] + 'T00:00:00');
+
+     const remappedDataVolantes = dataTabelaVolantes.map((row, index) => {
+        const dataObj = new Date(sortedDates[index] + 'T00:00:00');
         const diaSemanaIndex = dataObj.getDay();
         return {
             ...row,
@@ -159,7 +140,7 @@ function prepararDadosTabela(
 
 // Helper para obter o ID da função real com base na chave da coluna e data
 const getRealFunctionId = (columnKey: string, dateStr: string, tipoTabela: string): string => {
-    const dataObj = new Date(dateStr + 'T00:00:00');
+    const dataObj = new Date(dateStr + "T00:00:00");
     const diaSemanaIndex = dataObj.getDay();
     const isMeioSemana = diaSemanaIndex === DIAS_REUNIAO.meioSemana;
 
@@ -179,8 +160,8 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano, onOpenSu
     return <p className="text-muted-foreground text-center py-4">Nenhuma designação gerada.</p>;
   }
 
-  const dadosIndicadores = prepararDadosTabela(designacoesFeitas, membros, mes, ano, 'Indicadores');
-  const dadosVolantes = prepararDadosTabela(designacoesFeitas, membros, mes, ano, 'Volantes');
+  const dadosIndicadores = prepararDadosTabela(designacoesFeitas, mes, ano, 'Indicadores');
+  const dadosVolantes = prepararDadosTabela(designacoesFeitas, mes, ano, 'Volantes');
 
   const handleNameClick = (
     date: string, // YYYY-MM-DD
