@@ -153,7 +153,6 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
     if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) continue;
     
-    // Ignorar linhas de descrição/instrução que não são títulos de parte
     if (line.match(/^\s*Quando nossos irmãos/i) ||
         line.match(/^\s*Seja hospitaleiro/i) ||
         line.match(/^\s*“Um olhar animado”/i) ||
@@ -167,20 +166,19 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     const partMatch = line.match(partRegex);
 
     if (partMatch) {
+      const fullTitleFromLine = partMatch[2].trim();
       const partNumber = parseInt(partMatch[1], 10);
-      let fullTitleFromLine = partMatch[2].trim();
-
       let partName = "";
       let partTheme: string | undefined = undefined;
 
-      const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/;
+      const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i; // Regex para o tempo, case-insensitive
       const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
 
       if (timeMatchResult && timeMatchResult.index !== undefined) {
         partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
         partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
       } else {
-        partName = fullTitleFromLine; // partTheme remains undefined for now
+        partName = fullTitleFromLine;
       }
       
       let nextLineIndex = i + 1;
@@ -193,7 +191,6 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
           const isChantOrPrayer = nextLine.toUpperCase().startsWith('CÂNTICO') || nextLine.toUpperCase().startsWith('ORAÇÃO');
           const isComment = nextLine.toLowerCase().startsWith('sua resposta') || nextLine.toLowerCase().startsWith('pergunto-se:');
           const isInstructionalForNextLine = nextLine.match(/^\s*Quando nossos irmãos/i) || nextLine.match(/^\s*Seja hospitaleiro/i) || nextLine.match(/^\s*“Um olhar animado”/i) || nextLine.match(/^\s*Um jovem casal/i) || nextLine.match(/^\s*Mostre o VÍDEO/i) || nextLine.match(/^\s*O que você aprendeu/i);
-
 
           if (isNewPart || isSectionHeader || isChantOrPrayer || isComment || isInstructionalForNextLine) {
               break; 
@@ -209,10 +206,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       }
       partTheme = partTheme?.trim();
 
-      // Se partName ainda estiver vazio e partTheme tiver conteúdo,
-      // e partTheme não for apenas um tempo, use partTheme como partName.
-      // Isto é para casos onde o título da parte está na linha do tempo.
-      if (!partName && partTheme && !partTheme.match(/^\s*\(\s*\d+(?:-\d+)?\s*min\s*\)\s*$/)) {
+      if (!partName && partTheme && !partTheme.match(/^\s*\(\s*\d+(?:-\d+)?\s*min\s*\)\s*$/i)) {
         const themeTimeMatch = partTheme.match(timeMatchRegex);
         if (themeTimeMatch && themeTimeMatch.index !== undefined) {
             partName = partTheme.substring(0, themeTimeMatch.index).trim();
@@ -223,7 +217,6 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
         }
       }
 
-
       const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
 
       if (currentSection === 'TESOUROS') {
@@ -232,7 +225,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
         } else if (partName.toLowerCase().includes('joias espirituais')) {
            result.joiasEspirituaisTema = extractedPart.partTheme || "Perguntas e respostas sobre a leitura da Bíblia.";
         } else if (partNumber === 1) { 
-            result.tesourosDiscursoTema = extractedPart.partName; // Prioriza o nome da parte como tema principal
+            result.tesourosDiscursoTema = extractedPart.partName + (extractedPart.partTheme ? ` ${extractedPart.partTheme}` : "");
         }
       } else if (currentSection === 'FMM') {
         if(extractedPart.partName) result.fmmParts.push(extractedPart);
