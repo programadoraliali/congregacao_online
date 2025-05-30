@@ -59,9 +59,9 @@ export function MemberManagementCard({
       else if (p.id === 'leitorDom') displayName = 'Lei (Dom)';
       else if (p.id === 'presidente') displayName = 'Pres';
       
-      const badgeColor = BADGE_COLORS[p.grupo] || BADGE_COLORS.default;
+      const badgeColorClasses = BADGE_COLORS[p.grupo] || BADGE_COLORS.default;
       return (
-         <Badge key={p.id} variant="outline" className={`mr-1 mb-1 ${badgeColor}`}>
+         <Badge key={p.id} variant="default" className={`mr-1 mb-1 ${badgeColorClasses}`}>
           {displayName}
         </Badge>
       );
@@ -136,4 +136,3 @@ export function MemberManagementCard({
     </Card>
   );
 }
-
