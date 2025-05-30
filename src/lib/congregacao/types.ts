@@ -80,16 +80,18 @@ export interface AllPublicMeetingAssignments {
 
 // Tipos para a nova aba "NVMC"
 export interface NVMCParticipantDynamic {
-  id: string; 
-  customTitle: string; 
+  id: string;
+  partName: string; // Ex: "Iniciando conversas", "Fazendo discípulos" - Extraído, não editável diretamente na lista
+  partTheme?: string; // Ex: "(3 min) DE CASA EM CASA..." - Editável
   needsAssistant?: boolean;
   participantId?: string | null;
   assistantId?: string | null;
 }
 
 export interface NVCVidaCristaDynamicPart {
-  id: string; 
-  customTitle: string; 
+  id: string;
+  partName: string; // Ex: "Podemos ter um coração alegre..." - Extraído, não editável diretamente
+  partTheme?: string; // Ex: "(15 min) Consideração." - Editável
   participantId?: string | null;
 }
 
@@ -99,19 +101,19 @@ export interface NVMCDailyAssignments {
   oracaoInicialId?: string | null;
   // Tesouros da Palavra de Deus
   tesourosDiscursoId?: string | null;
-  tesourosDiscursoCustomTitle?: string; // Adicionado para o parser
+  tesourosDiscursoCustomTitle?: string;
   joiasEspirituaisId?: string | null;
-  joiasEspirituaisCustomTitle?: string; // Adicionado para o parser
+  joiasEspirituaisCustomTitle?: string;
   leituraBibliaId?: string | null;
-  leituraBibliaCustomTitle?: string; 
+  leituraBibliaCustomTitle?: string;
   // Faça Seu Melhor no Ministério (dynamic parts)
-  fmmParts: NVMCParticipantDynamic[]; 
+  fmmParts: NVMCParticipantDynamic[];
   // Nossa Vida Cristã (dynamic parts for talks/items)
-  vidaCristaParts: NVCVidaCristaDynamicPart[]; 
+  vidaCristaParts: NVCVidaCristaDynamicPart[];
   // EBC (fixed within VC section)
   ebcDirigenteId?: string | null;
   ebcLeitorId?: string | null;
-  ebcCustomTitle?: string; 
+  ebcCustomTitle?: string;
   oracaoFinalId?: string | null;
 }
 
@@ -125,7 +127,8 @@ export interface AllNVMCAssignments {
 
 // Tipos para o parser de texto NVMC
 export interface ParsedNvmcPart {
-  customTitle: string;
+  partName: string;
+  partTheme?: string;
 }
 
 export interface ParsedNvmcProgram {

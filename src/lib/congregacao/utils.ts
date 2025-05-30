@@ -122,93 +122,96 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
 }
 
 export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0 && !line.startsWith('Sua resposta') && !line.startsWith('PERGUNTE-SE:'));
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0 && !line.toLowerCase().startsWith('sua resposta') && !line.toLowerCase().startsWith('pergunto-se:'));
   const result: ParsedNvmcProgram = {
     fmmParts: [],
     vidaCristaParts: [],
   };
 
   let currentSection: 'TESOUROS' | 'FMM' | 'VC' | null = null;
-  let expectingTitleFor: 'LEITURA' | 'EBC' | 'DISCURSO_TESOUROS' | 'JOIAS' | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    if (line.includes('TESOUROS DA PALAVRA DE DEUS')) {
+    if (line.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS')) {
       currentSection = 'TESOUROS';
-      expectingTitleFor = null;
       continue;
     }
-    if (line.includes('FAÇA SEU MELHOR NO MINISTÉRIO')) {
+    if (line.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO')) {
       currentSection = 'FMM';
-      expectingTitleFor = null;
       continue;
     }
-    if (line.includes('NOSSA VIDA CRISTÃ')) {
+    if (line.toUpperCase().includes('NOSSA VIDA CRISTÃ')) {
       currentSection = 'VC';
-      expectingTitleFor = null;
       continue;
     }
+    if (line.toUpperCase().startsWith('CÂNTICO') && line.includes('ORAÇÃO')) continue;
+    if (line.toUpperCase().startsWith('CÂNTICO')) continue;
+    if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
+    if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) continue;
+    if (line.match(/^\s*Quando nossos irmãos/i)) continue; // Ignora linhas de introdução/contexto
+    if (line.match(/^\s*Seja hospitaleiro/i)) continue;
+    if (line.match(/^\s*“Um olhar animado”/i)) continue;
+    if (line.match(/^\s*Um jovem casal/i)) continue;
+    if (line.match(/^\s*Mostre o VÍDEO/i)) continue;
+    if (line.match(/^\s*O que você aprendeu/i)) continue;
     
-    if (line.match(/^\s*\(\d+\s*min\)\s*$/) || line.match(/^\s*\(\d+\s*min\)\s*Consideração\s*\.?\s*$/i)) {
-        if (expectingTitleFor) expectingTitleFor = null;
-        continue;
-    }
 
+    const partRegex = /^(\d+)\.\s*([^(\n]+)(?:\(([^)]+)\))?\s*(.*)/;
+    const partMatch = line.match(partRegex);
 
-    const partMatch = line.match(/^(\d+)\.\s*(.*)/);
     if (partMatch) {
-      const partTitleSegment = partMatch[2].trim();
-      let fullTitle = partTitleSegment;
-      const partNumber = parseInt(partMatch[1], 10); // Moved partNumber declaration up
+      const partNumber = parseInt(partMatch[1], 10);
+      let partName = partMatch[2].trim();
+      const timeInfo = partMatch[3] ? `(${partMatch[3]})` : ""; // Inclui os parênteses
+      let partTheme = (partMatch[4] || "").trim();
 
-      if (i + 1 < lines.length && lines[i + 1].match(/^\s*\(\d+\s*min\)/)) {
-        const nextLineContent = lines[i + 1].replace(/^\s*\(\d+\s*min\)\s*/, '').trim();
-        if (nextLineContent && !nextLineContent.match(/^(\d+)\.\s/) && !lines[i+1].includes('Cântico')) { 
-          fullTitle += ` ${nextLineContent}`;
-        }
-        
-        if (!partTitleSegment.toLowerCase().includes('leitura da bíblia') && 
-            !partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') &&
-            !partTitleSegment.toLowerCase().includes('joias espirituais') &&
-            !(currentSection === 'TESOUROS' && partNumber === 1) 
-           ) {
-        }
+      if (timeInfo && partTheme) {
+        partTheme = `${timeInfo} ${partTheme}`;
+      } else if (timeInfo) {
+        partTheme = timeInfo;
       }
       
+      // Tenta juntar linhas subsequentes se não forem uma nova parte ou seção
+      let nextLineIndex = i + 1;
+      while (nextLineIndex < lines.length) {
+          const nextLine = lines[nextLineIndex].trim();
+          if (nextLine.match(/^(\d+)\.\s*/) || // Início de nova parte numerada
+              nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
+              nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
+              nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ') ||
+              nextLine.toUpperCase().startsWith('CÂNTICO') ||
+              nextLine.toLowerCase().startsWith('sua resposta') ||
+              nextLine.toLowerCase().startsWith('pergunto-se:') ||
+              nextLine.match(/^\s*\(\d+\s*min\)/) && !partTheme // Se a próxima linha é só tempo, e o tema atual está vazio
+            ) {
+              break; 
+          }
+          partTheme += ` ${nextLine}`;
+          i = nextLineIndex; // Avança o índice principal
+          nextLineIndex++;
+      }
+      partTheme = partTheme.trim();
+
+
+      const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
 
       if (currentSection === 'TESOUROS') {
-        if (partTitleSegment.toLowerCase().includes('leitura da bíblia')) {
-          result.leituraBibliaTema = fullTitle.replace(/leitura da bíblia/i, '').trim();
-          expectingTitleFor = null;
-        } else if (partTitleSegment.toLowerCase().includes('joias espirituais')) {
-           result.joiasEspirituaisTema = "Perguntas e respostas sobre a leitura da Bíblia."; 
-           expectingTitleFor = null;
-        } else if (partNumber === 1 && !partTitleSegment.toLowerCase().includes('leitura da bíblia') && !partTitleSegment.toLowerCase().includes('joias espirituais')) {
-            result.tesourosDiscursoTema = fullTitle;
-            expectingTitleFor = null;
+        if (partName.toLowerCase().includes('leitura da bíblia')) {
+          result.leituraBibliaTema = partTheme || partName.replace(/leitura da bíblia/i, '').trim();
+        } else if (partName.toLowerCase().includes('joias espirituais')) {
+           result.joiasEspirituaisTema = partTheme || "Perguntas e respostas sobre a leitura da Bíblia.";
+        } else if (partNumber === 1) { // Primeiro item de Tesouros é geralmente o discurso
+            result.tesourosDiscursoTema = partTheme || partName;
         }
       } else if (currentSection === 'FMM') {
-        result.fmmParts.push({ customTitle: fullTitle });
-        expectingTitleFor = null;
+        result.fmmParts.push(extractedPart);
       } else if (currentSection === 'VC') {
-        if (partTitleSegment.toLowerCase().includes('estudo bíblico de congregação')) {
-          result.ebcTema = fullTitle.replace(/estudo bíblico de congregação/i, '').trim();
-          expectingTitleFor = null;
-        } else if (!partTitleSegment.toLowerCase().startsWith('Cântico')) {
-          result.vidaCristaParts.push({ customTitle: fullTitle });
-          expectingTitleFor = null;
+        if (partName.toLowerCase().includes('estudo bíblico de congregação')) {
+          result.ebcTema = partTheme || partName.replace(/estudo bíblico de congregação/i, '').trim();
+        } else {
+          result.vidaCristaParts.push(extractedPart);
         }
-      }
-      if (i + 1 < lines.length && lines[i + 1].match(/^\s*\(\d+\s*min\)/) && 
-          (partTitleSegment.toLowerCase().includes('leitura da bíblia') ||
-           partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') ||
-           (currentSection === 'TESOUROS' && partNumber === 1 && !partTitleSegment.toLowerCase().includes('joias espirituais')) ||
-           currentSection === 'FMM' ||
-           (currentSection === 'VC' && !partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') && !partTitleSegment.toLowerCase().startsWith('Cântico')) 
-          )
-         ) {
-           i++;
       }
     }
   }
