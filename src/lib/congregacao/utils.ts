@@ -150,9 +150,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       continue;
     }
     
-    // Ignorar linhas que são claramente apenas de tempo, como "(10 min)" sozinhas ou com pouco texto
     if (line.match(/^\s*\(\d+\s*min\)\s*$/) || line.match(/^\s*\(\d+\s*min\)\s*Consideração\s*\.?\s*$/i)) {
-        // Se estávamos esperando um título, mas encontramos apenas uma linha de tempo/consideração, resetamos.
         if (expectingTitleFor) expectingTitleFor = null;
         continue;
     }
@@ -162,37 +160,31 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     if (partMatch) {
       const partTitleSegment = partMatch[2].trim();
       let fullTitle = partTitleSegment;
+      const partNumber = parseInt(partMatch[1], 10); // Moved partNumber declaration up
 
-      // Se a linha seguinte for a continuação do título (contém tempo e mais texto)
       if (i + 1 < lines.length && lines[i + 1].match(/^\s*\(\d+\s*min\)/)) {
         const nextLineContent = lines[i + 1].replace(/^\s*\(\d+\s*min\)\s*/, '').trim();
-        if (nextLineContent && !nextLineContent.match(/^(\d+)\.\s/) && !lines[i+1].includes('Cântico')) { // Evitar anexar a próxima parte numerada ou cântico
+        if (nextLineContent && !nextLineContent.match(/^(\d+)\.\s/) && !lines[i+1].includes('Cântico')) { 
           fullTitle += ` ${nextLineContent}`;
         }
-        // Avança o índice i se a próxima linha foi usada, a menos que seja uma parte que precise do tema especificamente.
+        
         if (!partTitleSegment.toLowerCase().includes('leitura da bíblia') && 
             !partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') &&
             !partTitleSegment.toLowerCase().includes('joias espirituais') &&
-            !(currentSection === 'TESOUROS' && partNumber === 1) // Para o primeiro discurso de Tesouros
+            !(currentSection === 'TESOUROS' && partNumber === 1) 
            ) {
-             // i++; // Comentado para testar se a linha de tempo deve ser sempre consumida pelo parser principal
         }
       }
       
-      const partNumber = parseInt(partMatch[1], 10);
-
 
       if (currentSection === 'TESOUROS') {
         if (partTitleSegment.toLowerCase().includes('leitura da bíblia')) {
           result.leituraBibliaTema = fullTitle.replace(/leitura da bíblia/i, '').trim();
           expectingTitleFor = null;
         } else if (partTitleSegment.toLowerCase().includes('joias espirituais')) {
-           // O título é "Joias espirituais", o conteúdo específico (perguntas) vem depois e não é o "tema" da parte.
-           // Podemos extrair a referência bíblica se houver, mas não há um "tema" como em um discurso.
-           result.joiasEspirituaisTema = "Perguntas e respostas sobre a leitura da Bíblia."; // Título genérico
+           result.joiasEspirituaisTema = "Perguntas e respostas sobre a leitura da Bíblia."; 
            expectingTitleFor = null;
         } else if (partNumber === 1 && !partTitleSegment.toLowerCase().includes('leitura da bíblia') && !partTitleSegment.toLowerCase().includes('joias espirituais')) {
-            // Assume que a primeira parte numerada em Tesouros é o discurso
             result.tesourosDiscursoTema = fullTitle;
             expectingTitleFor = null;
         }
@@ -208,7 +200,6 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
           expectingTitleFor = null;
         }
       }
-       // Consumir a linha de tempo se ela foi usada para o título da parte.
       if (i + 1 < lines.length && lines[i + 1].match(/^\s*\(\d+\s*min\)/) && 
           (partTitleSegment.toLowerCase().includes('leitura da bíblia') ||
            partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') ||
@@ -223,3 +214,4 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   }
   return result;
 }
+
