@@ -7,7 +7,7 @@ import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerat
 import { MemberFormDialog } from '@/components/congregacao/MemberFormDialog';
 import { BulkAddDialog } from '@/components/congregacao/BulkAddDialog';
 import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog';
-import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog'; // Novo
+import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog';
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
 import type { Membro, DesignacoesFeitas, SubstitutionDetails } from '@/lib/congregacao/types';
 import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants';
@@ -17,7 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Trash2, History, UserCog, UserPlus, ListChecks, Users, Settings2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trash2, History, Users, Settings2, ListChecks } from 'lucide-react';
 
 
 export default function Home() {
@@ -32,7 +33,6 @@ export default function Home() {
   const [clearType, setClearType] = useState<'history' | 'all' | null>(null);
   const [memberIdForAdvancedOptions, setMemberIdForAdvancedOptions] = useState<string | null>(null);
 
-  // Estado para o modal de substituição
   const [isSubstitutionModalOpen, setIsSubstitutionModalOpen] = useState(false);
   const [substitutionDetails, setSubstitutionDetails] = useState<SubstitutionDetails | null>(null);
 
@@ -176,8 +176,6 @@ export default function Home() {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
-                        // Se outro membro estava designado para esta função nesta data e este não é ele,
-                        // E este membro tinha esta designação no histórico, remove (cenário de troca ou limpeza)
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -227,7 +225,6 @@ export default function Home() {
     toast({ title: "Todos os Dados Limpos", description: "Todos os dados da aplicação foram removidos.", variant: "destructive" });
   };
 
-  // Funções para o modal de substituição
   const handleOpenSubstitutionModal = (details: SubstitutionDetails) => {
     setSubstitutionDetails(details);
     setIsSubstitutionModalOpen(true);
@@ -242,21 +239,19 @@ export default function Home() {
     const { date, functionId, originalMemberId } = substitutionDetails;
     const { mes, ano } = cachedScheduleInfo;
 
-    // 1. Atualizar designacoesMensaisCache
     const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
     if (novasDesignacoes[date]) {
       novasDesignacoes[date][functionId] = newMemberId;
     } else {
-      // Isso não deveria acontecer se a substituição é de uma designação existente
       novasDesignacoes[date] = { [functionId]: newMemberId };
     }
-    setDesignacoesMensaisCache(novasDesignacoes);
+    
+    // Atualiza o estado que controla a exibição, o que por sua vez atualiza currentSchedule no Card.
+    setDesignacoesMensaisCache(novasDesignacoes); 
 
-    // 2. Atualizar histórico dos membros
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
       if (m.id === originalMemberId) {
-        // Se o membro original tinha esta designação no histórico, remover.
         if (membroModificado.historicoDesignacoes[date] === functionId) {
              delete membroModificado.historicoDesignacoes[date];
         }
@@ -268,7 +263,6 @@ export default function Home() {
     });
     persistMembros(membrosAtualizados);
 
-    // 3. Salvar o cache de designações atualizado
     salvarCacheDesignacoes({schedule: novasDesignacoes, mes, ano});
 
     toast({ title: "Substituição Realizada", description: "A designação foi atualizada com sucesso." });
@@ -312,14 +306,23 @@ export default function Home() {
                  Gerar Designações
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
-              <ScheduleGenerationCard 
-                membros={membros} 
-                onScheduleGenerated={handleScheduleGenerated}
-                currentSchedule={designacoesMensaisCache}
-                currentMes={cachedScheduleInfo?.mes ?? null}
-                currentAno={cachedScheduleInfo?.ano ?? null}
-                onOpenSubstitutionModal={handleOpenSubstitutionModal} 
-              />
+              <Tabs defaultValue="indicadores-volantes-av-limpeza" className="w-full pt-2">
+                <TabsList className="mx-4 mb-2">
+                  <TabsTrigger value="indicadores-volantes-av-limpeza">Indicadores/Volantes/AV/Limpeza</TabsTrigger>
+                  {/* Outras TabsTriggers podem ser adicionadas aqui no futuro */}
+                </TabsList>
+                <TabsContent value="indicadores-volantes-av-limpeza" className="pt-0">
+                  <ScheduleGenerationCard 
+                    membros={membros} 
+                    onScheduleGenerated={handleScheduleGenerated}
+                    currentSchedule={designacoesMensaisCache}
+                    currentMes={cachedScheduleInfo?.mes ?? null}
+                    currentAno={cachedScheduleInfo?.ano ?? null}
+                    onOpenSubstitutionModal={handleOpenSubstitutionModal} 
+                  />
+                </TabsContent>
+                {/* Outras TabsContents podem ser adicionadas aqui no futuro */}
+              </Tabs>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
