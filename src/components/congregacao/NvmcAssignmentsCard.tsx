@@ -59,8 +59,8 @@ export function NvmcAssignmentsCard({
   
   const { toast } = useToast();
 
-  const currentYear = new Date().getFullYear();
-  const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const currentYearVal = new Date().getFullYear();
+  const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYearVal - 2 + i);
 
   const ensureDayAssignmentsStructure = (assignments: NVMCDailyAssignments | undefined): NVMCDailyAssignments => {
     return {
@@ -75,8 +75,8 @@ export function NvmcAssignmentsCard({
       leituraBibliaId: assignments?.leituraBibliaId,
       leituraBibliaCustomTitle: assignments?.leituraBibliaCustomTitle,
       fmmParts: Array.isArray(assignments?.fmmParts) ? assignments.fmmParts.map(p => ({...p, id: p.id || generatePartId(), partName: p.partName || '', partTheme: p.partTheme })) : [],
-      vidaCristaParts: Array.isArray(assignments?.vidaCristaParts) ? assignments.vidaCristaParts.map(p => ({...p, id: p.id || generatePartId(), partName: p.partName || '', partTheme: p.partTheme })) : [],
       vidaCristaCantico: assignments?.vidaCristaCantico,
+      vidaCristaParts: Array.isArray(assignments?.vidaCristaParts) ? assignments.vidaCristaParts.map(p => ({...p, id: p.id || generatePartId(), partName: p.partName || '', partTheme: p.partTheme })) : [],
       ebcDirigenteId: assignments?.ebcDirigenteId,
       ebcLeitorId: assignments?.ebcLeitorId,
       ebcCustomTitle: assignments?.ebcCustomTitle,
@@ -490,37 +490,45 @@ export function NvmcAssignmentsCard({
                     <UploadCloud className="mr-2 h-4 w-4" /> Importar Programa (Texto)
                 </Button>
               </div>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.GERAL}</h4>
+              <div className="space-y-6"> {/* Increased spacing for between boxes */}
+                
+                {/* Box 1: Cântico e Oração Inicial */}
+                <div className="border rounded-lg p-4 shadow-sm">
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.GERAL}</h4>
                   {dailyAssignments.canticoInicialNumero && (
-                    <p className="text-sm text-muted-foreground mt-1 mb-2 ml-1 pl-1"> 
+                    <p className="text-sm text-muted-foreground mt-1 mb-2 ml-1 pl-1">
                       {dailyAssignments.canticoInicialNumero}
                     </p>
                   )}
                   {renderFixedPart(dateStr, 'presidenteId', NVMC_FIXED_PARTS_CONFIG.presidenteId)}
                   {renderFixedPart(dateStr, 'oracaoInicialId', NVMC_FIXED_PARTS_CONFIG.oracaoInicialId)}
                   {dailyAssignments.comentariosIniciaisDetalhes && (
-                    <p className="text-sm text-muted-foreground mt-2 mb-2 ml-1 pl-1"> 
+                    <p className="text-sm text-muted-foreground mt-2 mb-2 ml-1 pl-1">
                       {dailyAssignments.comentariosIniciaisDetalhes} | Comentários Iniciais
                     </p>
                   )}
                 </div>
-                <div>
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.TESOUROS}</h4>
+
+                {/* Box 2: Tesouros da Palavra de Deus */}
+                <div className="border rounded-lg p-4 shadow-sm">
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.TESOUROS}</h4>
                   {renderFixedPart(dateStr, 'tesourosDiscursoId', NVMC_FIXED_PARTS_CONFIG.tesourosDiscursoId)}
                   {renderFixedPart(dateStr, 'joiasEspirituaisId', NVMC_FIXED_PARTS_CONFIG.joiasEspirituaisId)}
                   {renderFixedPart(dateStr, 'leituraBibliaId', NVMC_FIXED_PARTS_CONFIG.leituraBibliaId)}
                 </div>
-                <div>
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.FMM}</h4>
+
+                {/* Box 3: Faça Seu Melhor no Ministério */}
+                <div className="border rounded-lg p-4 shadow-sm">
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.FMM}</h4>
                   {dailyAssignments.fmmParts.map(part => renderFmmPart(dateStr, part))}
                   <Button variant="outline" size="sm" onClick={() => addDynamicPart(dateStr, 'fmm')} className="mt-2">
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Parte (FMM)
                   </Button>
                 </div>
-                <div>
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.VIDA_CRISTA}</h4>
+
+                {/* Box 4: Nossa Vida Cristã */}
+                <div className="border rounded-lg p-4 shadow-sm">
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.VIDA_CRISTA}</h4>
                   {dailyAssignments.vidaCristaParts.map(part => renderVidaCristaPart(dateStr, part))}
                    {dailyAssignments.vidaCristaCantico && (
                      <p className="text-sm text-muted-foreground mt-2 mb-2 ml-1 pl-1"> 
@@ -534,8 +542,10 @@ export function NvmcAssignmentsCard({
                   {renderFixedPart(dateStr, 'ebcDirigenteId', NVMC_FIXED_PARTS_CONFIG.ebcDirigenteId)}
                   {renderFixedPart(dateStr, 'ebcLeitorId', NVMC_FIXED_PARTS_CONFIG.ebcLeitorId)}
                 </div>
-                 <div>
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_FIXED_PARTS_CONFIG.oracaoFinalId.section}</h4>
+                
+                {/* Box 5: Comentários Finais */}
+                 <div className="border rounded-lg p-4 shadow-sm">
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_FIXED_PARTS_CONFIG.oracaoFinalId.section}</h4>
                   {dailyAssignments.comentariosFinaisDetalhes && (
                     <p className="text-sm text-muted-foreground mb-2 ml-1 pl-1">{dailyAssignments.comentariosFinaisDetalhes}</p>
                   )}
