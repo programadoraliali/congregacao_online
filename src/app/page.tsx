@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -6,16 +7,18 @@ import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerat
 import { MemberFormDialog } from '@/components/congregacao/MemberFormDialog';
 import { BulkAddDialog } from '@/components/congregacao/BulkAddDialog';
 import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog';
+import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog'; // Novo
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
-import type { Membro, DesignacoesFeitas } from '@/lib/congregacao/types';
+import type { Membro, DesignacoesFeitas, SubstitutionDetails } from '@/lib/congregacao/types';
 import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants';
-import { validarEstruturaMembro, gerarIdMembro, formatarDataCompleta, formatarDataParaChave } from '@/lib/congregacao/utils';
+import { validarEstruturaMembro, gerarIdMembro } from '@/lib/congregacao/utils';
 import { carregarMembrosLocalmente, salvarMembrosLocalmente, carregarCacheDesignacoes, salvarCacheDesignacoes, limparCacheDesignacoes } from '@/lib/congregacao/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Trash2, History } from 'lucide-react';
+import { Trash2, History, UserCog } from 'lucide-react';
+
 
 export default function Home() {
   const [membros, setMembros] = useState<Membro[]>([]);
@@ -29,23 +32,25 @@ export default function Home() {
   const [clearType, setClearType] = useState<'history' | 'all' | null>(null);
   const [memberIdForAdvancedOptions, setMemberIdForAdvancedOptions] = useState<string | null>(null);
 
+  // Estado para o modal de substituição
+  const [isSubstitutionModalOpen, setIsSubstitutionModalOpen] = useState(false);
+  const [substitutionDetails, setSubstitutionDetails] = useState<SubstitutionDetails | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
     setMembros(carregarMembrosLocalmente());
-    const cachedSchedule = carregarCacheDesignacoes(); // This needs to also load month/year
-    // For now, let's assume cache is for *any* month. Better would be to store month/year with it.
-    // For this simple implementation, we'll just load it. The Generate Card will handle showing it.
-    // A more robust cache would involve storing { schedule: DesignacoesFeitas, mes: number, ano: number }
-    if (cachedSchedule && typeof cachedSchedule === 'object' && 'schedule' in cachedSchedule && 'mes' in cachedSchedule && 'ano' in cachedSchedule) { // Simplified cache loading
-        setDesignacoesMensaisCache((cachedSchedule as any).schedule);
-        setCachedScheduleInfo({mes: (cachedSchedule as any).mes, ano: (cachedSchedule as any).ano});
+    const cachedData = carregarCacheDesignacoes(); 
+    if (cachedData && typeof cachedData === 'object' && 'schedule' in cachedData && 'mes' in cachedData && 'ano' in cachedData) {
+        setDesignacoesMensaisCache((cachedData as any).schedule);
+        setCachedScheduleInfo({mes: (cachedData as any).mes, ano: (cachedData as any).ano});
     }
   }, []);
 
   const persistMembros = (novosMembros: Membro[]) => {
-    setMembros(novosMembros.sort((a, b) => a.nome.localeCompare(b.nome)));
-    salvarMembrosLocalmente(novosMembros);
+    const membrosOrdenados = novosMembros.sort((a, b) => a.nome.localeCompare(b.nome));
+    setMembros(membrosOrdenados);
+    salvarMembrosLocalmente(membrosOrdenados);
   };
 
   const handleSaveMember = (memberData: Membro) => {
@@ -56,9 +61,9 @@ export default function Home() {
         return;
     }
 
-    if (memberData.id) { // Editing
+    if (memberData.id) { 
       novosMembros = membros.map(m => m.id === memberData.id ? validarEstruturaMembro(memberData, false) : m);
-    } else { // Adding new
+    } else { 
       const novoMembro = validarEstruturaMembro({ ...memberData, id: gerarIdMembro() }, false);
       if(novoMembro) novosMembros = [...membros, novoMembro];
       else {
@@ -95,7 +100,7 @@ export default function Home() {
         const novoMembro = validarEstruturaMembro({ nome, permissoesBase: {}, historicoDesignacoes: {}, impedimentos: [] }, true);
         if (novoMembro) {
           novosMembrosParaAdicionar.push(novoMembro);
-          nomesExistentes.add(nome.toLowerCase()); // Add to set to avoid duplicates within the bulk list
+          nomesExistentes.add(nome.toLowerCase()); 
           adicionadosCount++;
         }
       }
@@ -138,7 +143,7 @@ export default function Home() {
 
         const nomesUnicosNoArquivo = new Set<string>();
         const membrosValidosImportados = importedData.map(obj => {
-            const membroValidado = validarEstruturaMembro(obj, true); // Gera ID se não existir
+            const membroValidado = validarEstruturaMembro(obj, true);
             if (membroValidado && !nomesUnicosNoArquivo.has(membroValidado.nome.toLowerCase())) {
                 nomesUnicosNoArquivo.add(membroValidado.nome.toLowerCase());
                 return membroValidado;
@@ -148,7 +153,7 @@ export default function Home() {
         }).filter(Boolean) as Membro[];
 
         persistMembros(membrosValidosImportados);
-        limparResultadoMensal(); // Clear any generated schedule as members changed
+        limparResultadoMensal(); 
         toast({ title: "Importado", description: `${membrosValidosImportados.length} membros importados com sucesso.` });
       } catch (err: any) {
         console.error("Erro ao importar membros:", err);
@@ -161,17 +166,16 @@ export default function Home() {
   const handleScheduleGenerated = (designacoes: DesignacoesFeitas, mes: number, ano: number) => {
     setDesignacoesMensaisCache(designacoes);
     setCachedScheduleInfo({mes, ano});
-    // Update member histories after generation
-    const novosMembros = membros.map(m => {
-        const membroAtualizado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } }; // Deep copy history
+    
+    const novosMembros = [...membros].map(m => {
+        const membroAtualizado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } }; 
         Object.entries(designacoes).forEach(([dataStr, funcoesDoDia]) => {
-            const dataObj = new Date(dataStr + "T00:00:00"); // Ensure local time for month/year check
+            const dataObj = new Date(dataStr + "T00:00:00");
             if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
                  Object.entries(funcoesDoDia).forEach(([funcaoId, membroId]) => {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
-                        // If this member was previously assigned this func on this day but now isn't, remove it
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -182,7 +186,7 @@ export default function Home() {
         return membroAtualizado;
     });
     persistMembros(novosMembros);
-    salvarCacheDesignacoes({schedule: designacoes, mes, ano});
+    salvarCacheDesignacoes({schedule: designacoes, mes, ano}); // Passa o objeto completo
   };
 
   const limparResultadoMensal = () => {
@@ -192,16 +196,13 @@ export default function Home() {
   };
 
   const handleOpenAdvancedOptions = (memberId: string | null) => {
-    setMemberIdForAdvancedOptions(memberId); // Store which member's options (if any)
-    // For global clear, memberId will be null
-    setIsMemberFormOpen(false); // Close member form if open
-    // Determine clear type based on context, or set it when specific buttons are clicked
-    // For now, let's assume this function is generic, and specific buttons will set clearType
+    setMemberIdForAdvancedOptions(memberId);
+    setIsMemberFormOpen(false); 
     setIsConfirmClearOpen(true);
   };
   
   const handleClearHistory = () => {
-    if (memberIdForAdvancedOptions) { // Clear history for specific member
+    if (memberIdForAdvancedOptions) { 
         const membro = membros.find(m => m.id === memberIdForAdvancedOptions);
         if (membro) {
             const membrosAtualizados = membros.map(m => 
@@ -210,7 +211,7 @@ export default function Home() {
             persistMembros(membrosAtualizados);
             toast({ title: "Histórico Limpo", description: `Histórico de ${membro.nome} foi limpo.` });
         }
-    } else { // Clear history for all members
+    } else { 
         const membrosAtualizados = membros.map(m => ({ ...m, historicoDesignacoes: {} }));
         persistMembros(membrosAtualizados);
         toast({ title: "Histórico Limpo", description: "Histórico de todos os membros foi limpo." });
@@ -222,6 +223,56 @@ export default function Home() {
     persistMembros([]);
     limparResultadoMensal();
     toast({ title: "Todos os Dados Limpos", description: "Todos os dados da aplicação foram removidos.", variant: "destructive" });
+  };
+
+  // Funções para o modal de substituição
+  const handleOpenSubstitutionModal = (details: SubstitutionDetails) => {
+    setSubstitutionDetails(details);
+    setIsSubstitutionModalOpen(true);
+  };
+
+  const handleConfirmSubstitution = (newMemberId: string) => {
+    if (!substitutionDetails || !designacoesMensaisCache || cachedScheduleInfo === null) {
+      toast({ title: "Erro", description: "Não foi possível processar a substituição. Dados ausentes.", variant: "destructive" });
+      return;
+    }
+
+    const { date, functionId, originalMemberId } = substitutionDetails;
+    const { mes, ano } = cachedScheduleInfo;
+
+    // 1. Atualizar designacoesMensaisCache
+    const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
+    if (novasDesignacoes[date]) {
+      novasDesignacoes[date][functionId] = newMemberId;
+    } else {
+      novasDesignacoes[date] = { [functionId]: newMemberId };
+    }
+    setDesignacoesMensaisCache(novasDesignacoes);
+
+    // 2. Atualizar histórico dos membros
+    const membrosAtualizados = membros.map(m => {
+      const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
+      if (m.id === originalMemberId) {
+        // Se o membro original tinha esta designação no histórico, remover/alterar.
+        // No contexto de substituição, assumimos que ele estava designado, então removemos.
+        // Se ele não estivesse (o que seria estranho), nada acontece aqui.
+        if (membroModificado.historicoDesignacoes[date] === functionId) {
+             delete membroModificado.historicoDesignacoes[date];
+        }
+      }
+      if (m.id === newMemberId) {
+        membroModificado.historicoDesignacoes[date] = functionId;
+      }
+      return membroModificado;
+    });
+    persistMembros(membrosAtualizados);
+
+    // 3. Salvar o cache de designações atualizado
+    salvarCacheDesignacoes({schedule: novasDesignacoes, mes, ano});
+
+    toast({ title: "Substituição Realizada", description: "A designação foi atualizada com sucesso." });
+    setIsSubstitutionModalOpen(false);
+    setSubstitutionDetails(null);
   };
 
 
@@ -239,7 +290,7 @@ export default function Home() {
         <Accordion type="multiple" defaultValue={['item-1', 'item-2']} className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
-                {/* Icon Removed */}
+                Gerenciar Membros
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <MemberManagementCard
@@ -255,7 +306,7 @@ export default function Home() {
           </AccordionItem>
           <AccordionItem value="item-2">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
-                 {/* Icon Removed */}
+                 Gerar Designações
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <ScheduleGenerationCard 
@@ -264,6 +315,7 @@ export default function Home() {
                 currentSchedule={designacoesMensaisCache}
                 currentMes={cachedScheduleInfo?.mes ?? null}
                 currentAno={cachedScheduleInfo?.ano ?? null}
+                onOpenSubstitutionModal={handleOpenSubstitutionModal} // Passa a função
               />
             </AccordionContent>
           </AccordionItem>
@@ -310,6 +362,16 @@ export default function Home() {
         clearType={clearType}
         targetMemberName={memberIdForAdvancedOptions ? membros.find(m=>m.id === memberIdForAdvancedOptions)?.nome : null}
       />
+       {isSubstitutionModalOpen && substitutionDetails && designacoesMensaisCache && (
+        <SubstitutionDialog
+          isOpen={isSubstitutionModalOpen}
+          onOpenChange={setIsSubstitutionModalOpen}
+          substitutionDetails={substitutionDetails}
+          allMembers={membros}
+          currentAssignmentsForMonth={designacoesMensaisCache}
+          onConfirmSubstitution={handleConfirmSubstitution}
+        />
+      )}
     </div>
   );
 }

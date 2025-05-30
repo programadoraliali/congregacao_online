@@ -2,12 +2,11 @@
 'use server'; 
 
 import type { Membro, FuncaoDesignada, DesignacoesFeitas, DiasReuniao } from './types';
-import { FUNCOES_DESIGNADAS, DIAS_REUNIAO as DIAS_REUNIAO_CONFIG, NOMES_DIAS_SEMANA_ABREV } from './constants';
+import { FUNCOES_DESIGNADAS, DIAS_REUNIAO as DIAS_REUNIAO_CONFIG } from './constants';
 import { formatarDataCompleta, getPermissaoRequerida } from './utils';
-// AI import removido pois a lógica de sugestão será determinística
-// import { suggestBestAssignment, type SuggestBestAssignmentInput } from '@/ai/flows/suggest-best-assignment';
 
-// --- Funções Auxiliares para Priorização ---
+
+// --- Funções Auxiliares de Elegibilidade e Priorização (Refatoradas e Exportadas) ---
 
 function encontrarDataReuniaoAnterior(
   dataAtual: Date,
@@ -20,7 +19,7 @@ function encontrarDataReuniaoAnterior(
   for (const dataCand of datasDeReuniaoNoMes) {
     if (dataCand < dataAtual && dataCand.getDay() === diaSemanaAlvo) {
       if (dataAnterior === null || dataCand > dataAnterior) {
-        dataAnterior = new Date(dataCand); // Garante nova instância
+        dataAnterior = new Date(dataCand);
       }
     }
   }
@@ -36,9 +35,6 @@ function fezFuncaoNaReuniaoAnterior(
   if (!dataReuniaoAnteriorStr) return false;
   const designacoesDoDiaAnterior = designacoesFeitasNoMesAtual[dataReuniaoAnteriorStr];
   if (!designacoesDoDiaAnterior) return false;
-  // Verifica se o membro fez especificamente esta função (ou uma equivalente com o mesmo base ID, ex: indicadorExternoQui vs indicadorPalcoQui)
-  // Para simplificar, vamos considerar a funcaoId exata.
-  // Se a regra fosse "qualquer função de indicador", a lógica seria mais complexa aqui.
   return designacoesDoDiaAnterior[funcaoId] === membroId;
 }
 
@@ -46,11 +42,12 @@ function contarUsoFuncaoNoMes(
   membroId: string,
   funcaoId: string,
   designacoesFeitasNoMesAtual: DesignacoesFeitas,
-  dataAtualStr: string // Para não contar a designação que estamos prestes a fazer
+  dataAtualStr: string,
+  ignorarDataAtual: boolean = true // Se true, não conta a designação da dataAtualStr
 ): number {
   let count = 0;
   for (const dataStr in designacoesFeitasNoMesAtual) {
-    if (dataStr >= dataAtualStr) continue; // Considera apenas designações já feitas
+    if (ignorarDataAtual && dataStr >= dataAtualStr) continue;
     const funcoesDoDia = designacoesFeitasNoMesAtual[dataStr];
     if (funcoesDoDia && funcoesDoDia[funcaoId] === membroId) {
       count++;
@@ -62,11 +59,12 @@ function contarUsoFuncaoNoMes(
 function contarUsoGeralNoMes(
   membroId: string,
   designacoesFeitasNoMesAtual: DesignacoesFeitas,
-  dataAtualStr: string // Para não contar a designação que estamos prestes a fazer
+  dataAtualStr: string,
+  ignorarDataAtual: boolean = true // Se true, não conta a designação da dataAtualStr
 ): number {
   let count = 0;
   for (const dataStr in designacoesFeitasNoMesAtual) {
-    if (dataStr >= dataAtualStr) continue; // Considera apenas designações já feitas
+    if (ignorarDataAtual && dataStr >= dataAtualStr) continue;
     const funcoesDoDia = designacoesFeitasNoMesAtual[dataStr];
     if (funcoesDoDia) {
       for (const funcId in funcoesDoDia) {
@@ -109,8 +107,86 @@ function getDataUltimaVezFuncao(
   return ultimaData;
 }
 
-// --- Lógica Principal de Geração ---
+export function getEligibleMembersForFunctionDate(
+  funcao: FuncaoDesignada,
+  dataReuniao: Date,
+  dataReuniaoStr: string,
+  todosMembros: Membro[],
+  designacoesNoDia: Record<string, string | null> = {}, // Designações já feitas neste dia específico
+  membroExcluidoId?: string | null // Para substituição, não considerar este membro
+): Membro[] {
+  const tipoReuniao = dataReuniao.getUTCDay() === DIAS_REUNIAO_CONFIG.meioSemana ? 'meioSemana' : 'publica';
+  const membrosDesignadosNesteDia = new Set(Object.values(designacoesNoDia).filter(id => id !== null) as string[]);
 
+  return todosMembros.filter(membro => {
+    if (membroExcluidoId && membro.id === membroExcluidoId) {
+      return false;
+    }
+
+    const permissaoNecessariaId = getPermissaoRequerida(funcao.id, tipoReuniao);
+    if (!permissaoNecessariaId || !membro.permissoesBase[permissaoNecessariaId]) {
+      return false;
+    }
+
+    if (membro.impedimentos.some(imp => dataReuniaoStr >= imp.from && dataReuniaoStr <= imp.to)) {
+      return false;
+    }
+
+    if (membrosDesignadosNesteDia.has(membro.id)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export function sortMembersByPriority(
+  membrosElegiveis: Membro[],
+  funcao: FuncaoDesignada,
+  dataReuniaoAnteriorStr: string | null,
+  designacoesFeitasNoMesAtual: DesignacoesFeitas,
+  dataReuniaoStr: string,
+  membrosComHistoricoCompleto: Membro[] // Para acessar o histórico original completo
+): Membro[] {
+  
+  // Criar uma cópia para não modificar o array original diretamente
+  const membrosOrdenados = [...membrosElegiveis];
+
+  membrosOrdenados.sort((membroA, membroB) => {
+    const fezAFuncaoAnterior = fezFuncaoNaReuniaoAnterior(membroA.id, funcao.id, dataReuniaoAnteriorStr, designacoesFeitasNoMesAtual);
+    const fezBFuncaoAnterior = fezFuncaoNaReuniaoAnterior(membroB.id, funcao.id, dataReuniaoAnteriorStr, designacoesFeitasNoMesAtual);
+    if (fezAFuncaoAnterior && !fezBFuncaoAnterior) return 1; 
+    if (!fezAFuncaoAnterior && fezBFuncaoAnterior) return -1;
+
+    const usoFuncaoMesA = contarUsoFuncaoNoMes(membroA.id, funcao.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+    const usoFuncaoMesB = contarUsoFuncaoNoMes(membroB.id, funcao.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+    if (usoFuncaoMesA !== usoFuncaoMesB) return usoFuncaoMesA - usoFuncaoMesB;
+
+    const usoGeralMesA = contarUsoGeralNoMes(membroA.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+    const usoGeralMesB = contarUsoGeralNoMes(membroB.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
+    if (usoGeralMesA !== usoGeralMesB) return usoGeralMesA - usoGeralMesB;
+    
+    const membroOriginalA = membrosComHistoricoCompleto.find(m => m.id === membroA.id)!;
+    const membroOriginalB = membrosComHistoricoCompleto.find(m => m.id === membroB.id)!;
+
+    const usoFuncaoHistA = contarUsoFuncaoNoHistorico(membroA.id, funcao.id, membroOriginalA);
+    const usoFuncaoHistB = contarUsoFuncaoNoHistorico(membroB.id, funcao.id, membroOriginalB);
+    if (usoFuncaoHistA !== usoFuncaoHistB) return usoFuncaoHistA - usoFuncaoHistB;
+
+    const ultimaVezA = getDataUltimaVezFuncao(membroA.id, funcao.id, membroOriginalA);
+    const ultimaVezB = getDataUltimaVezFuncao(membroB.id, funcao.id, membroOriginalB);
+
+    if (ultimaVezA === null && ultimaVezB !== null) return -1;
+    if (ultimaVezA !== null && ultimaVezB === null) return 1;
+    if (ultimaVezA && ultimaVezB && ultimaVezA !== ultimaVezB) {
+      return ultimaVezA.localeCompare(ultimaVezB);
+    }
+    
+    return Math.random() - 0.5;
+  });
+  return membrosOrdenados;
+}
+
+// --- Lógica Principal de Geração ---
 export async function calcularDesignacoesAction(
   mes: number, // 0-11
   ano: number,
@@ -119,9 +195,6 @@ export async function calcularDesignacoesAction(
   
   const DIAS_REUNIAO: DiasReuniao = DIAS_REUNIAO_CONFIG;
   const designacoesFeitasNoMesAtual: DesignacoesFeitas = {};
-  
-  // Usar uma cópia para não modificar os objetos originais, especialmente o histórico
-  // que será usado para consulta do "passado" antes deste mês.
   const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[];
 
   const datasDeReuniaoNoMes: Date[] = [];
@@ -129,107 +202,54 @@ export async function calcularDesignacoesAction(
   const ultimoDiaDoMes = new Date(Date.UTC(ano, mes + 1, 0));
 
   for (let dia = new Date(primeiroDiaDoMes); dia <= ultimoDiaDoMes; dia.setUTCDate(dia.getUTCDate() + 1)) {
-    const diaDaSemana = dia.getUTCDay(); // Use UTC days
+    const diaDaSemana = dia.getUTCDay();
     if (diaDaSemana === DIAS_REUNIAO.meioSemana || diaDaSemana === DIAS_REUNIAO.publica) {
-      datasDeReuniaoNoMes.push(new Date(dia)); // Salva uma cópia da data
+      datasDeReuniaoNoMes.push(new Date(dia));
     }
   }
 
   if (datasDeReuniaoNoMes.length === 0) {
     return { error: "Nenhuma data de reunião encontrada para este mês." };
   }
-  // Ordenar as datas de reunião cronologicamente (já deve estar, mas para garantir)
   datasDeReuniaoNoMes.sort((a, b) => a.getTime() - b.getTime());
 
   for (const dataReuniao of datasDeReuniaoNoMes) {
-    const dataReuniaoStr = formatarDataCompleta(dataReuniao); // "YYYY-MM-DD"
+    const dataReuniaoStr = formatarDataCompleta(dataReuniao);
     designacoesFeitasNoMesAtual[dataReuniaoStr] = {};
     
     const tipoReuniaoAtual = dataReuniao.getUTCDay() === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
     const funcoesParaEsteTipoReuniao = FUNCOES_DESIGNADAS.filter(f => f.tipoReuniao.includes(tipoReuniaoAtual));
-
-    const membrosDesignadosNesteDia: Set<string> = new Set();
-
+    
     const dataReuniaoAnteriorObj = encontrarDataReuniaoAnterior(dataReuniao, tipoReuniaoAtual, datasDeReuniaoNoMes, DIAS_REUNIAO);
     const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
 
-
     for (const funcao of funcoesParaEsteTipoReuniao) {
-      // 4.2. Regras de Elegibilidade
-      let membrosElegiveis = membrosDisponiveis.filter(membro => {
-        // Condição de Permissão
-        const permissaoNecessariaId = getPermissaoRequerida(funcao.id, tipoReuniaoAtual);
-        if (!permissaoNecessariaId || !membro.permissoesBase[permissaoNecessariaId]) {
-          return false;
-        }
-
-        // Condição de Impedimento
-        if (membro.impedimentos.some(imp => dataReuniaoStr >= imp.from && dataReuniaoStr <= imp.to)) {
-          return false;
-        }
-
-        // Condição de Designação Única por Dia
-        if (membrosDesignadosNesteDia.has(membro.id)) {
-          return false;
-        }
-        return true;
-      });
+      const membrosElegiveis = getEligibleMembersForFunctionDate(
+        funcao,
+        dataReuniao,
+        dataReuniaoStr,
+        membrosDisponiveis,
+        designacoesFeitasNoMesAtual[dataReuniaoStr]
+      );
 
       if (membrosElegiveis.length === 0) {
         designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
         continue;
       }
 
-      // 4.3. Sistema de Priorização
-      membrosElegiveis.sort((membroA, membroB) => {
-        // Prioridade 1: Anti-Repetição Imediata
-        const fezAFuncaoAnterior = fezFuncaoNaReuniaoAnterior(membroA.id, funcao.id, dataReuniaoAnteriorStr, designacoesFeitasNoMesAtual);
-        const fezBFuncaoAnterior = fezFuncaoNaReuniaoAnterior(membroB.id, funcao.id, dataReuniaoAnteriorStr, designacoesFeitasNoMesAtual);
-        if (fezAFuncaoAnterior && !fezBFuncaoAnterior) return 1; 
-        if (!fezAFuncaoAnterior && fezBFuncaoAnterior) return -1;
+      const membrosOrdenados = sortMembersByPriority(
+        membrosElegiveis,
+        funcao,
+        dataReuniaoAnteriorStr,
+        designacoesFeitasNoMesAtual,
+        dataReuniaoStr,
+        membros // Passa a lista original para consulta de histórico
+      );
 
-        // Prioridade 2: Uso na Função no Mês (considerando designações já feitas neste ciclo)
-        const usoFuncaoMesA = contarUsoFuncaoNoMes(membroA.id, funcao.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
-        const usoFuncaoMesB = contarUsoFuncaoNoMes(membroB.id, funcao.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
-        if (usoFuncaoMesA !== usoFuncaoMesB) return usoFuncaoMesA - usoFuncaoMesB;
-
-        // Prioridade 3: Uso Geral no Mês (considerando designações já feitas neste ciclo)
-        const usoGeralMesA = contarUsoGeralNoMes(membroA.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
-        const usoGeralMesB = contarUsoGeralNoMes(membroB.id, designacoesFeitasNoMesAtual, dataReuniaoStr);
-        if (usoGeralMesA !== usoGeralMesB) return usoGeralMesA - usoGeralMesB;
-        
-        // Para as prioridades 4 e 5, usamos o histórico original do membro (membros[findIndex])
-        const membroOriginalA = membros.find(m => m.id === membroA.id)!;
-        const membroOriginalB = membros.find(m => m.id === membroB.id)!;
-
-        // Prioridade 4: Uso na Função no Histórico Passado
-        const usoFuncaoHistA = contarUsoFuncaoNoHistorico(membroA.id, funcao.id, membroOriginalA);
-        const usoFuncaoHistB = contarUsoFuncaoNoHistorico(membroB.id, funcao.id, membroOriginalB);
-        if (usoFuncaoHistA !== usoFuncaoHistB) return usoFuncaoHistA - usoFuncaoHistB;
-
-        // Prioridade 5: Data da Última Vez (Histórico Passado)
-        const ultimaVezA = getDataUltimaVezFuncao(membroA.id, funcao.id, membroOriginalA);
-        const ultimaVezB = getDataUltimaVezFuncao(membroB.id, funcao.id, membroOriginalB);
-
-        if (ultimaVezA === null && ultimaVezB !== null) return -1; // A (nunca fez) tem prioridade
-        if (ultimaVezA !== null && ultimaVezB === null) return 1;  // B (nunca fez) tem prioridade
-        if (ultimaVezA && ultimaVezB && ultimaVezA !== ultimaVezB) {
-          return ultimaVezA.localeCompare(ultimaVezB); // Data mais antiga (menor string) tem prioridade
-        }
-        
-        // Desempate Final: Aleatório
-        return Math.random() - 0.5;
-      });
-
-      const membroEscolhido = membrosElegiveis[0];
+      const membroEscolhido = membrosOrdenados[0];
       if (membroEscolhido) {
         designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = membroEscolhido.id;
-        membrosDesignadosNesteDia.add(membroEscolhido.id);
-        // O histórico do membro (membro.historicoDesignacoes) não é atualizado aqui.
-        // Isso será feito na page.tsx após o retorno desta função,
-        // para garantir que as prioridades 4 e 5 usem o histórico *antes* deste mês.
       } else {
-        // Isso não deveria acontecer se membrosElegiveis.length > 0
         designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
       }
     }
@@ -238,4 +258,104 @@ export async function calcularDesignacoesAction(
   return { designacoesFeitas: designacoesFeitasNoMesAtual };
 }
 
-    
+
+// --- Funções para Lógica de Substituição ---
+
+export function findNextBestCandidateForSubstitution(
+  dateStr: string,
+  functionId: string,
+  originalMemberId: string,
+  allMembers: Membro[],
+  currentAssignmentsForMonth: DesignacoesFeitas
+): Membro | null {
+  const targetDate = new Date(dateStr + "T00:00:00"); // Para obter dia da semana
+  const targetFunction = FUNCOES_DESIGNADAS.find(f => f.id === functionId);
+
+  if (!targetFunction) return null;
+
+  const assignmentsOnTargetDate = currentAssignmentsForMonth[dateStr] || {};
+  
+  // Precisa identificar a data da reunião anterior do mesmo tipo para a regra de anti-repetição
+  // Esta lógica é simplificada aqui; uma implementação mais robusta buscaria no mês todo.
+  // Para simplificar, vamos assumir que a regra de anti-repetição imediata pode ser menos crítica
+  // para substituições ou dependeria de um contexto mais amplo de datas do mês.
+  // Por ora, passaremos null como dataReuniaoAnteriorStr para `sortMembersByPriority` na substituição,
+  // o que significa que a prioridade 1 (anti-repetição imediata) não terá efeito direto da mesma forma.
+  // Ou, precisaríamos de `datasDeReuniaoNoMes` aqui também.
+  
+  // Temporariamente simplificando:
+  const datasDeReuniaoNoMesFicticia : Date[] = Object.keys(currentAssignmentsForMonth)
+    .map(d => new Date(d + "T00:00:00"))
+    .sort((a,b) => a.getTime() - b.getTime());
+  
+  const tipoReuniaoAtual = targetDate.getUTCDay() === DIAS_REUNIAO_CONFIG.meioSemana ? 'meioSemana' : 'publica';
+  const dataReuniaoAnteriorObj = encontrarDataReuniaoAnterior(targetDate, tipoReuniaoAtual, datasDeReuniaoNoMesFicticia, DIAS_REUNIAO_CONFIG);
+  const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
+
+
+  const eligibleMembers = getEligibleMembersForFunctionDate(
+    targetFunction,
+    targetDate,
+    dateStr,
+    allMembers,
+    assignmentsOnTargetDate,
+    originalMemberId // Exclui o membro original
+  );
+
+  if (eligibleMembers.length === 0) return null;
+
+  const sortedMembers = sortMembersByPriority(
+    eligibleMembers,
+    targetFunction,
+    dataReuniaoAnteriorStr, 
+    currentAssignmentsForMonth,
+    dateStr,
+    allMembers
+  );
+  
+  return sortedMembers.length > 0 ? sortedMembers[0] : null;
+}
+
+export function getPotentialSubstitutesList(
+  dateStr: string,
+  functionId: string,
+  originalMemberId: string,
+  allMembers: Membro[],
+  currentAssignmentsForMonth: DesignacoesFeitas
+): Membro[] {
+  const targetDate = new Date(dateStr + "T00:00:00");
+  const targetFunction = FUNCOES_DESIGNADAS.find(f => f.id === functionId);
+
+  if (!targetFunction) return [];
+
+  const assignmentsOnTargetDate = currentAssignmentsForMonth[dateStr] || {};
+  
+  const datasDeReuniaoNoMesFicticia : Date[] = Object.keys(currentAssignmentsForMonth)
+    .map(d => new Date(d + "T00:00:00"))
+    .sort((a,b) => a.getTime() - b.getTime());
+  
+  const tipoReuniaoAtual = targetDate.getUTCDay() === DIAS_REUNIAO_CONFIG.meioSemana ? 'meioSemana' : 'publica';
+  const dataReuniaoAnteriorObj = encontrarDataReuniaoAnterior(targetDate, tipoReuniaoAtual, datasDeReuniaoNoMesFicticia, DIAS_REUNIAO_CONFIG);
+  const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
+
+
+  const eligibleMembers = getEligibleMembersForFunctionDate(
+    targetFunction,
+    targetDate,
+    dateStr,
+    allMembers,
+    assignmentsOnTargetDate,
+    originalMemberId // Exclui o membro original da lista de potenciais substitutos diretos se ele não puder se substituir.
+                     // Se a intenção é apenas ver quem *poderia* fazer, não o exclua aqui, mas sim ao selecionar.
+                     // Para a lista de Opção B, geralmente queremos todos os elegíveis MENOS o original.
+  );
+
+  return sortMembersByPriority(
+    eligibleMembers,
+    targetFunction,
+    dataReuniaoAnteriorStr,
+    currentAssignmentsForMonth,
+    dateStr,
+    allMembers
+  );
+}

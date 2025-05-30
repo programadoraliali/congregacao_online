@@ -51,3 +51,11 @@ export interface DiasReuniao {
   meioSemana: number; // 0 (Dom) - 6 (Sab)
   publica: number;    // 0 (Dom) - 6 (Sab)
 }
+
+export interface SubstitutionDetails {
+  date: string; // YYYY-MM-DD
+  functionId: string;
+  originalMemberId: string;
+  originalMemberName: string | null;
+  currentFunctionGroupId: 'Indicadores' | 'Volantes' | string; // Para saber qual funcao especifica dentro do grupo
+}

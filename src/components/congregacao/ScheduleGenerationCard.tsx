@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { NOMES_MESES } from '@/lib/congregacao/constants';
-import type { DesignacoesFeitas, Membro } from '@/lib/congregacao/types';
+import type { DesignacoesFeitas, Membro, SubstitutionDetails } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
 import { useToast } from "@/hooks/use-toast";
@@ -16,17 +16,19 @@ import { CalendarCheck, FileText, AlertTriangle, Loader2 } from 'lucide-react';
 interface ScheduleGenerationCardProps {
   membros: Membro[];
   onScheduleGenerated: (designacoes: DesignacoesFeitas, mes: number, ano: number) => void;
-  currentSchedule: DesignacoesFeitas | null; // Last successfully generated/cached schedule
-  currentMes: number | null; // Month of the currentSchedule
-  currentAno: number | null; // Year of the currentSchedule
+  currentSchedule: DesignacoesFeitas | null;
+  currentMes: number | null;
+  currentAno: number | null;
+  onOpenSubstitutionModal: (details: SubstitutionDetails) => void; // Nova prop
 }
 
 export function ScheduleGenerationCard({ 
   membros, 
   onScheduleGenerated, 
-  currentSchedule, // This prop is now only for initial selection
-  currentMes,     // This prop is now only for initial selection
-  currentAno      // This prop is now only for initial selection
+  currentSchedule,
+  currentMes,
+  currentAno,
+  onOpenSubstitutionModal // Nova prop
 }: ScheduleGenerationCardProps) {
   const [selectedMes, setSelectedMes] = useState<string>(currentMes !== null ? currentMes.toString() : new Date().getMonth().toString());
   const [selectedAno, setSelectedAno] = useState<string>(currentAno !== null ? currentAno.toString() : new Date().getFullYear().toString());
@@ -34,23 +36,32 @@ export function ScheduleGenerationCard({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // New state to hold the schedule data that should be displayed
   const [displayedScheduleData, setDisplayedScheduleData] = useState<{
     schedule: DesignacoesFeitas;
     mes: number;
     ano: number;
   } | null>(null);
 
-  // Effect to clear displayed schedule and errors when selected month/year changes
   useEffect(() => {
-    setDisplayedScheduleData(null);
-    setError(null);
-  }, [selectedMes, selectedAno]);
+    // Se houver um currentSchedule (cache) e o mês/ano selecionado corresponderem,
+    // inicializa o displayedScheduleData com ele.
+    // No entanto, a lógica de "só gerar ao clicar" é mantida porque
+    // o handleGenerateSchedule sempre redefine o displayedScheduleData.
+    if (currentSchedule && currentMes !== null && currentAno !== null &&
+        parseInt(selectedMes,10) === currentMes && parseInt(selectedAno,10) === currentAno) {
+       // setDisplayedScheduleData({ schedule: currentSchedule, mes: currentMes, ano: currentAno });
+       // Comentado para forçar o clique em "Gerar" mesmo se houver cache inicial
+    } else {
+      setDisplayedScheduleData(null); // Limpa se o cache não corresponder à seleção inicial
+    }
+     setError(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMes, selectedAno]); // Não incluir currentSchedule, currentMes, currentAno aqui para evitar re-set indesejado
 
   const handleGenerateSchedule = async () => {
     setError(null);
     setIsLoading(true);
-    setDisplayedScheduleData(null); // Clear previous display before generating new
+    setDisplayedScheduleData(null); 
     const mes = parseInt(selectedMes, 10);
     const ano = parseInt(selectedAno, 10);
 
@@ -68,8 +79,8 @@ export function ScheduleGenerationCard({
         setError(result.error);
         toast({ title: "Erro ao Gerar Designações", description: result.error, variant: "destructive" });
       } else {
-        onScheduleGenerated(result.designacoesFeitas, mes, ano); // Update parent cache
-        setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano }); // Set schedule for display
+        onScheduleGenerated(result.designacoesFeitas, mes, ano); 
+        setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano });
         toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
       }
     } catch (e: any) {
@@ -83,7 +94,6 @@ export function ScheduleGenerationCard({
   };
   
   const handleExportPDF = () => {
-    // Placeholder for PDF export functionality
     toast({
       title: "Funcionalidade Indisponível",
       description: "A exportação para PDF ainda não foi implementada.",
@@ -156,7 +166,8 @@ export function ScheduleGenerationCard({
                 designacoesFeitas={displayedScheduleData.schedule} 
                 membros={membros} 
                 mes={displayedScheduleData.mes} 
-                ano={displayedScheduleData.ano} 
+                ano={displayedScheduleData.ano}
+                onOpenSubstitutionModal={onOpenSubstitutionModal} // Passa a prop
               />
               <div className="mt-6 text-center">
                 <Button variant="outline" onClick={handleExportPDF}>
@@ -175,4 +186,3 @@ export function ScheduleGenerationCard({
     </Card>
   );
 }
-
