@@ -37,8 +37,8 @@ export function PublicMeetingAssignmentsCard({
   initialYear,
   onSaveAssignments,
 }: PublicMeetingAssignmentsCardProps) {
-  const [displayMonth, setDisplayMonth] = useState<number>(initialMonth);
-  const [displayYear, setDisplayYear] = useState<number>(initialYear);
+  const [displayMonth, setDisplayMonth] = useState<number>(initialMonth ?? new Date().getMonth());
+  const [displayYear, setDisplayYear] = useState<number>(initialYear ?? new Date().getFullYear());
   const [assignments, setAssignments] = useState<{ [dateStr: string]: PublicMeetingAssignment }>({});
   const [isMemberSelectionOpen, setIsMemberSelectionOpen] = useState(false);
   const [memberSelectionContext, setMemberSelectionContext] = useState<{
@@ -62,12 +62,15 @@ export function PublicMeetingAssignmentsCard({
 
   const sundaysInMonth = useMemo(() => {
     const dates: Date[] = [];
+    // Ensure UTC to avoid timezone issues when determining day of week and month boundaries
     const firstDay = new Date(Date.UTC(displayYear, displayMonth, 1));
-    const lastDay = new Date(Date.UTC(displayYear, displayMonth + 1, 0));
-    for (let day = new Date(firstDay); day <= lastDay; day.setUTCDate(day.getUTCDate() + 1)) {
-      if (day.getUTCDay() === DIAS_REUNIAO.publica) { // Domingo
-        dates.push(new Date(day));
-      }
+    const lastDayMonth = new Date(Date.UTC(displayYear, displayMonth + 1, 0)).getUTCDate(); // Get the last day number of the month
+
+    for (let dayNum = 1; dayNum <= lastDayMonth; dayNum++) {
+        const currentDate = new Date(Date.UTC(displayYear, displayMonth, dayNum));
+        if (currentDate.getUTCDay() === DIAS_REUNIAO.publica) { // Domingo is 0
+            dates.push(currentDate);
+        }
     }
     return dates;
   }, [displayMonth, displayYear]);
@@ -122,7 +125,7 @@ export function PublicMeetingAssignmentsCard({
           <BookOpenText className="mr-2 h-5 w-5 text-primary" /> Designações da Reunião Pública
         </CardTitle>
         <CardDescription>
-          Configure os temas, oradores e participantes para as reuniões públicas.
+          Configure os temas, oradores e participantes para as reuniões públicas de {obterNomeMes(displayMonth)} de {displayYear}.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -165,11 +168,12 @@ export function PublicMeetingAssignmentsCard({
           const dateStr = formatarDataCompleta(dateObj);
           const dayAssignment = assignments[dateStr] || {};
           const dayAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
-          const formattedDateDisplay = `${dayAbrev} ${dateObj.getUTCDate()}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+          // Use getUTCDate() for day and getUTCMonth() for month to be consistent with how dates were generated
+          const formattedDateDisplay = `${dayAbrev} ${dateObj.getUTCDate().toString().padStart(2, '0')}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
           
           return (
             <div key={dateStr}>
-              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay} - {obterNomeMes(displayMonth)} {displayYear}</h3>
+              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay} - {obterNomeMes(dateObj.getUTCMonth())} {dateObj.getUTCFullYear()}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                 <div>
                   <Label htmlFor={`tema-${dateStr}`}>Tema do Discurso</Label>
@@ -256,5 +260,3 @@ export function PublicMeetingAssignmentsCard({
     </Card>
   );
 }
-
-    
