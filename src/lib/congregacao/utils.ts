@@ -133,7 +133,6 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   };
 
   let currentSection: 'TESOUROS' | 'FMM' | 'VC' | null = null;
-  let ebcLines: string[] = [];
   let captureEbcTheme = false;
 
   for (let i = 0; i < lines.length; i++) {
@@ -155,17 +154,20 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
       continue;
     }
     if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) {
-      result.comentariosFinaisDetalhes = line;
-      currentSection = null; // Encerra a captura para outras seções
+      let details = line.substring('Comentários finais'.length).trim();
+      if (details.startsWith('|')) {
+        details = details.substring(1).trim();
+      }
+      result.comentariosFinaisDetalhes = details;
+      currentSection = null;
       captureEbcTheme = false;
       continue;
     }
-    if (line.toUpperCase().startsWith('CÂNTICO') && (line.includes('ORAÇÃO') || lines[i-1]?.toUpperCase().startsWith('COMENTÁRIOS FINAIS'))) {
-      // Parte dos comentários finais ou cântico inicial
+    if (line.toUpperCase().startsWith('CÂNTICO') && (line.includes('ORAÇÃO') || lines[i-1]?.toUpperCase().startsWith('COMENTÁRIOS FINAIS') || lines[i-1]?.toUpperCase().includes('NOSSA VIDA CRISTÃ') )) {
       continue;
     }
      if (line.toUpperCase().startsWith('CÂNTICO')) {
-      captureEbcTheme = false; // Para de capturar para o EBC se encontrar um cântico solto
+      captureEbcTheme = false; 
       continue;
     }
     if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
@@ -177,7 +179,8 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
         line.match(/^\s*Mostre o VÍDEO/i) ||
         line.match(/^\s*O que você aprendeu/i) ||
         line.match(/ijwbq artigo/i) || 
-        line.match(/Que joias espirituais você encontrou/i)
+        line.match(/Que joias espirituais você encontrou/i) ||
+        line.toLowerCase().includes("depois, pergunte:")
        ) {
       continue;
     }
@@ -186,12 +189,13 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     const partMatch = line.match(partRegex);
 
     if (partMatch) {
-      const partNumber = parseInt(partMatch[1], 10);
       const fullTitleFromLine = partMatch[2].trim();
+      const partNumber = parseInt(partMatch[1], 10);
       
       let partName = "";
       let partTheme: string | undefined = undefined;
 
+      // Regex para encontrar o tempo (X min)
       const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i;
       const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
 
@@ -213,7 +217,8 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
           const isCommentOrQuestion = nextLine.toLowerCase().startsWith('sua resposta') || 
                                       nextLine.toLowerCase().startsWith('pergunto-se:') ||
                                       nextLine.match(/ijwbq artigo/i) ||
-                                      nextLine.match(/Que joias espirituais você encontrou/i);
+                                      nextLine.match(/Que joias espirituais você encontrou/i) ||
+                                      nextLine.toLowerCase().includes("depois, pergunte:");
           const isInstructionalForNextLine = nextLine.match(/^\s*Quando nossos irmãos/i) || 
                                              nextLine.match(/^\s*Seja hospitaleiro/i) || 
                                              nextLine.match(/^\s*“Um olhar animado”/i) || 
@@ -235,42 +240,33 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
           nextLineIndex++;
       }
       partTheme = partTheme?.trim();
-
-      if (!partName && partTheme) {
-        const themeTimeMatch = partTheme.match(timeMatchRegex);
-        if (themeTimeMatch && themeTimeMatch.index !== undefined && themeTimeMatch.index > 0) {
-            partName = partTheme.substring(0, themeTimeMatch.index).trim();
-            partTheme = partTheme.substring(themeTimeMatch.index).trim();
-        } else if (!themeTimeMatch) { 
-            partName = partTheme;
-            partTheme = undefined;
-        }
-      }
-
       partName = partName.replace(/:$/, '').trim();
-      const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
 
+      const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
+      
       if (currentSection === 'TESOUROS') {
         if (extractedPart.partName.toLowerCase().includes('leitura da bíblia')) {
           result.leituraBibliaTema = extractedPart.partTheme || extractedPart.partName.replace(/leitura da bíblia/i, '').trim();
         } else if (extractedPart.partName.toLowerCase().includes('joias espirituais')) {
            result.joiasEspirituaisTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + "Perguntas e respostas";
         } else if (partNumber === 1) { 
-            result.tesourosDiscursoTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + extractedPart.partName;
+           result.tesourosDiscursoTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + extractedPart.partName;
         }
       } else if (currentSection === 'FMM') {
         if(extractedPart.partName) result.fmmParts.push(extractedPart);
       } else if (currentSection === 'VC') {
         if (extractedPart.partName.toLowerCase().includes('estudo bíblico de congregação')) {
           result.ebcTema = extractedPart.partTheme || extractedPart.partName.replace(/estudo bíblico de congregação/i, '').trim();
-          captureEbcTheme = false; // Termina a captura específica para EBC
+          captureEbcTheme = false; 
         } else {
           if(extractedPart.partName) result.vidaCristaParts.push(extractedPart);
         }
       }
-    } else if (captureEbcTheme && currentSection === 'VC') { // Se não for uma parte numerada, mas estamos capturando para EBC
-        ebcLines.push(line);
+    } else if (currentSection === 'VC' && line.toLowerCase().startsWith('bt cap')) { // Specific catch for EBC theme if not numbered
+        result.ebcTema = line;
+        captureEbcTheme = false;
     }
   }
   return result;
 }
+
