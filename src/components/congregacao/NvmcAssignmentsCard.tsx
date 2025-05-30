@@ -132,8 +132,8 @@ export function NvmcAssignmentsCard({
     dateStr: string, 
     partType: 'fmm' | 'vc', 
     partId: string, 
-    field: keyof NVMCParticipantDynamic | keyof NVCVidaCristaDynamicPart, 
-    value: string | boolean
+    field: 'partTheme', // Only partTheme is directly editable by user in this context
+    value: string
   ) => {
     setCurrentMonthAssignments(prev => {
       const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
@@ -141,17 +141,36 @@ export function NvmcAssignmentsCard({
       if (partType === 'fmm') {
         const partIndex = dayAssignments.fmmParts.findIndex(p => p.id === partId);
         if (partIndex > -1) {
-          (dayAssignments.fmmParts[partIndex] as any)[field] = value;
+          dayAssignments.fmmParts[partIndex][field] = value;
         }
       } else if (partType === 'vc') {
         const partIndex = dayAssignments.vidaCristaParts.findIndex(p => p.id === partId);
         if (partIndex > -1) {
-          (dayAssignments.vidaCristaParts[partIndex] as any)[field] = value;
+          dayAssignments.vidaCristaParts[partIndex][field] = value;
         }
       }
       return { ...prev, [dateStr]: dayAssignments };
     });
   };
+  
+  const handleDynamicPartNeedsAssistantChange = (
+    dateStr: string,
+    partId: string,
+    needsAssistant: boolean
+  ) => {
+     setCurrentMonthAssignments(prev => {
+      const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
+      const partIndex = dayAssignments.fmmParts.findIndex(p => p.id === partId);
+      if (partIndex > -1) {
+        dayAssignments.fmmParts[partIndex].needsAssistant = needsAssistant;
+        if (!needsAssistant) {
+          dayAssignments.fmmParts[partIndex].assistantId = null; // Clear assistant if not needed
+        }
+      }
+      return { ...prev, [dateStr]: dayAssignments };
+    });
+  };
+
 
   const addDynamicPart = (dateStr: string, partType: 'fmm' | 'vc') => {
     const newPartId = generatePartId();
@@ -318,7 +337,7 @@ export function NvmcAssignmentsCard({
             </Button>
         </div>
         {customTitle && (
-            <p className="text-xs text-muted-foreground mt-1 ml-[40%] pl-1">Ref/Tema: {customTitle}</p>
+            <p className="text-xs text-muted-foreground mt-1 ml-[40%] pl-1">{customTitle}</p>
         )}
       </div>
     );
@@ -348,8 +367,8 @@ export function NvmcAssignmentsCard({
         <div className="flex items-center space-x-2">
             <Checkbox 
                 id={`needsAssistant-${part.id}`} 
-                checked={part.needsAssistant} 
-                onCheckedChange={(checked) => handleDynamicPartChange(dateStr, 'fmm', part.id, 'needsAssistant', !!checked)}
+                checked={!!part.needsAssistant} 
+                onCheckedChange={(checked) => handleDynamicPartNeedsAssistantChange(dateStr, part.id, !!checked)}
             />
             <Label htmlFor={`needsAssistant-${part.id}`} className="text-sm font-normal">Precisa de Ajudante?</Label>
         </div>
@@ -539,3 +558,6 @@ export function NvmcAssignmentsCard({
     </Card>
   );
 }
+
+
+    
