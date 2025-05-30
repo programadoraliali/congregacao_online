@@ -153,15 +153,14 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
     if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) continue;
     
-    // Ignorar linhas de instrução/vídeo específicas que não são títulos de partes
     if (line.match(/^\s*Quando nossos irmãos/i) ||
         line.match(/^\s*Seja hospitaleiro/i) ||
         line.match(/^\s*“Um olhar animado”/i) ||
         line.match(/^\s*Um jovem casal/i) ||
         line.match(/^\s*Mostre o VÍDEO/i) ||
         line.match(/^\s*O que você aprendeu/i) ||
-        line.match(/ijwbq artigo/i) || // Linha de referência para Joias Espirituais
-        line.match(/Que joias espirituais você encontrou/i) // Pergunta de Joias Espirituais
+        line.match(/ijwbq artigo/i) || 
+        line.match(/Que joias espirituais você encontrou/i)
        ) {
       continue;
     }
@@ -186,7 +185,6 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
             partName = fullTitleFromLine;
         }
         
-        // Consumir linhas subsequentes que fazem parte do tema/descrição
         let nextLineIndex = i + 1;
         while (nextLineIndex < lines.length) {
             const nextLine = lines[nextLineIndex].trim();
@@ -210,47 +208,35 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
                 break; 
             }
             
-            // Se partTheme ainda não foi definido (ou seja, o tempo não estava na primeira linha da parte)
-            // e partName já tem algo, então esta linha é o início do partTheme
-            if (partName && partTheme === undefined) {
+            if (partTheme === undefined) {
                 partTheme = nextLine;
-            } else if (partTheme !== undefined) { // Se partTheme já existe, anexe
+            } else { 
                 partTheme += ` ${nextLine}`;
-            } else if (!partName && nextLine) { // Se partName está vazio, esta linha pode ser o partName
-                 const potentialTimeMatch = nextLine.match(timeMatchRegex);
-                 if(potentialTimeMatch && potentialTimeMatch.index !== undefined) {
-                    partName = nextLine.substring(0, potentialTimeMatch.index).trim();
-                    partTheme = nextLine.substring(potentialTimeMatch.index).trim();
-                 } else {
-                    partName = nextLine;
-                 }
             }
             i = nextLineIndex; 
             nextLineIndex++;
         }
         partTheme = partTheme?.trim();
 
-        // Se partName ainda estiver vazio, mas partTheme tem texto que não é só tempo/ref,
-        // tente extrair partName de partTheme.
-        if (!partName && partTheme && !partTheme.match(/^\s*\(\s*\d+(?:-\d+)?\s*min\s*\)\s*([\w\s.:§]+)?$/i)) {
+        if (!partName && partTheme) {
           const themeTimeMatch = partTheme.match(timeMatchRegex);
-          if (themeTimeMatch && themeTimeMatch.index !== undefined && themeTimeMatch.index > 0) { // Garante que há texto antes do tempo
+          if (themeTimeMatch && themeTimeMatch.index !== undefined && themeTimeMatch.index > 0) {
               partName = partTheme.substring(0, themeTimeMatch.index).trim();
               partTheme = partTheme.substring(themeTimeMatch.index).trim();
-          } else if (!themeTimeMatch) { // Se não há tempo, partTheme é o nome
+          } else if (!themeTimeMatch) { 
               partName = partTheme;
               partTheme = undefined;
           }
         }
 
-      const extractedPart: ParsedNvmcPart = { partName: partName.replace(/:$/, '').trim(), partTheme: partTheme || undefined };
+      partName = partName.replace(/:$/, '').trim();
+      const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
 
       if (currentSection === 'TESOUROS') {
         if (extractedPart.partName.toLowerCase().includes('leitura da bíblia')) {
           result.leituraBibliaTema = extractedPart.partTheme || extractedPart.partName.replace(/leitura da bíblia/i, '').trim();
         } else if (extractedPart.partName.toLowerCase().includes('joias espirituais')) {
-           // Não preenchemos um "tema" para joias, pois é uma seção de perguntas e respostas
-           result.joiasEspirituaisTema = "Perguntas e respostas"; // Placeholder ou deixar undefined
+           result.joiasEspirituaisTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + "Perguntas e respostas";
         } else if (partNumber === 1) { 
             result.tesourosDiscursoTema = (extractedPart.partTheme ? `${extractedPart.partTheme} ` : "") + extractedPart.partName;
         }
