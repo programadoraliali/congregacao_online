@@ -348,6 +348,3 @@ export async function getPotentialSubstitutesList(
     allMembers
   );
 }
-
-
-    
