@@ -246,7 +246,6 @@ export default function Home() {
       novasDesignacoes[date] = { [functionId]: newMemberId };
     }
     
-    // Atualiza o estado que controla a exibição, o que por sua vez atualiza currentSchedule no Card.
     setDesignacoesMensaisCache(novasDesignacoes); 
 
     const membrosAtualizados = membros.map(m => {

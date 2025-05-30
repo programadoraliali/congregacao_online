@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'; // Removido CardTitle
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { NOMES_MESES } from '@/lib/congregacao/constants';
@@ -43,29 +43,31 @@ export function ScheduleGenerationCard({
   } | null>(null);
 
   useEffect(() => {
-    // Este efeito sincroniza displayedScheduleData com currentSchedule do pai
-    // se os meses/anos se alinharem. Importante para ver atualizações pós-substituição.
-    // Também limpa displayedScheduleData se o mês/ano selecionado mudar e não corresponder
-    // ao currentSchedule (forçando o clique em "Gerar").
     if (
       currentSchedule &&
       currentMes !== null && currentAno !== null &&
       currentMes === parseInt(selectedMes, 10) &&
       currentAno === parseInt(selectedAno, 10)
     ) {
-      setDisplayedScheduleData({
-        schedule: currentSchedule,
-        mes: currentMes,
-        ano: currentAno,
-      });
-      setError(null); // Limpa erros anteriores se agora estamos mostrando um cronograma válido
-    } else {
-      // Se currentSchedule não corresponder ao mês/ano selecionado,
-      // ou se currentSchedule for nulo, garante que displayedScheduleData também seja nulo.
+      // Only update displayedScheduleData if the "Generate" button was effectively the source
+      // This means we check if isLoading is false (meaning a generation just completed)
+      // OR if displayedScheduleData is already set for this month/year (meaning it was previously generated and now a substitution happened)
+      if (!isLoading || (displayedScheduleData && displayedScheduleData.mes === currentMes && displayedScheduleData.ano === currentAno)) {
+         setDisplayedScheduleData({
+           schedule: currentSchedule,
+           mes: currentMes,
+           ano: currentAno,
+         });
+      }
+      // Don't clear error here if it's a generation error for the current selection
+    } else if (
+        (currentMes !== parseInt(selectedMes, 10) || currentAno !== parseInt(selectedAno, 10))
+    ) {
+      // Clear display if month/year selection changes AND it doesn't match what's cached/current
       setDisplayedScheduleData(null);
-      // Não limpar o erro aqui, pois pode haver um erro de geração para a seleção atual.
+      // setError(null); // Clear previous errors when selection changes
     }
-  }, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno]);
+  }, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno, isLoading, displayedScheduleData]);
 
 
   const handleGenerateSchedule = async () => {
@@ -90,9 +92,6 @@ export function ScheduleGenerationCard({
         toast({ title: "Erro ao Gerar Designações", description: result.error, variant: "destructive" });
       } else {
         onScheduleGenerated(result.designacoesFeitas, mes, ano);
-        // onScheduleGenerated atualizará currentSchedule, currentMes, currentAno props,
-        // e o useEffect acima cuidará de definir displayedScheduleData.
-        // No entanto, para uma resposta imediata da UI, podemos definir aqui também.
         setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano });
         toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
       }
@@ -119,7 +118,7 @@ export function ScheduleGenerationCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center"><CalendarCheck className="mr-2 h-6 w-6 text-primary" /> Gerar Designações Mensais</CardTitle>
+        {/* CardTitle removido */}
         <CardDescription>Selecione o mês e ano para gerar o cronograma de designações.</CardDescription>
       </CardHeader>
       <CardContent>
