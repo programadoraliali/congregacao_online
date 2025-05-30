@@ -126,6 +126,10 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   const result: ParsedNvmcProgram = {
     fmmParts: [],
     vidaCristaParts: [],
+    leituraBibliaTema: undefined,
+    ebcTema: undefined,
+    tesourosDiscursoTema: undefined,
+    joiasEspirituaisTema: undefined,
   };
 
   let currentSection: 'TESOUROS' | 'FMM' | 'VC' | null = null;
@@ -149,66 +153,81 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
     if (line.toUpperCase().startsWith('CÂNTICO')) continue;
     if (line.toUpperCase().startsWith('COMENTÁRIOS INICIAIS')) continue;
     if (line.toUpperCase().startsWith('COMENTÁRIOS FINAIS')) continue;
-    if (line.match(/^\s*Quando nossos irmãos/i)) continue; // Ignora linhas de introdução/contexto
+    if (line.match(/^\s*Quando nossos irmãos/i)) continue;
     if (line.match(/^\s*Seja hospitaleiro/i)) continue;
     if (line.match(/^\s*“Um olhar animado”/i)) continue;
     if (line.match(/^\s*Um jovem casal/i)) continue;
     if (line.match(/^\s*Mostre o VÍDEO/i)) continue;
     if (line.match(/^\s*O que você aprendeu/i)) continue;
     
-
-    const partRegex = /^(\d+)\.\s*([^(\n]+)(?:\(([^)]+)\))?\s*(.*)/;
+    const partRegex = /^\s*(\d+)\.\s*(.*)/;
     const partMatch = line.match(partRegex);
 
     if (partMatch) {
       const partNumber = parseInt(partMatch[1], 10);
-      let partName = partMatch[2].trim();
-      const timeInfo = partMatch[3] ? `(${partMatch[3]})` : ""; // Inclui os parênteses
-      let partTheme = (partMatch[4] || "").trim();
+      let fullTitleFromLine = partMatch[2].trim();
 
-      if (timeInfo && partTheme) {
-        partTheme = `${timeInfo} ${partTheme}`;
-      } else if (timeInfo) {
-        partTheme = timeInfo;
+      let partName = "";
+      let partTheme: string | undefined = undefined;
+
+      // Regex to find the time part, e.g., "(3 min)" or "(10-12 min)"
+      const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/;
+      const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
+
+      if (timeMatchResult && timeMatchResult.index !== undefined) {
+        // Found a time component. Text before it is partName, text from it is partTheme.
+        partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
+        partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
+      } else {
+        // No time component on this line, so the whole line is the partName for now.
+        // partTheme might be on subsequent lines.
+        partName = fullTitleFromLine;
       }
       
-      // Tenta juntar linhas subsequentes se não forem uma nova parte ou seção
+      // Join subsequent lines for longer themes, if any
       let nextLineIndex = i + 1;
       while (nextLineIndex < lines.length) {
           const nextLine = lines[nextLineIndex].trim();
-          if (nextLine.match(/^(\d+)\.\s*/) || // Início de nova parte numerada
-              nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
-              nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
-              nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ') ||
-              nextLine.toUpperCase().startsWith('CÂNTICO') ||
-              nextLine.toLowerCase().startsWith('sua resposta') ||
-              nextLine.toLowerCase().startsWith('pergunto-se:') ||
-              nextLine.match(/^\s*\(\d+\s*min\)/) && !partTheme // Se a próxima linha é só tempo, e o tema atual está vazio
-            ) {
+          
+          const isNewPart = nextLine.match(/^\s*(\d+)\.\s*/);
+          const isSectionHeader = nextLine.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS') ||
+                                  nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
+                                  nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
+          const isChantOrPrayer = nextLine.toUpperCase().startsWith('CÂNTICO') || nextLine.toUpperCase().startsWith('ORAÇÃO');
+          const isComment = nextLine.toLowerCase().startsWith('sua resposta') || nextLine.toLowerCase().startsWith('pergunto-se:');
+          const isInstructional = nextLine.match(/^\s*Quando nossos irmãos/i) || nextLine.match(/^\s*Seja hospitaleiro/i) || nextLine.match(/^\s*“Um olhar animado”/i) || nextLine.match(/^\s*Um jovem casal/i) || nextLine.match(/^\s*Mostre o VÍDEO/i) || nextLine.match(/^\s*O que você aprendeu/i);
+
+
+          if (isNewPart || isSectionHeader || isChantOrPrayer || isComment || isInstructional) {
               break; 
           }
-          partTheme += ` ${nextLine}`;
-          i = nextLineIndex; // Avança o índice principal
+          
+          if (partTheme === undefined) {
+              partTheme = nextLine;
+          } else {
+              partTheme += ` ${nextLine}`;
+          }
+          i = nextLineIndex; 
           nextLineIndex++;
       }
-      partTheme = partTheme.trim();
+      partTheme = partTheme?.trim();
 
 
       const extractedPart: ParsedNvmcPart = { partName, partTheme: partTheme || undefined };
 
       if (currentSection === 'TESOUROS') {
         if (partName.toLowerCase().includes('leitura da bíblia')) {
-          result.leituraBibliaTema = partTheme || partName.replace(/leitura da bíblia/i, '').trim();
+          result.leituraBibliaTema = extractedPart.partTheme || partName.replace(/leitura da bíblia/i, '').trim();
         } else if (partName.toLowerCase().includes('joias espirituais')) {
-           result.joiasEspirituaisTema = partTheme || "Perguntas e respostas sobre a leitura da Bíblia.";
-        } else if (partNumber === 1) { // Primeiro item de Tesouros é geralmente o discurso
-            result.tesourosDiscursoTema = partTheme || partName;
+           result.joiasEspirituaisTema = extractedPart.partTheme || "Perguntas e respostas sobre a leitura da Bíblia.";
+        } else if (partNumber === 1) { 
+            result.tesourosDiscursoTema = extractedPart.partTheme || partName;
         }
       } else if (currentSection === 'FMM') {
         result.fmmParts.push(extractedPart);
       } else if (currentSection === 'VC') {
         if (partName.toLowerCase().includes('estudo bíblico de congregação')) {
-          result.ebcTema = partTheme || partName.replace(/estudo bíblico de congregação/i, '').trim();
+          result.ebcTema = extractedPart.partTheme || partName.replace(/estudo bíblico de congregação/i, '').trim();
         } else {
           result.vidaCristaParts.push(extractedPart);
         }
@@ -217,4 +236,3 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   }
   return result;
 }
-
