@@ -107,14 +107,14 @@ function getDataUltimaVezFuncao(
   return ultimaData;
 }
 
-export function getEligibleMembersForFunctionDate(
+export async function getEligibleMembersForFunctionDate(
   funcao: FuncaoDesignada,
   dataReuniao: Date,
   dataReuniaoStr: string,
   todosMembros: Membro[],
   designacoesNoDia: Record<string, string | null> = {}, // Designações já feitas neste dia específico
   membroExcluidoId?: string | null // Para substituição, não considerar este membro
-): Membro[] {
+): Promise<Membro[]> {
   const tipoReuniao = dataReuniao.getUTCDay() === DIAS_REUNIAO_CONFIG.meioSemana ? 'meioSemana' : 'publica';
   const membrosDesignadosNesteDia = new Set(Object.values(designacoesNoDia).filter(id => id !== null) as string[]);
 
@@ -139,14 +139,14 @@ export function getEligibleMembersForFunctionDate(
   });
 }
 
-export function sortMembersByPriority(
+export async function sortMembersByPriority(
   membrosElegiveis: Membro[],
   funcao: FuncaoDesignada,
   dataReuniaoAnteriorStr: string | null,
   designacoesFeitasNoMesAtual: DesignacoesFeitas,
   dataReuniaoStr: string,
   membrosComHistoricoCompleto: Membro[] // Para acessar o histórico original completo
-): Membro[] {
+): Promise<Membro[]> {
   
   // Criar uma cópia para não modificar o array original diretamente
   const membrosOrdenados = [...membrosElegiveis];
@@ -195,7 +195,7 @@ export async function calcularDesignacoesAction(
   
   const DIAS_REUNIAO: DiasReuniao = DIAS_REUNIAO_CONFIG;
   const designacoesFeitasNoMesAtual: DesignacoesFeitas = {};
-  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[];
+  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[]; // Deep copy for manipulation
 
   const datasDeReuniaoNoMes: Date[] = [];
   const primeiroDiaDoMes = new Date(Date.UTC(ano, mes, 1));
@@ -224,7 +224,7 @@ export async function calcularDesignacoesAction(
     const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
 
     for (const funcao of funcoesParaEsteTipoReuniao) {
-      const membrosElegiveis = getEligibleMembersForFunctionDate(
+      const membrosElegiveis = await getEligibleMembersForFunctionDate(
         funcao,
         dataReuniao,
         dataReuniaoStr,
@@ -237,7 +237,7 @@ export async function calcularDesignacoesAction(
         continue;
       }
 
-      const membrosOrdenados = sortMembersByPriority(
+      const membrosOrdenados = await sortMembersByPriority(
         membrosElegiveis,
         funcao,
         dataReuniaoAnteriorStr,
@@ -261,29 +261,20 @@ export async function calcularDesignacoesAction(
 
 // --- Funções para Lógica de Substituição ---
 
-export function findNextBestCandidateForSubstitution(
+export async function findNextBestCandidateForSubstitution(
   dateStr: string,
   functionId: string,
   originalMemberId: string,
   allMembers: Membro[],
   currentAssignmentsForMonth: DesignacoesFeitas
-): Membro | null {
-  const targetDate = new Date(dateStr + "T00:00:00"); // Para obter dia da semana
+): Promise<Membro | null> {
+  const targetDate = new Date(dateStr + "T00:00:00"); 
   const targetFunction = FUNCOES_DESIGNADAS.find(f => f.id === functionId);
 
   if (!targetFunction) return null;
 
   const assignmentsOnTargetDate = currentAssignmentsForMonth[dateStr] || {};
   
-  // Precisa identificar a data da reunião anterior do mesmo tipo para a regra de anti-repetição
-  // Esta lógica é simplificada aqui; uma implementação mais robusta buscaria no mês todo.
-  // Para simplificar, vamos assumir que a regra de anti-repetição imediata pode ser menos crítica
-  // para substituições ou dependeria de um contexto mais amplo de datas do mês.
-  // Por ora, passaremos null como dataReuniaoAnteriorStr para `sortMembersByPriority` na substituição,
-  // o que significa que a prioridade 1 (anti-repetição imediata) não terá efeito direto da mesma forma.
-  // Ou, precisaríamos de `datasDeReuniaoNoMes` aqui também.
-  
-  // Temporariamente simplificando:
   const datasDeReuniaoNoMesFicticia : Date[] = Object.keys(currentAssignmentsForMonth)
     .map(d => new Date(d + "T00:00:00"))
     .sort((a,b) => a.getTime() - b.getTime());
@@ -293,18 +284,18 @@ export function findNextBestCandidateForSubstitution(
   const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
 
 
-  const eligibleMembers = getEligibleMembersForFunctionDate(
+  const eligibleMembers = await getEligibleMembersForFunctionDate(
     targetFunction,
     targetDate,
     dateStr,
     allMembers,
     assignmentsOnTargetDate,
-    originalMemberId // Exclui o membro original
+    originalMemberId 
   );
 
   if (eligibleMembers.length === 0) return null;
 
-  const sortedMembers = sortMembersByPriority(
+  const sortedMembers = await sortMembersByPriority(
     eligibleMembers,
     targetFunction,
     dataReuniaoAnteriorStr, 
@@ -316,13 +307,13 @@ export function findNextBestCandidateForSubstitution(
   return sortedMembers.length > 0 ? sortedMembers[0] : null;
 }
 
-export function getPotentialSubstitutesList(
+export async function getPotentialSubstitutesList(
   dateStr: string,
   functionId: string,
   originalMemberId: string,
   allMembers: Membro[],
   currentAssignmentsForMonth: DesignacoesFeitas
-): Membro[] {
+): Promise<Membro[]> {
   const targetDate = new Date(dateStr + "T00:00:00");
   const targetFunction = FUNCOES_DESIGNADAS.find(f => f.id === functionId);
 
@@ -339,15 +330,13 @@ export function getPotentialSubstitutesList(
   const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
 
 
-  const eligibleMembers = getEligibleMembersForFunctionDate(
+  const eligibleMembers = await getEligibleMembersForFunctionDate(
     targetFunction,
     targetDate,
     dateStr,
     allMembers,
     assignmentsOnTargetDate,
-    originalMemberId // Exclui o membro original da lista de potenciais substitutos diretos se ele não puder se substituir.
-                     // Se a intenção é apenas ver quem *poderia* fazer, não o exclua aqui, mas sim ao selecionar.
-                     // Para a lista de Opção B, geralmente queremos todos os elegíveis MENOS o original.
+    originalMemberId 
   );
 
   return sortMembersByPriority(
@@ -359,3 +348,6 @@ export function getPotentialSubstitutesList(
     allMembers
   );
 }
+
+
+    
