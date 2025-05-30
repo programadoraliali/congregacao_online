@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, BookOpenText, Save } from 'lucide-react';
+import { UserPlus, BookOpenText, FileText } from 'lucide-react'; // Adicionado FileText
 import { MemberSelectionDialog } from './MemberSelectionDialog';
 import { useToast } from "@/hooks/use-toast";
 
@@ -118,6 +118,13 @@ export function PublicMeetingAssignmentsCard({
     // O toast de sucesso já é dado em page.tsx
   };
 
+  const handleExportPublicMeetingPDF = () => {
+    toast({
+      title: "Funcionalidade Indisponível",
+      description: "A exportação para PDF ainda não foi implementada.",
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -156,6 +163,10 @@ export function PublicMeetingAssignmentsCard({
               </SelectContent>
             </Select>
           </div>
+           {/* Botão Salvar movido para perto dos seletores, para salvar o mês/ano ativo */}
+           <Button onClick={handleSaveChanges} className="w-full sm:w-auto">
+            Salvar Alterações de {obterNomeMes(displayMonth)}
+          </Button>
         </div>
 
         {sundaysInMonth.length === 0 && (
@@ -173,7 +184,7 @@ export function PublicMeetingAssignmentsCard({
           
           return (
             <div key={dateStr}>
-              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay} - {obterNomeMes(dateObj.getUTCMonth())} {dateObj.getUTCFullYear()}</h3>
+              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay} - {obterNomeMes(dateObj.getUTCMonth())} de {dateObj.getUTCFullYear()}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                 <div>
                   <Label htmlFor={`tema-${dateStr}`}>Tema do Discurso</Label>
@@ -233,9 +244,9 @@ export function PublicMeetingAssignmentsCard({
         })}
         {sundaysInMonth.length > 0 && (
             <div className="mt-8 flex justify-end">
-            <Button onClick={handleSaveChanges}>
-                <Save className="mr-2 h-4 w-4" />
-                Salvar Designações da Reunião Pública
+            <Button variant="outline" onClick={handleExportPublicMeetingPDF}>
+                <FileText className="mr-2 h-4 w-4" />
+                Exportar como PDF (em breve)
             </Button>
             </div>
         )}
@@ -260,3 +271,5 @@ export function PublicMeetingAssignmentsCard({
     </Card>
   );
 }
+
+
