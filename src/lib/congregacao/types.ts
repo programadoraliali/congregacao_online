@@ -1,4 +1,5 @@
 
+
 export interface PermissaoBase {
   id: string;
   nome: string;
@@ -78,9 +79,9 @@ export interface AllPublicMeetingAssignments {
 }
 
 // Tipos para a nova aba "NVMC"
-export interface NVMCParticipantDynamic {
+export interface NVMCParticipantDynamic { // Renomeado de NVMCParticipantAssignment para consistência
   id: string; // Unique ID for this part instance
-  customTitle?: string;
+  customTitle: string; // Tornando obrigatório, pois virá do parse ou entrada manual
   needsAssistant?: boolean;
   participantId?: string | null;
   assistantId?: string | null;
@@ -88,7 +89,7 @@ export interface NVMCParticipantDynamic {
 
 export interface NVCVidaCristaDynamicPart {
   id: string; // Unique ID for this part instance
-  customTitle: string;
+  customTitle: string; // Tornando obrigatório
   participantId?: string | null;
 }
 
@@ -100,13 +101,15 @@ export interface NVMCDailyAssignments {
   tesourosDiscursoId?: string | null;
   joiasEspirituaisId?: string | null;
   leituraBibliaId?: string | null;
+  leituraBibliaCustomTitle?: string; // Para armazenar o tema da leitura
   // Faça Seu Melhor no Ministério (dynamic parts)
-  fmmParts?: NVMCParticipantDynamic[];
+  fmmParts: NVMCParticipantDynamic[]; // Mudou de opcional para obrigatório
   // Nossa Vida Cristã (dynamic parts for talks/items)
-  vidaCristaParts?: NVCVidaCristaDynamicPart[];
+  vidaCristaParts: NVCVidaCristaDynamicPart[]; // Mudou de opcional para obrigatório
   // EBC (fixed within VC section)
   ebcDirigenteId?: string | null;
   ebcLeitorId?: string | null;
+  ebcCustomTitle?: string; // Para armazenar o tema do EBC
   oracaoFinalId?: string | null;
 }
 
@@ -116,4 +119,19 @@ export interface AllNVMCAssignments {
     // Chave: "YYYY-MM-DD" (data completa de cada reunião de meio de semana)
     [dateStr: string]: NVMCDailyAssignments;
   };
+}
+
+// Tipos para o parser de texto NVMC
+export interface ParsedNvmcPart {
+  customTitle: string;
+  // Se precisarmos de mais detalhes do parser, adicionamos aqui
+}
+
+export interface ParsedNvmcProgram {
+  fmmParts: ParsedNvmcPart[];
+  vidaCristaParts: ParsedNvmcPart[];
+  leituraBibliaTema?: string;
+  ebcTema?: string;
+  tesourosDiscursoTema?: string;
+  joiasEspirituaisTema?: string;
 }

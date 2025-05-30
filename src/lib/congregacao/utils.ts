@@ -1,5 +1,6 @@
 
-import { type Membro, type PermissaoBase, type Impedimento } from './types';
+
+import { type Membro, type PermissaoBase, type Impedimento, type ParsedNvmcProgram, type ParsedNvmcPart } from './types';
 import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV } from './constants';
 
 export function gerarIdMembro(): string {
@@ -118,4 +119,107 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
             if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'publica') return 'leitorDom';
             return undefined;
     }
+}
+
+export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0 && !line.startsWith('Sua resposta') && !line.startsWith('PERGUNTE-SE:'));
+  const result: ParsedNvmcProgram = {
+    fmmParts: [],
+    vidaCristaParts: [],
+  };
+
+  let currentSection: 'TESOUROS' | 'FMM' | 'VC' | null = null;
+  let expectingTitleFor: 'LEITURA' | 'EBC' | 'DISCURSO_TESOUROS' | 'JOIAS' | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.includes('TESOUROS DA PALAVRA DE DEUS')) {
+      currentSection = 'TESOUROS';
+      expectingTitleFor = null;
+      continue;
+    }
+    if (line.includes('FAÇA SEU MELHOR NO MINISTÉRIO')) {
+      currentSection = 'FMM';
+      expectingTitleFor = null;
+      continue;
+    }
+    if (line.includes('NOSSA VIDA CRISTÃ')) {
+      currentSection = 'VC';
+      expectingTitleFor = null;
+      continue;
+    }
+    
+    // Ignorar linhas que são claramente apenas de tempo, como "(10 min)" sozinhas ou com pouco texto
+    if (line.match(/^\s*\(\d+\s*min\)\s*$/) || line.match(/^\s*\(\d+\s*min\)\s*Consideração\s*\.?\s*$/i)) {
+        // Se estávamos esperando um título, mas encontramos apenas uma linha de tempo/consideração, resetamos.
+        if (expectingTitleFor) expectingTitleFor = null;
+        continue;
+    }
+
+
+    const partMatch = line.match(/^(\d+)\.\s*(.*)/);
+    if (partMatch) {
+      const partTitleSegment = partMatch[2].trim();
+      let fullTitle = partTitleSegment;
+
+      // Se a linha seguinte for a continuação do título (contém tempo e mais texto)
+      if (i + 1 < lines.length && lines[i + 1].match(/^\s*\(\d+\s*min\)/)) {
+        const nextLineContent = lines[i + 1].replace(/^\s*\(\d+\s*min\)\s*/, '').trim();
+        if (nextLineContent && !nextLineContent.match(/^(\d+)\.\s/) && !lines[i+1].includes('Cântico')) { // Evitar anexar a próxima parte numerada ou cântico
+          fullTitle += ` ${nextLineContent}`;
+        }
+        // Avança o índice i se a próxima linha foi usada, a menos que seja uma parte que precise do tema especificamente.
+        if (!partTitleSegment.toLowerCase().includes('leitura da bíblia') && 
+            !partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') &&
+            !partTitleSegment.toLowerCase().includes('joias espirituais') &&
+            !(currentSection === 'TESOUROS' && partNumber === 1) // Para o primeiro discurso de Tesouros
+           ) {
+             // i++; // Comentado para testar se a linha de tempo deve ser sempre consumida pelo parser principal
+        }
+      }
+      
+      const partNumber = parseInt(partMatch[1], 10);
+
+
+      if (currentSection === 'TESOUROS') {
+        if (partTitleSegment.toLowerCase().includes('leitura da bíblia')) {
+          result.leituraBibliaTema = fullTitle.replace(/leitura da bíblia/i, '').trim();
+          expectingTitleFor = null;
+        } else if (partTitleSegment.toLowerCase().includes('joias espirituais')) {
+           // O título é "Joias espirituais", o conteúdo específico (perguntas) vem depois e não é o "tema" da parte.
+           // Podemos extrair a referência bíblica se houver, mas não há um "tema" como em um discurso.
+           result.joiasEspirituaisTema = "Perguntas e respostas sobre a leitura da Bíblia."; // Título genérico
+           expectingTitleFor = null;
+        } else if (partNumber === 1 && !partTitleSegment.toLowerCase().includes('leitura da bíblia') && !partTitleSegment.toLowerCase().includes('joias espirituais')) {
+            // Assume que a primeira parte numerada em Tesouros é o discurso
+            result.tesourosDiscursoTema = fullTitle;
+            expectingTitleFor = null;
+        }
+      } else if (currentSection === 'FMM') {
+        result.fmmParts.push({ customTitle: fullTitle });
+        expectingTitleFor = null;
+      } else if (currentSection === 'VC') {
+        if (partTitleSegment.toLowerCase().includes('estudo bíblico de congregação')) {
+          result.ebcTema = fullTitle.replace(/estudo bíblico de congregação/i, '').trim();
+          expectingTitleFor = null;
+        } else if (!partTitleSegment.toLowerCase().startsWith('Cântico')) {
+          result.vidaCristaParts.push({ customTitle: fullTitle });
+          expectingTitleFor = null;
+        }
+      }
+       // Consumir a linha de tempo se ela foi usada para o título da parte.
+      if (i + 1 < lines.length && lines[i + 1].match(/^\s*\(\d+\s*min\)/) && 
+          (partTitleSegment.toLowerCase().includes('leitura da bíblia') ||
+           partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') ||
+           (currentSection === 'TESOUROS' && partNumber === 1 && !partTitleSegment.toLowerCase().includes('joias espirituais')) ||
+           currentSection === 'FMM' ||
+           (currentSection === 'VC' && !partTitleSegment.toLowerCase().includes('estudo bíblico de congregação') && !partTitleSegment.toLowerCase().startsWith('Cântico')) 
+          )
+         ) {
+           i++;
+      }
+    }
+  }
+  return result;
 }

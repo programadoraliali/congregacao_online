@@ -1,10 +1,11 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Membro, AllNVMCAssignments, NVMCDailyAssignments, NVMCParticipantDynamic, NVCVidaCristaDynamicPart } from '@/lib/congregacao/types';
+import type { Membro, AllNVMCAssignments, NVMCDailyAssignments, NVMCParticipantDynamic, NVCVidaCristaDynamicPart, ParsedNvmcProgram } from '@/lib/congregacao/types';
 import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, NVMC_PART_SECTIONS, NVMC_FIXED_PARTS_CONFIG } from '@/lib/congregacao/constants';
-import { formatarDataCompleta, formatarDataParaChave, obterNomeMes } from '@/lib/congregacao/utils';
+import { formatarDataCompleta, formatarDataParaChave, obterNomeMes, parseNvmcProgramText } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, BookUser, Edit3, PlusCircle, Trash2 } from 'lucide-react';
+import { UserPlus, BookUser, Edit3, PlusCircle, Trash2, FileText, UploadCloud } from 'lucide-react';
 import { MemberSelectionDialog } from './MemberSelectionDialog';
+import { ParseNvmcProgramDialog } from './ParseNvmcProgramDialog'; // Novo
 import { useToast } from "@/hooks/use-toast";
 
 interface NvmcAssignmentsCardProps {
@@ -45,13 +47,16 @@ export function NvmcAssignmentsCard({
   const [isMemberSelectionOpen, setIsMemberSelectionOpen] = useState(false);
   const [memberSelectionContext, setMemberSelectionContext] = useState<{
     dateStr: string;
-    partKeyOrId: string; // Can be a fixed part key (e.g., 'presidenteId') or a dynamic part's 'id'
-    dynamicPartType?: 'fmm' | 'vc'; // Indicates if it's for fmmParts or vidaCristaParts
-    roleInPart?: 'participantId' | 'assistantId'; // For FMM parts primarily
+    partKeyOrId: string; 
+    dynamicPartType?: 'fmm' | 'vc'; 
+    roleInPart?: 'participantId' | 'assistantId'; 
     currentMemberId?: string | null;
     requiredPermissionId?: string | null;
     excludedMemberIds?: string[];
   } | null>(null);
+
+  const [isParseProgramDialogOpen, setIsParseProgramDialogOpen] = useState(false);
+  const [dateForProgramImport, setDateForProgramImport] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -60,10 +65,10 @@ export function NvmcAssignmentsCard({
 
   useEffect(() => {
     const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
-    if (allNvmcAssignments && allNvmcAssignments[yearMonthKey]) {
-      // Ensure fmmParts and vidaCristaParts are arrays
-      const loadedAssignments = allNvmcAssignments[yearMonthKey];
-      const sanitizedAssignments: { [dateStr: string]: NVMCDailyAssignments } = {};
+    const loadedAssignments = allNvmcAssignments ? allNvmcAssignments[yearMonthKey] : null;
+    const sanitizedAssignments: { [dateStr: string]: NVMCDailyAssignments } = {};
+
+    if (loadedAssignments) {
       for (const dateStr in loadedAssignments) {
         sanitizedAssignments[dateStr] = {
           ...loadedAssignments[dateStr],
@@ -71,11 +76,10 @@ export function NvmcAssignmentsCard({
           vidaCristaParts: Array.isArray(loadedAssignments[dateStr].vidaCristaParts) ? loadedAssignments[dateStr].vidaCristaParts : [],
         };
       }
-      setCurrentMonthAssignments(sanitizedAssignments);
-    } else {
-      setCurrentMonthAssignments({});
     }
+    setCurrentMonthAssignments(sanitizedAssignments);
   }, [displayMonth, displayYear, allNvmcAssignments]);
+
 
   const midweekMeetingDates = useMemo(() => {
     const dates: Date[] = [];
@@ -97,12 +101,30 @@ export function NvmcAssignmentsCard({
     return member ? member.nome : 'Desconhecido';
   };
 
-  const handleUpdateAssignment = (dateStr: string, updates: Partial<NVMCDailyAssignments>) => {
+  // Helper para garantir que NVMCDailyAssignments tenha as arrays inicializadas
+  const ensureDayAssignmentsStructure = (assignments: NVMCDailyAssignments | undefined): NVMCDailyAssignments => {
+    return {
+      presidenteId: assignments?.presidenteId,
+      oracaoInicialId: assignments?.oracaoInicialId,
+      tesourosDiscursoId: assignments?.tesourosDiscursoId,
+      joiasEspirituaisId: assignments?.joiasEspirituaisId,
+      leituraBibliaId: assignments?.leituraBibliaId,
+      leituraBibliaCustomTitle: assignments?.leituraBibliaCustomTitle,
+      fmmParts: Array.isArray(assignments?.fmmParts) ? assignments.fmmParts : [],
+      vidaCristaParts: Array.isArray(assignments?.vidaCristaParts) ? assignments.vidaCristaParts : [],
+      ebcDirigenteId: assignments?.ebcDirigenteId,
+      ebcLeitorId: assignments?.ebcLeitorId,
+      ebcCustomTitle: assignments?.ebcCustomTitle,
+      oracaoFinalId: assignments?.oracaoFinalId,
+    };
+  };
+
+  const handleUpdateFixedPartAssignment = (dateStr: string, partKey: keyof NVMCDailyAssignments, memberId: string | null) => {
     setCurrentMonthAssignments(prev => ({
       ...prev,
       [dateStr]: {
-        ...(prev[dateStr] || { fmmParts: [], vidaCristaParts: [] }), // Ensure arrays exist
-        ...updates,
+        ...ensureDayAssignmentsStructure(prev[dateStr]),
+        [partKey]: memberId,
       },
     }));
   };
@@ -115,14 +137,14 @@ export function NvmcAssignmentsCard({
     value: string | boolean
   ) => {
     setCurrentMonthAssignments(prev => {
-      const dayAssignments = JSON.parse(JSON.stringify(prev[dateStr] || { fmmParts: [], vidaCristaParts: [] })) as NVMCDailyAssignments;
+      const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
       
-      if (partType === 'fmm' && dayAssignments.fmmParts) {
+      if (partType === 'fmm') {
         const partIndex = dayAssignments.fmmParts.findIndex(p => p.id === partId);
         if (partIndex > -1) {
           (dayAssignments.fmmParts[partIndex] as any)[field] = value;
         }
-      } else if (partType === 'vc' && dayAssignments.vidaCristaParts) {
+      } else if (partType === 'vc') {
         const partIndex = dayAssignments.vidaCristaParts.findIndex(p => p.id === partId);
         if (partIndex > -1) {
           (dayAssignments.vidaCristaParts[partIndex] as any)[field] = value;
@@ -135,12 +157,12 @@ export function NvmcAssignmentsCard({
   const addDynamicPart = (dateStr: string, partType: 'fmm' | 'vc') => {
     const newPartId = generatePartId();
     setCurrentMonthAssignments(prev => {
-      const dayAssignments = JSON.parse(JSON.stringify(prev[dateStr] || { fmmParts: [], vidaCristaParts: [] })) as NVMCDailyAssignments;
+      const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
       
       if (partType === 'fmm') {
-        dayAssignments.fmmParts = [...(dayAssignments.fmmParts || []), { id: newPartId, customTitle: '', needsAssistant: false, participantId: null, assistantId: null }];
+        dayAssignments.fmmParts = [...dayAssignments.fmmParts, { id: newPartId, customTitle: '', needsAssistant: false, participantId: null, assistantId: null }];
       } else if (partType === 'vc') {
-        dayAssignments.vidaCristaParts = [...(dayAssignments.vidaCristaParts || []), { id: newPartId, customTitle: '', participantId: null }];
+        dayAssignments.vidaCristaParts = [...dayAssignments.vidaCristaParts, { id: newPartId, customTitle: '', participantId: null }];
       }
       return { ...prev, [dateStr]: dayAssignments };
     });
@@ -148,11 +170,11 @@ export function NvmcAssignmentsCard({
 
   const removeDynamicPart = (dateStr: string, partType: 'fmm' | 'vc', partId: string) => {
     setCurrentMonthAssignments(prev => {
-      const dayAssignments = JSON.parse(JSON.stringify(prev[dateStr] || { fmmParts: [], vidaCristaParts: [] })) as NVMCDailyAssignments;
+      const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
       
-      if (partType === 'fmm' && dayAssignments.fmmParts) {
+      if (partType === 'fmm') {
         dayAssignments.fmmParts = dayAssignments.fmmParts.filter(p => p.id !== partId);
-      } else if (partType === 'vc' && dayAssignments.vidaCristaParts) {
+      } else if (partType === 'vc') {
         dayAssignments.vidaCristaParts = dayAssignments.vidaCristaParts.filter(p => p.id !== partId);
       }
       return { ...prev, [dateStr]: dayAssignments };
@@ -161,31 +183,32 @@ export function NvmcAssignmentsCard({
   
   const handleOpenMemberSelection = (
     dateStr: string, 
-    partKeyOrId: string,
+    partKeyOrId: string, // Se for fixed, é a chave (ex: 'presidenteId'), se for dynamic é o part.id
     dynamicPartType?: 'fmm' | 'vc',
-    roleInPart?: 'participantId' | 'assistantId'
+    roleInPart?: 'participantId' | 'assistantId' // Apenas para partes dinâmicas FMM
   ) => {
-    const assignmentsForDay = currentMonthAssignments[dateStr] || { fmmParts: [], vidaCristaParts: [] };
+    const assignmentsForDay = ensureDayAssignmentsStructure(currentMonthAssignments[dateStr]);
     let currentMemberId: string | null | undefined = null;
     let requiredPermissionId: string | null = null;
     let excludedMemberIds: string[] = [];
 
-    if (dynamicPartType === 'fmm' && roleInPart) {
-        const fmmPart = (assignmentsForDay.fmmParts || []).find(p => p.id === partKeyOrId);
+    if (dynamicPartType === 'fmm' && roleInPart) { // Parte dinâmica FMM
+        const fmmPart = assignmentsForDay.fmmParts.find(p => p.id === partKeyOrId);
         if (fmmPart) {
             currentMemberId = fmmPart[roleInPart];
+            // Excluir o outro participante da mesma parte FMM
             if (roleInPart === 'participantId' && fmmPart.assistantId) excludedMemberIds.push(fmmPart.assistantId);
             if (roleInPart === 'assistantId' && fmmPart.participantId) excludedMemberIds.push(fmmPart.participantId);
         }
-        // FMM parts usually don't have a strict permission beyond being a publisher.
-        // Specific talks within FMM might, this could be enhanced later.
-    } else if (dynamicPartType === 'vc') {
-        const vcPart = (assignmentsForDay.vidaCristaParts || []).find(p => p.id === partKeyOrId);
+        // Permissão para FMM é geralmente 'qualquer publicador', então null aqui.
+        // Poderia ser refinado se algumas partes FMM tiverem requisitos específicos.
+    } else if (dynamicPartType === 'vc') { // Parte dinâmica Vida Cristã
+        const vcPart = assignmentsForDay.vidaCristaParts.find(p => p.id === partKeyOrId);
         currentMemberId = vcPart?.participantId;
-        // Vida Crista parts often require an elder/MS, so 'presidente' might be a default.
-        // This could be refined if VC parts have different permission needs.
+        // VC partes geralmente são por anciãos/SM, então 'presidente' como um bom default.
+        // Pode ser refinado se necessário.
         requiredPermissionId = 'presidente'; 
-    } else { // Fixed part
+    } else { // Parte Fixa (partKeyOrId é a chave da parte, ex: 'presidenteId')
         currentMemberId = (assignmentsForDay as any)[partKeyOrId];
         requiredPermissionId = NVMC_FIXED_PARTS_CONFIG[partKeyOrId]?.requiredPermissionId || null;
     }
@@ -202,19 +225,19 @@ export function NvmcAssignmentsCard({
     setIsMemberSelectionOpen(true);
   };
 
-  const handleSelectMember = (selectedMemberId: string) => {
+ const handleSelectMember = (selectedMemberId: string) => {
     if (!memberSelectionContext) return;
     const { dateStr, partKeyOrId, dynamicPartType, roleInPart } = memberSelectionContext;
 
     setCurrentMonthAssignments(prev => {
-        const dayAssignments = JSON.parse(JSON.stringify(prev[dateStr] || { fmmParts: [], vidaCristaParts: [] })) as NVMCDailyAssignments;
+        const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
 
-        if (dynamicPartType === 'fmm' && roleInPart && dayAssignments.fmmParts) {
+        if (dynamicPartType === 'fmm' && roleInPart) {
             const partIndex = dayAssignments.fmmParts.findIndex(p => p.id === partKeyOrId);
             if (partIndex > -1) {
                 dayAssignments.fmmParts[partIndex][roleInPart] = selectedMemberId;
             }
-        } else if (dynamicPartType === 'vc' && dayAssignments.vidaCristaParts) {
+        } else if (dynamicPartType === 'vc') {
             const partIndex = dayAssignments.vidaCristaParts.findIndex(p => p.id === partKeyOrId);
             if (partIndex > -1) {
                 dayAssignments.vidaCristaParts[partIndex].participantId = selectedMemberId;
@@ -233,15 +256,70 @@ export function NvmcAssignmentsCard({
     onSaveNvmcAssignments(currentMonthAssignments, displayMonth, displayYear);
   };
 
+  const handleOpenParseDialog = (dateStr: string) => {
+    setDateForProgramImport(dateStr);
+    setIsParseProgramDialogOpen(true);
+  };
+
+  const handleProgramTextParsed = (text: string) => {
+    if (!dateForProgramImport) return;
+    
+    const parsedProgram = parseNvmcProgramText(text);
+    
+    setCurrentMonthAssignments(prev => {
+      const dayAssignments = ensureDayAssignmentsStructure(prev[dateForProgramImport]);
+
+      // Atualizar partes FMM
+      dayAssignments.fmmParts = parsedProgram.fmmParts.map(p => ({
+        id: generatePartId(),
+        customTitle: p.customTitle,
+        needsAssistant: false, // Default, pode ser ajustado por uma lógica mais fina no parser ou manualmente
+        participantId: null,
+        assistantId: null,
+      }));
+
+      // Atualizar partes Vida Cristã
+      dayAssignments.vidaCristaParts = parsedProgram.vidaCristaParts.map(p => ({
+        id: generatePartId(),
+        customTitle: p.customTitle,
+        participantId: null,
+      }));
+      
+      // Atualizar temas das partes fixas, se existirem no parser
+      if (parsedProgram.leituraBibliaTema) {
+        dayAssignments.leituraBibliaCustomTitle = parsedProgram.leituraBibliaTema;
+      }
+      if (parsedProgram.ebcTema) {
+        dayAssignments.ebcCustomTitle = parsedProgram.ebcTema;
+      }
+       // Poderia adicionar tesourosDiscursoTema e joiasEspirituaisTema aqui se a estrutura de NVMCDailyAssignments for atualizada para eles.
+
+      return { ...prev, [dateForProgramImport]: dayAssignments };
+    });
+
+    toast({ title: "Programa Importado", description: `Títulos das partes para ${dateForProgramImport} foram preenchidos. Atribua os membros.`});
+    setDateForProgramImport(null);
+  };
+
+
   const renderFixedPart = (dateStr: string, partKey: keyof NVMCDailyAssignments, config: typeof NVMC_FIXED_PARTS_CONFIG[string]) => {
-    const assignmentForDay = currentMonthAssignments[dateStr] || {};
+    const assignmentForDay = ensureDayAssignmentsStructure(currentMonthAssignments[dateStr]);
     const memberId = (assignmentForDay as any)[partKey] as string | null;
+    const customTitle = (assignmentForDay as any)[`${partKey}CustomTitle` as keyof NVMCDailyAssignments] as string | undefined || 
+                        (assignmentForDay as any)[`${partKey.replace('Id', '')}CustomTitle` as keyof NVMCDailyAssignments] as string | undefined;
+
+
     return (
-      <div className="flex items-center gap-2 mb-2">
-        <Label htmlFor={`${partKey}-${dateStr}`} className="w-2/5 whitespace-nowrap">{config.label}:</Label>
-        <Button variant="outline" size="sm" id={`${partKey}-${dateStr}`} className="flex-1 justify-start" onClick={() => handleOpenMemberSelection(dateStr, partKey)}>
-           {getMemberName(memberId)}
-        </Button>
+      <div className="mb-2">
+        <div className="flex items-center gap-2">
+            <Label htmlFor={`${partKey}-${dateStr}`} className="w-2/5 whitespace-nowrap">{config.label}:</Label>
+            <Button variant="outline" size="sm" id={`${partKey}-${dateStr}`} className="flex-1 justify-start" onClick={() => handleOpenMemberSelection(dateStr, partKey)}>
+            {getMemberName(memberId)}
+            </Button>
+        </div>
+        {customTitle && (partKey === 'leituraBibliaId' || partKey === 'ebcLeitorId' || partKey === 'ebcDirigenteId') && (
+            <p className="text-xs text-muted-foreground mt-1 ml-[40%] pl-1">Tema/Ref: {customTitle}</p>
+        )}
       </div>
     );
   };
@@ -365,13 +443,18 @@ export function NvmcAssignmentsCard({
           const dateStr = formatarDataCompleta(dateObj);
           const dayAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
           const formattedDateDisplay = `${dayAbrev} ${dateObj.getUTCDate().toString().padStart(2, '0')}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
-          const dailyAssignments = currentMonthAssignments[dateStr] || { fmmParts: [], vidaCristaParts: [] };
+          const dailyAssignments = ensureDayAssignmentsStructure(currentMonthAssignments[dateStr]);
           
           return (
             <div key={dateStr} className="mb-6">
-              <h3 className="text-xl font-semibold text-primary mb-3 sticky top-0 bg-background py-2 z-10 border-b">
-                {formattedDateDisplay} - {obterNomeMes(dateObj.getUTCMonth())} de {dateObj.getUTCFullYear()}
-              </h3>
+              <div className="flex justify-between items-center mb-3 sticky top-0 bg-background py-2 z-10 border-b">
+                <h3 className="text-xl font-semibold text-primary">
+                    {formattedDateDisplay} - {obterNomeMes(dateObj.getUTCMonth())} de {dateObj.getUTCFullYear()}
+                </h3>
+                <Button variant="outline" size="sm" onClick={() => handleOpenParseDialog(dateStr)}>
+                    <UploadCloud className="mr-2 h-4 w-4" /> Importar Programa (Texto)
+                </Button>
+              </div>
               <div className="space-y-4">
                 <div>
                   <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.GERAL}</h4>
@@ -381,19 +464,24 @@ export function NvmcAssignmentsCard({
                 <div>
                   <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.TESOUROS}</h4>
                   {renderFixedPart(dateStr, 'tesourosDiscursoId', NVMC_FIXED_PARTS_CONFIG.tesourosDiscursoId)}
+                   {dailyAssignments.leituraBibliaCustomTitle && NVMC_FIXED_PARTS_CONFIG.tesourosDiscursoId.requiredPermissionId && (
+                        <p className="text-xs text-muted-foreground mt-0 mb-1 ml-[40%] pl-1">
+                            Tema: { (currentMonthAssignments[dateStr] as any)?.tesourosDiscursoCustomTitle || "Não extraído"}
+                        </p>
+                    )}
                   {renderFixedPart(dateStr, 'joiasEspirituaisId', NVMC_FIXED_PARTS_CONFIG.joiasEspirituaisId)}
                   {renderFixedPart(dateStr, 'leituraBibliaId', NVMC_FIXED_PARTS_CONFIG.leituraBibliaId)}
                 </div>
                 <div>
                   <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.FMM}</h4>
-                  {(dailyAssignments.fmmParts || []).map(part => renderFmmPart(dateStr, part))}
+                  {dailyAssignments.fmmParts.map(part => renderFmmPart(dateStr, part))}
                   <Button variant="outline" size="sm" onClick={() => addDynamicPart(dateStr, 'fmm')} className="mt-2">
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Parte (FMM)
                   </Button>
                 </div>
                 <div>
                   <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.VIDA_CRISTA}</h4>
-                  {(dailyAssignments.vidaCristaParts || []).map(part => renderVidaCristaPart(dateStr, part))}
+                  {dailyAssignments.vidaCristaParts.map(part => renderVidaCristaPart(dateStr, part))}
                    <Button variant="outline" size="sm" onClick={() => addDynamicPart(dateStr, 'vc')} className="mt-2">
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Parte (Vida Cristã)
                   </Button>
@@ -438,6 +526,15 @@ export function NvmcAssignmentsCard({
           }
         />
       )}
+      {dateForProgramImport && (
+        <ParseNvmcProgramDialog
+          isOpen={isParseProgramDialogOpen}
+          onOpenChange={setIsParseProgramDialogOpen}
+          onParseText={handleProgramTextParsed}
+          currentMeetingDate={dateForProgramImport}
+        />
+      )}
     </Card>
   );
 }
+
