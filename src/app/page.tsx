@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MemberManagementCard } from '@/components/congregacao/MemberManagementCard';
 import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerationCard';
+import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard'; // Nova importação
 import { MemberFormDialog } from '@/components/congregacao/MemberFormDialog';
 import { BulkAddDialog } from '@/components/congregacao/BulkAddDialog';
 import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog';
@@ -40,7 +41,7 @@ export default function Home() {
 
   useEffect(() => {
     setMembros(carregarMembrosLocalmente());
-    const cachedScheduleObject = carregarCacheDesignacoes(); 
+    const cachedScheduleObject = carregarCacheDesignacoes();
     if (cachedScheduleObject) {
         setDesignacoesMensaisCache(cachedScheduleObject.schedule);
         setCachedScheduleInfo({ mes: cachedScheduleObject.mes, ano: cachedScheduleObject.ano });
@@ -61,9 +62,9 @@ export default function Home() {
         return;
     }
 
-    if (memberData.id) { 
+    if (memberData.id) {
       novosMembros = membros.map(m => m.id === memberData.id ? validarEstruturaMembro(memberData, false) : m);
-    } else { 
+    } else {
       const novoMembro = validarEstruturaMembro({ ...memberData, id: gerarIdMembro() }, false);
       if(novoMembro) novosMembros = [...membros, novoMembro];
       else {
@@ -76,7 +77,7 @@ export default function Home() {
     setIsMemberFormOpen(false);
     setMemberToEdit(null);
   };
-  
+
   const handleEditMember = (member: Membro) => {
     setMemberToEdit(member);
     setIsMemberFormOpen(true);
@@ -100,7 +101,7 @@ export default function Home() {
         const novoMembro = validarEstruturaMembro({ nome, permissoesBase: {}, historicoDesignacoes: {}, impedimentos: [] }, true);
         if (novoMembro) {
           novosMembrosParaAdicionar.push(novoMembro);
-          nomesExistentes.add(nome.toLowerCase()); 
+          nomesExistentes.add(nome.toLowerCase());
           adicionadosCount++;
         }
       }
@@ -136,7 +137,7 @@ export default function Home() {
         if (!Array.isArray(importedData)) {
           throw new Error("O arquivo JSON não é um array válido.");
         }
-        
+
         if (membros.length > 0 && !window.confirm("Isso substituirá todos os dados de membros existentes. Deseja continuar?")) {
             return;
         }
@@ -153,7 +154,7 @@ export default function Home() {
         }).filter(Boolean) as Membro[];
 
         persistMembros(membrosValidosImportados);
-        limparResultadoMensal(); 
+        limparResultadoMensal();
         toast({ title: "Importado", description: `${membrosValidosImportados.length} membros importados com sucesso.` });
       } catch (err: any) {
         console.error("Erro ao importar membros:", err);
@@ -166,9 +167,9 @@ export default function Home() {
   const handleScheduleGenerated = (designacoes: DesignacoesFeitas, mes: number, ano: number) => {
     setDesignacoesMensaisCache(designacoes);
     setCachedScheduleInfo({mes, ano});
-    
+
     const novosMembros = [...membros].map(m => {
-        const membroAtualizado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } }; 
+        const membroAtualizado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
         Object.entries(designacoes).forEach(([dataStr, funcoesDoDia]) => {
             const dataObj = new Date(dataStr + "T00:00:00");
             if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
@@ -197,21 +198,21 @@ export default function Home() {
 
   const handleOpenAdvancedOptions = (memberId: string | null) => {
     setMemberIdForAdvancedOptions(memberId);
-    setIsMemberFormOpen(false); 
+    setIsMemberFormOpen(false);
     setIsConfirmClearOpen(true);
   };
-  
+
   const handleClearHistory = () => {
-    if (memberIdForAdvancedOptions) { 
+    if (memberIdForAdvancedOptions) {
         const membro = membros.find(m => m.id === memberIdForAdvancedOptions);
         if (membro) {
-            const membrosAtualizados = membros.map(m => 
+            const membrosAtualizados = membros.map(m =>
                 m.id === memberIdForAdvancedOptions ? { ...m, historicoDesignacoes: {} } : m
             );
             persistMembros(membrosAtualizados);
             toast({ title: "Histórico Limpo", description: `Histórico de ${membro.nome} foi limpo.` });
         }
-    } else { 
+    } else {
         const membrosAtualizados = membros.map(m => ({ ...m, historicoDesignacoes: {} }));
         persistMembros(membrosAtualizados);
         toast({ title: "Histórico Limpo", description: "Histórico de todos os membros foi limpo." });
@@ -245,8 +246,8 @@ export default function Home() {
     } else {
       novasDesignacoes[date] = { [functionId]: newMemberId };
     }
-    
-    setDesignacoesMensaisCache(novasDesignacoes); 
+
+    setDesignacoesMensaisCache(novasDesignacoes);
 
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
@@ -308,24 +309,32 @@ export default function Home() {
               <Tabs defaultValue="indicadores-volantes-av-limpeza" className="w-full pt-2">
                 <TabsList className="mx-4 mb-2">
                   <TabsTrigger value="indicadores-volantes-av-limpeza">Indicadores/Volantes/AV/Limpeza</TabsTrigger>
-                  {/* Outras TabsTriggers podem ser adicionadas aqui no futuro */}
+                  <TabsTrigger value="reuniao-publica">Reunião Pública</TabsTrigger>
                 </TabsList>
                 <TabsContent value="indicadores-volantes-av-limpeza" className="pt-0">
-                  <ScheduleGenerationCard 
-                    membros={membros} 
+                  <ScheduleGenerationCard
+                    membros={membros}
                     onScheduleGenerated={handleScheduleGenerated}
                     currentSchedule={designacoesMensaisCache}
                     currentMes={cachedScheduleInfo?.mes ?? null}
                     currentAno={cachedScheduleInfo?.ano ?? null}
-                    onOpenSubstitutionModal={handleOpenSubstitutionModal} 
+                    onOpenSubstitutionModal={handleOpenSubstitutionModal}
                   />
                 </TabsContent>
-                {/* Outras TabsContents podem ser adicionadas aqui no futuro */}
+                <TabsContent value="reuniao-publica" className="pt-0">
+                  <PublicMeetingAssignmentsCard
+                    allMembers={membros}
+                    assignments={designacoesMensaisCache}
+                    month={cachedScheduleInfo?.mes ?? null}
+                    year={cachedScheduleInfo?.ano ?? null}
+                    onOpenSubstitutionModal={handleOpenSubstitutionModal}
+                  />
+                </TabsContent>
               </Tabs>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-        
+
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center">
@@ -384,3 +393,5 @@ export default function Home() {
   );
 }
 
+
+    
