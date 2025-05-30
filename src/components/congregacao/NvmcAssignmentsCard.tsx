@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, BookUser, Edit3, PlusCircle, Trash2, UploadCloud, Users, FileText } from 'lucide-react'; // Added FileText
+import { UserPlus, BookUser, Edit3, PlusCircle, Trash2, UploadCloud, Users, FileText } from 'lucide-react';
 import { MemberSelectionDialog } from './MemberSelectionDialog';
 import { ParseNvmcProgramDialog } from './ParseNvmcProgramDialog';
 import { useToast } from "@/hooks/use-toast";
@@ -75,7 +75,7 @@ export function NvmcAssignmentsCard({
       leituraBibliaSalaAId: assignments?.leituraBibliaSalaAId,
       leituraBibliaSalaBId: assignments?.leituraBibliaSalaBId,
       leituraBibliaCustomTitle: assignments?.leituraBibliaCustomTitle,
-      fmmParts: Array.isArray(assignments?.fmmParts) ? assignments.fmmParts.map(p => ({...p, id: p.id || generatePartId(), partName: p.partName || '', partTheme: p.partTheme, participantSalaAId: p.participantSalaAId, assistantSalaAId: p.assistantSalaAId, participantSalaBId: p.participantSalaBId, assistantSalaBId: p.assistantSalaBId })) : [],
+      fmmParts: Array.isArray(assignments?.fmmParts) ? assignments.fmmParts.map(p => ({...p, id: p.id || generatePartId(), partName: p.partName || '', partTheme: p.partTheme, needsAssistant: !!p.needsAssistant, participantSalaAId: p.participantSalaAId, assistantSalaAId: p.assistantSalaAId, participantSalaBId: p.participantSalaBId, assistantSalaBId: p.assistantSalaBId })) : [],
       vidaCristaCantico: assignments?.vidaCristaCantico,
       vidaCristaParts: Array.isArray(assignments?.vidaCristaParts) ? assignments.vidaCristaParts.map(p => ({...p, id: p.id || generatePartId(), partName: p.partName || '', partTheme: p.partTheme, participantId: p.participantId })) : [],
       ebcDirigenteId: assignments?.ebcDirigenteId,
@@ -85,21 +85,7 @@ export function NvmcAssignmentsCard({
       oracaoFinalId: assignments?.oracaoFinalId,
     };
   };
-
-  useEffect(() => {
-    const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
-    const loadedAssignments = allNvmcAssignments ? allNvmcAssignments[yearMonthKey] : null;
-    const sanitizedAssignments: { [dateStr: string]: NVMCDailyAssignments } = {};
-
-    if (loadedAssignments) {
-      for (const dateStr in loadedAssignments) {
-        sanitizedAssignments[dateStr] = ensureDayAssignmentsStructure(loadedAssignments[dateStr]);
-      }
-    }
-    setCurrentMonthAssignments(sanitizedAssignments);
-  }, [displayMonth, displayYear, allNvmcAssignments]);
-
-
+  
   const midweekMeetingDates = useMemo(() => {
     const dates: Date[] = [];
     const firstDay = new Date(Date.UTC(displayYear, displayMonth, 1));
@@ -113,6 +99,22 @@ export function NvmcAssignmentsCard({
     }
     return dates;
   }, [displayMonth, displayYear]);
+
+  useEffect(() => {
+    const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
+    const loadedAssignments = allNvmcAssignments ? allNvmcAssignments[yearMonthKey] : null;
+    
+    const newMonthAssignments: { [dateStr: string]: NVMCDailyAssignments } = {};
+
+    midweekMeetingDates.forEach(dateObj => {
+      const dateStr = formatarDataCompleta(dateObj);
+      const existingAssignmentForDate = loadedAssignments ? loadedAssignments[dateStr] : undefined;
+      newMonthAssignments[dateStr] = ensureDayAssignmentsStructure(existingAssignmentForDate);
+    });
+
+    setCurrentMonthAssignments(newMonthAssignments);
+  }, [displayMonth, displayYear, allNvmcAssignments, midweekMeetingDates]);
+
 
   const getMemberName = (memberId: string | null | undefined): string => {
     if (!memberId) return 'Selecionar';
@@ -201,6 +203,7 @@ export function NvmcAssignmentsCard({
     let requiredPermissionId: string | null = null;
 
     const excludedMemberIds: string[] = [];
+    // Exclude members assigned to any role in Leitura da Bíblia or FMM parts for this day
     if (assignmentsForDay.leituraBibliaSalaAId) excludedMemberIds.push(assignmentsForDay.leituraBibliaSalaAId);
     if (assignmentsForDay.leituraBibliaSalaBId) excludedMemberIds.push(assignmentsForDay.leituraBibliaSalaBId);
     assignmentsForDay.fmmParts.forEach(p => {
@@ -210,7 +213,8 @@ export function NvmcAssignmentsCard({
       if (p.assistantSalaBId) excludedMemberIds.push(p.assistantSalaBId);
     });
     
-    if (dynamicPartType === 'fmm' && roleInPart && typeof roleInPart === 'string' && ('participantSalaAId' in NVMCParticipantDynamic.prototype || 'participantSalaBId' in NVMCParticipantDynamic.prototype)) {
+    if (dynamicPartType === 'fmm' && roleInPart && typeof roleInPart === 'string' && 
+        (roleInPart === 'participantSalaAId' || roleInPart === 'assistantSalaAId' || roleInPart === 'participantSalaBId' || roleInPart === 'assistantSalaBId') ) {
         const fmmPart = assignmentsForDay.fmmParts.find(p => p.id === partKeyOrId);
         if (fmmPart) {
             currentMemberId = fmmPart[roleInPart as keyof NVMCParticipantDynamic];
@@ -249,7 +253,8 @@ export function NvmcAssignmentsCard({
     setCurrentMonthAssignments(prev => {
         const dayAssignments = ensureDayAssignmentsStructure(prev[dateStr]);
 
-        if (dynamicPartType === 'fmm' && roleInPart && typeof roleInPart === 'string' && ('participantSalaAId' in NVMCParticipantDynamic.prototype || 'participantSalaBId' in NVMCParticipantDynamic.prototype)) {
+        if (dynamicPartType === 'fmm' && roleInPart && typeof roleInPart === 'string' && 
+            (roleInPart === 'participantSalaAId' || roleInPart === 'assistantSalaAId' || roleInPart === 'participantSalaBId' || roleInPart === 'assistantSalaBId')) {
             const partIndex = dayAssignments.fmmParts.findIndex(p => p.id === partKeyOrId);
             if (partIndex > -1) {
                 (dayAssignments.fmmParts[partIndex] as any)[roleInPart as keyof NVMCParticipantDynamic] = selectedMemberId;
@@ -274,7 +279,7 @@ export function NvmcAssignmentsCard({
   const handleSaveChanges = () => {
     onSaveNvmcAssignments(currentMonthAssignments, displayMonth, displayYear);
   };
-
+  
   const handleExportNvmcPDF = () => {
     toast({
       title: "Funcionalidade Indisponível",
@@ -512,7 +517,7 @@ export function NvmcAssignmentsCard({
               <div className="space-y-6"> 
                 
                 <div className="border rounded-lg p-4 shadow-sm">
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.GERAL}</h4>
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.CANTICO_E_ORACAO_INICIAL}</h4>
                   {dailyAssignments.canticoInicialNumero && (
                     <p className="text-sm text-muted-foreground mt-1 mb-3 ml-1 pl-1">
                       {dailyAssignments.canticoInicialNumero}
@@ -520,7 +525,7 @@ export function NvmcAssignmentsCard({
                   )}
                   {renderFixedPart(dateStr, 'presidenteId', NVMC_FIXED_PARTS_CONFIG.presidenteId)}
                   {renderFixedPart(dateStr, 'oracaoInicialId', NVMC_FIXED_PARTS_CONFIG.oracaoInicialId)}
-                  {dailyAssignments.comentariosIniciaisDetalhes && (
+                   {dailyAssignments.comentariosIniciaisDetalhes && (
                     <p className="text-sm text-muted-foreground mt-3 mb-1 ml-1 pl-1">
                       {dailyAssignments.comentariosIniciaisDetalhes} | Comentários Iniciais
                     </p>
@@ -528,7 +533,7 @@ export function NvmcAssignmentsCard({
                 </div>
 
                 <div className="border rounded-lg p-4 shadow-sm">
-                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.TESOUROS}</h4>
+                  <h4 className="text-md font-medium text-foreground mb-2 mt-1 uppercase">{NVMC_PART_SECTIONS.TESOUROS_DA_PALAVRA_DE_DEUS}</h4>
                   {renderFixedPart(dateStr, 'tesourosDiscursoId', NVMC_FIXED_PARTS_CONFIG.tesourosDiscursoId)}
                   {renderFixedPart(dateStr, 'joiasEspirituaisId', NVMC_FIXED_PARTS_CONFIG.joiasEspirituaisId)}
                   {renderFixedPart(dateStr, 'leituraBibliaSalaAId', NVMC_FIXED_PARTS_CONFIG.leituraBibliaSalaAId)}
@@ -536,7 +541,7 @@ export function NvmcAssignmentsCard({
                 </div>
 
                 <div className="border rounded-lg p-4 shadow-sm">
-                  <h4 className="text-md font-medium text-foreground mb-3 mt-1 uppercase">{NVMC_PART_SECTIONS.FMM}</h4>
+                  <h4 className="text-md font-medium text-foreground mb-3 mt-1 uppercase">{NVMC_PART_SECTIONS.FACA_SEU_MELHOR_NO_MINISTERIO}</h4>
                   {dailyAssignments.fmmParts.map(part => renderFmmPart(dateStr, part))}
                   <Button variant="outline" size="sm" onClick={() => addDynamicPart(dateStr, 'fmm')} className="mt-3">
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Parte (FMM)
@@ -544,7 +549,7 @@ export function NvmcAssignmentsCard({
                 </div>
 
                 <div className="border rounded-lg p-4 shadow-sm">
-                  <h4 className="text-md font-medium text-foreground mb-3 mt-1 uppercase">{NVMC_PART_SECTIONS.VIDA_CRISTA}</h4>
+                  <h4 className="text-md font-medium text-foreground mb-3 mt-1 uppercase">{NVMC_PART_SECTIONS.NOSSA_VIDA_CRISTA}</h4>
                    {dailyAssignments.vidaCristaParts.map(part => renderVidaCristaPart(dateStr, part))}
                    {dailyAssignments.vidaCristaCantico && (
                      <p className="text-sm text-muted-foreground mt-4 mb-3 ml-1 pl-1"> 
@@ -605,13 +610,42 @@ export function NvmcAssignmentsCard({
                'Participante'
           }
           dialogDescription={
-            memberSelectionContext.dynamicPartType === 'fmm' && currentMonthAssignments[memberSelectionContext.dateStr] ?
-            (
-              currentMonthAssignments[memberSelectionContext.dateStr]?.fmmParts.find(p => p.id === memberSelectionContext.partKeyOrId)?.partTheme
-            ) : (NVMC_FIXED_PARTS_CONFIG[memberSelectionContext.partKeyOrId as string] ? 
-                ((currentMonthAssignments[memberSelectionContext.dateStr] as any)[memberSelectionContext.partKeyOrId + 'CustomTitle' as any] || (currentMonthAssignments[memberSelectionContext.dateStr] as any)[memberSelectionContext.partKeyOrId.replace('SalaBId', 'CustomTitle').replace('SalaAId', 'CustomTitle') as any])
-                 : currentMonthAssignments[memberSelectionContext.dateStr]?.vidaCristaParts.find(p => p.id === memberSelectionContext.partKeyOrId)?.partTheme
-                )
+            (() => {
+              if (!memberSelectionContext) return "Selecione um membro.";
+              const assignmentsForDate = currentMonthAssignments[memberSelectionContext.dateStr];
+              if (!assignmentsForDate) return "Carregando detalhes da designação...";
+
+              const { partKeyOrId, dynamicPartType } = memberSelectionContext;
+
+              if (dynamicPartType === 'fmm') {
+                return assignmentsForDate.fmmParts.find(p => p.id === partKeyOrId)?.partTheme;
+              }
+              
+              if (NVMC_FIXED_PARTS_CONFIG[partKeyOrId as string]) {
+                const pk = partKeyOrId as keyof NVMCDailyAssignments; // Use type assertion
+                switch (pk) {
+                  case 'tesourosDiscursoId':
+                    return assignmentsForDate.tesourosDiscursoCustomTitle;
+                  case 'joiasEspirituaisId':
+                    return assignmentsForDate.joiasEspirituaisCustomTitle;
+                  case 'leituraBibliaSalaAId':
+                  case 'leituraBibliaSalaBId':
+                    return assignmentsForDate.leituraBibliaCustomTitle;
+                  case 'ebcDirigenteId':
+                  case 'ebcLeitorId':
+                    return assignmentsForDate.ebcCustomTitle;
+                  default:
+                    return undefined; 
+                }
+              }
+              
+              const vcPart = assignmentsForDate.vidaCristaParts.find(p => p.id === partKeyOrId);
+              if (vcPart) {
+                return vcPart.partTheme;
+              }
+              
+              return undefined; 
+            })() || `Selecione um membro para esta função.`
           }
         />
       )}
@@ -626,4 +660,3 @@ export function NvmcAssignmentsCard({
     </Card>
   );
 }
-
