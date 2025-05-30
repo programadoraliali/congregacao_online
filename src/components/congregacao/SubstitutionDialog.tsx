@@ -45,7 +45,7 @@ export function SubstitutionDialog({
   const [isLoadingManual, setIsLoadingManual] = useState(false);
   const [potentialSubstitutes, setPotentialSubstitutes] = useState<Membro[]>([]);
   const [selectedManualSubstitute, setSelectedManualSubstitute] = useState<string | null>(null);
-  const [automaticCandidate, setAutomaticCandidate] = useState<Membro | null>(null);
+  const [automaticCandidate, setAutomaticCandidate] = useState<Membro | null>(null); // Estado para armazenar o candidato para evitar confirmação no mesmo fluxo
   const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
@@ -68,9 +68,8 @@ export function SubstitutionDialog({
   const handleFindAutomaticSubstitute = async () => {
     setIsLoadingAutomatic(true);
     setError(null);
-    setAutomaticCandidate(null);
+    setAutomaticCandidate(null); 
     try {
-      // Simulating async operation if needed, or direct call
       const candidate = await findNextBestCandidateForSubstitution(
         date,
         functionId,
@@ -79,13 +78,9 @@ export function SubstitutionDialog({
         currentAssignmentsForMonth
       );
       if (candidate) {
-        setAutomaticCandidate(candidate);
-        // Directly confirm if user wants this candidate
-        if (window.confirm(`Deseja substituir ${originalMemberName || 'o membro original'} por ${candidate.nome} (próximo da lista)?`)) {
-          onConfirmSubstitution(candidate.id);
-        } else {
-          setAutomaticCandidate(null); // Clear if cancelled
-        }
+        // Se um candidato for encontrado, proceder diretamente com a substituição
+        onConfirmSubstitution(candidate.id);
+        // O fechamento do modal e a mensagem de sucesso serão tratados pelo onConfirmSubstitution
       } else {
         setError('Nenhum substituto automático elegível encontrado.');
         toast({ title: "Nenhum Substituto", description: "Não foi encontrado um substituto automático elegível.", variant: "default" });
@@ -142,7 +137,7 @@ export function SubstitutionDialog({
           <DialogTitle>Substituir: {memberToReplaceName}</DialogTitle>
           <DialogDescription>
             Data: {new Date(date + "T00:00:00").toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} <br />
-            Função: {functionId}
+            Função: {substitutionDetails.currentFunctionGroupId} - {functionId}
           </DialogDescription>
         </DialogHeader>
 
