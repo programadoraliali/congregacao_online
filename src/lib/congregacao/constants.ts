@@ -63,10 +63,10 @@ export const DIAS_SEMANA_REUNIAO_CORES = {
 };
 
 export const NVMC_PART_SECTIONS = {
-  GERAL: "Cântico e Oração Inicial", // Alterado de "Geral e Orações"
-  TESOUROS: "Tesouros da Palavra de Deus",
-  FMM: "Faça Seu Melhor no Ministério",
-  VIDA_CRISTA: "Nossa Vida Cristã",
+  GERAL: "CÂNTICO E ORAÇÃO INICIAL",
+  TESOUROS: "TESOUROS DA PALAVRA DE DEUS",
+  FMM: "FAÇA SEU MELHOR NO MINISTÉRIO",
+  VIDA_CRISTA: "NOSSA VIDA CRISTÃ",
 };
 
 // Configuration for fixed NVMC parts
@@ -80,3 +80,4 @@ export const NVMC_FIXED_PARTS_CONFIG: Record<keyof Omit<NVMCDailyAssignments, 'f
   ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' }, // Qualified brother
   oracaoFinalId: { label: "Oração Final", section: "Comentários finais", requiredPermissionId: 'presidente' }, // Typically elder/qualified MS // Section alterada para fins de agrupamento visual
 };
+
