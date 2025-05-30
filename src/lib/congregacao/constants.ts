@@ -25,6 +25,8 @@ export const PERMISSOES_BASE: PermissaoBase[] = [
   { id: 'presidente', nome: 'Presidente', grupo: 'Leitura/Presidência' },
 ];
 
+// Funções para a primeira aba (Indicadores/Volantes/AV/Limpeza)
+// presidenteReuniaoPublicaDom e leitorASentinelaDom foram removidos pois serão gerenciados na aba "Reunião Pública"
 export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   // Indicadores
   { id: 'indicadorExternoQui', nome: 'Indicador Externo', tipoReuniao: ['meioSemana'], tabela: 'Indicadores', permissaoRequeridaBase: 'indicadorQui' },
@@ -36,15 +38,14 @@ export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   { id: 'volante2Qui', nome: 'Volante 2', tipoReuniao: ['meioSemana'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteQui' },
   { id: 'volante1Dom', nome: 'Volante 1', tipoReuniao: ['publica'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteDom' },
   { id: 'volante2Dom', nome: 'Volante 2', tipoReuniao: ['publica'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteDom' },
-  // Leitor/Presidente (Domingo)
-  { id: 'leitorASentinelaDom', nome: 'Leitor (A Sentinela)', tipoReuniao: ['publica'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'leitorDom' },
-  { id: 'presidenteReuniaoPublicaDom', nome: 'Presidente (Reunião Pública)', tipoReuniao: ['publica'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'presidente' },
-  // Outras funções para Reunião de Meio de Semana
+  // Funções de meio de semana que permanecem automáticas
   { id: 'presidenteMeioSemana', nome: 'Presidente', tipoReuniao: ['meioSemana'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'presidente' },
 ];
 
 export const LOCAL_STORAGE_KEY_MEMBROS = 'congregacao_membros';
 export const LOCAL_STORAGE_KEY_SCHEDULE_CACHE = 'congregacao_schedule_cache';
+export const LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS = 'congregacao_public_meeting_assignments';
+
 
 export const BADGE_COLORS: Record<string, string> = {
   Indicadores: "bg-blue-100 text-blue-700 border-blue-300",
@@ -61,4 +62,3 @@ export const DIAS_SEMANA_REUNIAO_CORES = {
   publica: "bg-primary text-primary-foreground",    // Ochre
   outroDia: "bg-muted text-muted-foreground",
 };
-

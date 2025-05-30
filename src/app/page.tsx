@@ -4,16 +4,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MemberManagementCard } from '@/components/congregacao/MemberManagementCard';
 import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerationCard';
-import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard'; // Nova importação
+import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard';
 import { MemberFormDialog } from '@/components/congregacao/MemberFormDialog';
 import { BulkAddDialog } from '@/components/congregacao/BulkAddDialog';
 import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog';
 import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog';
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
-import type { Membro, DesignacoesFeitas, SubstitutionDetails } from '@/lib/congregacao/types';
+import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAssignments, PublicMeetingAssignment } from '@/lib/congregacao/types';
 import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants';
-import { validarEstruturaMembro, gerarIdMembro } from '@/lib/congregacao/utils';
-import { carregarMembrosLocalmente, salvarMembrosLocalmente, carregarCacheDesignacoes, salvarCacheDesignacoes, limparCacheDesignacoes } from '@/lib/congregacao/storage';
+import { validarEstruturaMembro, gerarIdMembro, formatarDataParaChave } from '@/lib/congregacao/utils';
+import { 
+  carregarMembrosLocalmente, 
+  salvarMembrosLocalmente, 
+  carregarCacheDesignacoes, 
+  salvarCacheDesignacoes, 
+  limparCacheDesignacoes,
+  carregarPublicMeetingAssignments,
+  salvarPublicMeetingAssignments,
+  limparPublicMeetingAssignments
+} from '@/lib/congregacao/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
@@ -24,14 +33,18 @@ import { Trash2, History, Users, Settings2, ListChecks } from 'lucide-react';
 
 export default function Home() {
   const [membros, setMembros] = useState<Membro[]>([]);
+  // Cache para a primeira aba (Indicadores/Volantes)
   const [designacoesMensaisCache, setDesignacoesMensaisCache] = useState<DesignacoesFeitas | null>(null);
   const [cachedScheduleInfo, setCachedScheduleInfo] = useState<{mes: number, ano: number} | null>(null);
+  // Cache para a segunda aba (Reunião Pública)
+  const [allPublicMeetingAssignmentsData, setAllPublicMeetingAssignmentsData] = useState<AllPublicMeetingAssignments | null>(null);
+
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<Membro | null>(null);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
-  const [clearType, setClearType] = useState<'history' | 'all' | null>(null);
+  const [clearType, setClearType] = useState<'history' | 'all' | 'public_meeting' | null>(null);
   const [memberIdForAdvancedOptions, setMemberIdForAdvancedOptions] = useState<string | null>(null);
 
   const [isSubstitutionModalOpen, setIsSubstitutionModalOpen] = useState(false);
@@ -46,6 +59,7 @@ export default function Home() {
         setDesignacoesMensaisCache(cachedScheduleObject.schedule);
         setCachedScheduleInfo({ mes: cachedScheduleObject.mes, ano: cachedScheduleObject.ano });
     }
+    setAllPublicMeetingAssignmentsData(carregarPublicMeetingAssignments());
   }, []);
 
   const persistMembros = (novosMembros: Membro[]) => {
@@ -154,7 +168,8 @@ export default function Home() {
         }).filter(Boolean) as Membro[];
 
         persistMembros(membrosValidosImportados);
-        limparResultadoMensal();
+        limparCacheDesignacoesPrimeiraAba(); // Limpa cache da primeira aba
+        limparCacheDesignacoesPublicMeeting(); // Limpa cache da segunda aba
         toast({ title: "Importado", description: `${membrosValidosImportados.length} membros importados com sucesso.` });
       } catch (err: any) {
         console.error("Erro ao importar membros:", err);
@@ -164,6 +179,7 @@ export default function Home() {
     reader.readAsText(file);
   };
 
+  // Para a primeira aba (Indicadores/Volantes)
   const handleScheduleGenerated = (designacoes: DesignacoesFeitas, mes: number, ano: number) => {
     setDesignacoesMensaisCache(designacoes);
     setCachedScheduleInfo({mes, ano});
@@ -177,6 +193,7 @@ export default function Home() {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
+                        // Se o membro foi removido de uma função que ele tinha antes nessa data
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -189,16 +206,37 @@ export default function Home() {
     persistMembros(novosMembros);
     salvarCacheDesignacoes({schedule: designacoes, mes, ano});
   };
-
-  const limparResultadoMensal = () => {
+  
+  const limparCacheDesignacoesPrimeiraAba = () => {
     setDesignacoesMensaisCache(null);
     setCachedScheduleInfo(null);
     limparCacheDesignacoes();
   };
 
+  // Para a segunda aba (Reunião Pública)
+  const handleSavePublicMeetingAssignments = (
+    monthAssignments: { [dateStr: string]: PublicMeetingAssignment },
+    mes: number,
+    ano: number
+  ) => {
+    const yearMonthKey = formatarDataParaChave(new Date(ano, mes, 1));
+    const updatedAllAssignments = {
+      ...(allPublicMeetingAssignmentsData || {}),
+      [yearMonthKey]: monthAssignments,
+    };
+    setAllPublicMeetingAssignmentsData(updatedAllAssignments);
+    salvarPublicMeetingAssignments(updatedAllAssignments);
+    toast({ title: "Sucesso", description: "Designações da Reunião Pública salvas." });
+  };
+
+  const limparCacheDesignacoesPublicMeeting = () => {
+    setAllPublicMeetingAssignmentsData(null);
+    limparPublicMeetingAssignments();
+  };
+
   const handleOpenAdvancedOptions = (memberId: string | null) => {
     setMemberIdForAdvancedOptions(memberId);
-    setIsMemberFormOpen(false);
+    setIsMemberFormOpen(false); // Garante que o form de membro está fechado
     setIsConfirmClearOpen(true);
   };
 
@@ -222,7 +260,8 @@ export default function Home() {
 
   const handleClearAllData = () => {
     persistMembros([]);
-    limparResultadoMensal();
+    limparCacheDesignacoesPrimeiraAba();
+    limparCacheDesignacoesPublicMeeting();
     toast({ title: "Todos os Dados Limpos", description: "Todos os dados da aplicação foram removidos.", variant: "destructive" });
   };
 
@@ -270,6 +309,9 @@ export default function Home() {
     setSubstitutionDetails(null);
   };
 
+  const currentPublicAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null
+    ? allPublicMeetingAssignmentsData?.[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
+    : null;
 
   return (
     <div className="container mx-auto p-4 min-h-screen flex flex-col">
@@ -324,10 +366,10 @@ export default function Home() {
                 <TabsContent value="reuniao-publica" className="pt-0">
                   <PublicMeetingAssignmentsCard
                     allMembers={membros}
-                    assignments={designacoesMensaisCache}
-                    month={cachedScheduleInfo?.mes ?? null}
-                    year={cachedScheduleInfo?.ano ?? null}
-                    onOpenSubstitutionModal={handleOpenSubstitutionModal}
+                    currentPublicAssignmentsForMonth={currentPublicAssignmentsForSelectedMonth || {}}
+                    month={cachedScheduleInfo?.mes ?? new Date().getMonth()}
+                    year={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
+                    onSaveAssignments={handleSavePublicMeetingAssignments}
                   />
                 </TabsContent>
               </Tabs>
@@ -344,8 +386,11 @@ export default function Home() {
                 <CardDescription>Use com cuidado. Estas ações são irreversíveis.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" onClick={() => { setClearType('history'); handleOpenAdvancedOptions(null);}}>
+                 <Button variant="outline" onClick={() => { setClearType('history'); handleOpenAdvancedOptions(null);}}>
                     <History className="mr-2 h-4 w-4" /> Limpar Histórico de Todos
+                </Button>
+                <Button variant="outline" onClick={() => { setClearType('public_meeting'); handleOpenAdvancedOptions(null);}}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Limpar Dados da Reunião Pública
                 </Button>
                 <Button variant="destructive" onClick={() => { setClearType('all'); handleOpenAdvancedOptions(null);}}>
                     <Trash2 className="mr-2 h-4 w-4" /> Limpar TODOS os Dados
@@ -376,6 +421,10 @@ export default function Home() {
         onOpenChange={setIsConfirmClearOpen}
         onClearHistory={handleClearHistory}
         onClearAllData={handleClearAllData}
+        onClearPublicMeetingData={() => {
+          limparCacheDesignacoesPublicMeeting();
+          toast({ title: "Dados Limpos", description: "Dados da Reunião Pública foram limpos." });
+        }}
         clearType={clearType}
         targetMemberName={memberIdForAdvancedOptions ? membros.find(m=>m.id === memberIdForAdvancedOptions)?.nome : null}
       />
@@ -392,6 +441,3 @@ export default function Home() {
     </div>
   );
 }
-
-
-    

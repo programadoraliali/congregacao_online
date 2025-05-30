@@ -1,109 +1,120 @@
 
 'use client';
 
-import React from 'react';
-import type { Membro, DesignacoesFeitas, Designacao, SubstitutionDetails } from '@/lib/congregacao/types';
-import { NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO, DIAS_SEMANA_REUNIAO_CORES } from '@/lib/congregacao/constants';
-import { formatarDataCompleta } from '@/lib/congregacao/utils';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Membro, PublicMeetingAssignment } from '@/lib/congregacao/types';
+import { NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO } from '@/lib/congregacao/constants';
+import { formatarDataCompleta, formatarDataParaChave, obterNomeMes } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScheduleTable } from './ScheduleTable'; // Reutilizando ScheduleTable
-import { BookOpen, UserCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { UserPlus, BookOpenText, Save } from 'lucide-react';
+import { MemberSelectionDialog } from './MemberSelectionDialog'; // Novo componente
 
 interface PublicMeetingAssignmentsCardProps {
   allMembers: Membro[];
-  assignments: DesignacoesFeitas | null;
-  month: number | null;
-  year: number | null;
-  onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
+  currentPublicAssignmentsForMonth: { [dateStr: string]: PublicMeetingAssignment };
+  month: number; // 0-11
+  year: number;
+  onSaveAssignments: (
+    updatedMonthAssignments: { [dateStr: string]: PublicMeetingAssignment },
+    month: number,
+    year: number
+  ) => void;
 }
+
+type EditableField = 'tema' | 'orador' | 'congregacaoOrador';
+type MemberRole = 'dirigente' | 'leitor';
 
 export function PublicMeetingAssignmentsCard({
   allMembers,
-  assignments,
+  currentPublicAssignmentsForMonth,
   month,
   year,
-  onOpenSubstitutionModal,
+  onSaveAssignments,
 }: PublicMeetingAssignmentsCardProps) {
-  if (assignments === null || month === null || year === null) {
+  const [assignments, setAssignments] = useState<{ [dateStr: string]: PublicMeetingAssignment }>({});
+  const [isMemberSelectionOpen, setIsMemberSelectionOpen] = useState(false);
+  const [memberSelectionContext, setMemberSelectionContext] = useState<{
+    dateStr: string;
+    role: MemberRole;
+    currentMemberId?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    setAssignments(currentPublicAssignmentsForMonth || {});
+  }, [currentPublicAssignmentsForMonth, month, year]);
+
+  const sundaysInMonth = useMemo(() => {
+    const dates: Date[] = [];
+    const firstDay = new Date(Date.UTC(year, month, 1));
+    const lastDay = new Date(Date.UTC(year, month + 1, 0));
+    for (let day = new Date(firstDay); day <= lastDay; day.setUTCDate(day.getUTCDate() + 1)) {
+      if (day.getUTCDay() === DIAS_REUNIAO.publica) { // Domingo
+        dates.push(new Date(day));
+      }
+    }
+    return dates;
+  }, [month, year]);
+
+  const handleInputChange = (dateStr: string, field: EditableField, value: string) => {
+    setAssignments(prev => ({
+      ...prev,
+      [dateStr]: {
+        ...(prev[dateStr] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleOpenMemberSelection = (dateStr: string, role: MemberRole) => {
+    const currentAssignment = assignments[dateStr];
+    const currentMemberId = role === 'dirigente' ? currentAssignment?.dirigenteId : currentAssignment?.leitorId;
+    setMemberSelectionContext({ dateStr, role, currentMemberId });
+    setIsMemberSelectionOpen(true);
+  };
+
+  const handleSelectMember = (selectedMemberId: string) => {
+    if (memberSelectionContext) {
+      const { dateStr, role } = memberSelectionContext;
+      setAssignments(prev => ({
+        ...prev,
+        [dateStr]: {
+          ...(prev[dateStr] || {}),
+          [role === 'dirigente' ? 'dirigenteId' : 'leitorId']: selectedMemberId,
+        },
+      }));
+    }
+    setIsMemberSelectionOpen(false);
+    setMemberSelectionContext(null);
+  };
+
+  const getMemberName = (memberId: string | null | undefined): string => {
+    if (!memberId) return 'Nenhum selecionado';
+    const member = allMembers.find(m => m.id === memberId);
+    return member ? member.nome : 'Desconhecido';
+  };
+  
+  const handleSaveChanges = () => {
+    onSaveAssignments(assignments, month, year);
+  };
+
+  if (sundaysInMonth.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center"><UserCheck className="mr-2 h-5 w-5 text-primary" /> Reunião Pública</CardTitle>
-          <CardDescription>Designações para Presidente e Leitor de A Sentinela.</CardDescription>
+          <CardTitle className="flex items-center">
+            <BookOpenText className="mr-2 h-5 w-5 text-primary" /> Designações da Reunião Pública
+          </CardTitle>
+          <CardDescription>
+            Configure os detalhes para as reuniões públicas de {obterNomeMes(month)} de {year}.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-4">
-            Gere o cronograma na aba "Indicadores/Volantes/AV/Limpeza" primeiro para ver as designações aqui.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const publicMeetingData: Designacao[] = [];
-  const fullDateStringsForTable: string[] = [];
-
-  const primeiroDiaDoMes = new Date(Date.UTC(year, month, 1));
-  const ultimoDiaDoMes = new Date(Date.UTC(year, month + 1, 0));
-
-  for (let dia = new Date(primeiroDiaDoMes); dia <= ultimoDiaDoMes; dia.setUTCDate(dia.getUTCDate() + 1)) {
-    if (dia.getUTCDay() === DIAS_REUNIAO.publica) { // Apenas Domingos
-      const dateStr = formatarDataCompleta(dia);
-      const dayAssignments = assignments[dateStr];
-
-      if (dayAssignments) {
-        publicMeetingData.push({
-          data: `${dia.getUTCDate()} ${NOMES_DIAS_SEMANA_ABREV[dia.getUTCDay()]}`,
-          diaSemanaBadgeColor: DIAS_SEMANA_REUNIAO_CORES.publica,
-          presidenteReuniaoPublicaDom: dayAssignments['presidenteReuniaoPublicaDom'],
-          leitorASentinelaDom: dayAssignments['leitorASentinelaDom'],
-        });
-        fullDateStringsForTable.push(dateStr);
-      } else {
-        // Adicionar linha vazia se não houver designações para um domingo específico (pouco provável se o cronograma foi gerado)
-         publicMeetingData.push({
-          data: `${dia.getUTCDate()} ${NOMES_DIAS_SEMANA_ABREV[dia.getUTCDay()]}`,
-          diaSemanaBadgeColor: DIAS_SEMANA_REUNIAO_CORES.publica,
-          presidenteReuniaoPublicaDom: null,
-          leitorASentinelaDom: null,
-        });
-        fullDateStringsForTable.push(dateStr);
-      }
-    }
-  }
-  
-  const columns = [
-    { key: 'data', label: 'Data' },
-    { key: 'presidenteReuniaoPublicaDom', label: 'Presidente da Reunião Pública' },
-    { key: 'leitorASentinelaDom', label: 'Leitor de A Sentinela' },
-  ];
-
-  const handleNameClick = (
-    dateClicked: string, // YYYY-MM-DD from fullDateStringsForTable
-    columnKey: string, // 'presidenteReuniaoPublicaDom' or 'leitorASentinelaDom'
-    originalMemberId: string,
-    originalMemberName: string | null
-  ) => {
-    // columnKey já é o functionId correto aqui
-    onOpenSubstitutionModal({
-      date: dateClicked,
-      functionId: columnKey,
-      originalMemberId,
-      originalMemberName,
-      currentFunctionGroupId: 'ReuniaoPublica', // ou um nome mais específico se necessário
-    });
-  };
-  
-  if (publicMeetingData.length === 0) {
-     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><UserCheck className="mr-2 h-5 w-5 text-primary" /> Reunião Pública</CardTitle>
-          <CardDescription>Designações para Presidente e Leitor de A Sentinela.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-4">
-            Não há domingos ou nenhuma designação para Reunião Pública neste mês.
+            Não há domingos neste mês.
           </p>
         </CardContent>
       </Card>
@@ -113,23 +124,106 @@ export function PublicMeetingAssignmentsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center"><BookOpen className="mr-2 h-5 w-5 text-primary" /> Designações da Reunião Pública</CardTitle>
+        <CardTitle className="flex items-center">
+          <BookOpenText className="mr-2 h-5 w-5 text-primary" /> Designações da Reunião Pública
+        </CardTitle>
         <CardDescription>
-          Lista de Presidentes da Reunião Pública e Leitores de A Sentinela para os domingos do mês selecionado.
+          Configure os temas, oradores e participantes para as reuniões públicas de {obterNomeMes(month)} de {year}.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <ScheduleTable
-          title="" // O título do card já é suficiente
-          data={publicMeetingData}
-          columns={columns}
-          allMembers={allMembers}
-          onNameClick={handleNameClick}
-          currentFullDateStrings={fullDateStringsForTable}
-        />
+      <CardContent className="space-y-6">
+        {sundaysInMonth.map((dateObj, index) => {
+          const dateStr = formatarDataCompleta(dateObj);
+          const dayAssignment = assignments[dateStr] || {};
+          const dayAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
+          const formattedDateDisplay = `${dayAbrev} ${dateObj.getUTCDate()}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+          
+          const otherRoleId = memberSelectionContext?.role === 'dirigente' ? dayAssignment.leitorId : dayAssignment.dirigenteId;
+
+          return (
+            <div key={dateStr}>
+              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <div>
+                  <Label htmlFor={`tema-${dateStr}`}>Tema do Discurso</Label>
+                  <Input
+                    id={`tema-${dateStr}`}
+                    value={dayAssignment.tema || ''}
+                    onChange={(e) => handleInputChange(dateStr, 'tema', e.target.value)}
+                    placeholder="Digite o tema"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`orador-${dateStr}`}>Orador</Label>
+                  <Input
+                    id={`orador-${dateStr}`}
+                    value={dayAssignment.orador || ''}
+                    onChange={(e) => handleInputChange(dateStr, 'orador', e.target.value)}
+                    placeholder="Nome do orador"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`congregacao-${dateStr}`}>Congregação do Orador (se visitante)</Label>
+                  <Input
+                    id={`congregacao-${dateStr}`}
+                    value={dayAssignment.congregacaoOrador || ''}
+                    onChange={(e) => handleInputChange(dateStr, 'congregacaoOrador', e.target.value)}
+                    placeholder="Congregação (opcional)"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Dirigente de A Sentinela</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm">
+                      {getMemberName(dayAssignment.dirigenteId)}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => handleOpenMemberSelection(dateStr, 'dirigente')}>
+                      <UserPlus className="mr-1.5 h-4 w-4" /> {dayAssignment.dirigenteId ? 'Alterar' : 'Selecionar'}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label>Leitor de A Sentinela</Label>
+                   <div className="flex items-center gap-2 mt-1">
+                    <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm">
+                       {getMemberName(dayAssignment.leitorId)}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => handleOpenMemberSelection(dateStr, 'leitor')}>
+                      <UserPlus className="mr-1.5 h-4 w-4" /> {dayAssignment.leitorId ? 'Alterar' : 'Selecionar'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              {index < sundaysInMonth.length - 1 && <Separator className="my-6" />}
+            </div>
+          );
+        })}
+        <div className="mt-8 flex justify-end">
+          <Button onClick={handleSaveChanges}>
+            <Save className="mr-2 h-4 w-4" />
+            Salvar Designações da Reunião Pública
+          </Button>
+        </div>
       </CardContent>
+
+      {memberSelectionContext && (
+        <MemberSelectionDialog
+          isOpen={isMemberSelectionOpen}
+          onOpenChange={setIsMemberSelectionOpen}
+          allMembers={allMembers}
+          targetRole={memberSelectionContext.role}
+          currentDate={memberSelectionContext.dateStr}
+          onSelectMember={handleSelectMember}
+          currentlyAssignedMemberId={memberSelectionContext.currentMemberId}
+          excludedMemberId={
+            memberSelectionContext.role === 'dirigente' 
+            ? assignments[memberSelectionContext.dateStr]?.leitorId 
+            : assignments[memberSelectionContext.dateStr]?.dirigenteId
+          }
+        />
+      )}
     </Card>
   );
 }
-
-    

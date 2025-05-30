@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -19,8 +20,9 @@ interface ConfirmClearDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   onClearHistory: () => void;
   onClearAllData: () => void;
-  clearType: 'history' | 'all' | null;
-  targetMemberName?: string | null; // If clearing history for a specific member
+  onClearPublicMeetingData?: () => void; // Nova prop
+  clearType: 'history' | 'all' | 'public_meeting' | null; // Novo tipo
+  targetMemberName?: string | null;
 }
 
 export function ConfirmClearDialog({
@@ -28,6 +30,7 @@ export function ConfirmClearDialog({
   onOpenChange,
   onClearHistory,
   onClearAllData,
+  onClearPublicMeetingData,
   clearType,
   targetMemberName,
 }: ConfirmClearDialogProps) {
@@ -37,6 +40,8 @@ export function ConfirmClearDialog({
       onClearHistory();
     } else if (clearType === 'all') {
       onClearAllData();
+    } else if (clearType === 'public_meeting' && onClearPublicMeetingData) {
+      onClearPublicMeetingData();
     }
     onOpenChange(false);
   };
@@ -51,9 +56,12 @@ export function ConfirmClearDialog({
     description = targetMemberName
       ? `Tem certeza que deseja limpar todo o histórico de designações de ${targetMemberName}? Esta ação não pode ser desfeita.`
       : "Tem certeza que deseja limpar o histórico de designações de TODOS os membros? Esta ação não pode ser desfeita.";
+  } else if (clearType === 'public_meeting') {
+    title = "Limpar Dados da Reunião Pública?";
+    description = "Tem certeza que deseja limpar todos os dados de Tema, Orador, Congregação, Dirigente e Leitor inseridos para as Reuniões Públicas? Esta ação não pode ser desfeita.";
   } else if (clearType === 'all') {
     title = "Limpar TODOS os Dados?";
-    description = "ATENÇÃO! Isso removerá TODOS os membros, suas permissões, históricos e impedimentos. Esta ação é EXTREMAMENTE destrutiva e não pode ser desfeita. Confirma que deseja prosseguir?";
+    description = "ATENÇÃO! Isso removerá TODOS os membros, permissões, históricos, impedimentos e dados das reuniões públicas. Esta ação é EXTREMAMENTE destrutiva e não pode ser desfeita. Confirma que deseja prosseguir?";
   }
 
 
@@ -73,7 +81,7 @@ export function ConfirmClearDialog({
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            className={clearType === 'all' ? "bg-destructive hover:bg-destructive/90" : ""}
+            className={(clearType === 'all' || clearType === 'public_meeting') ? "bg-destructive hover:bg-destructive/90" : ""}
           >
             Confirmar Limpeza
           </AlertDialogAction>

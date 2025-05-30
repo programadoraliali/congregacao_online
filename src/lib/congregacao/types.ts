@@ -59,3 +59,20 @@ export interface SubstitutionDetails {
   originalMemberName: string | null;
   currentFunctionGroupId: 'Indicadores' | 'Volantes' | string; // Para saber qual funcao especifica dentro do grupo
 }
+
+// Tipos para a nova aba "Reunião Pública"
+export interface PublicMeetingAssignment {
+  tema?: string;
+  orador?: string;
+  congregacaoOrador?: string;
+  dirigenteId?: string | null; // Member ID for Watchtower Conductor
+  leitorId?: string | null;   // Member ID for Watchtower Reader
+}
+
+export interface AllPublicMeetingAssignments {
+  // Chave: "AAAA-MM" (ex: "2024-07")
+  [yearMonth: string]: {
+    // Chave: "AAAA-MM-DD" (data completa de cada domingo)
+    [dateStr: string]: PublicMeetingAssignment;
+  };
+}
