@@ -150,11 +150,16 @@ export function SubstitutionDialog({
         {mode === 'options' && (
           <div className="py-4 space-y-3">
             <p className="text-sm text-muted-foreground">Escolha como deseja encontrar um substituto:</p>
-            <Button onClick={handleFindAutomaticSubstitute} className="w-full" disabled={isLoadingAutomatic}>
+            <Button onClick={handleFindAutomaticSubstitute} className="w-full" variant="default" disabled={isLoadingAutomatic}>
               {isLoadingAutomatic && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <ListChecks className="mr-2 h-4 w-4" /> Substituir pelo Próximo da Lista (Automático)
             </Button>
-            <Button onClick={handlePrepareManualSelection} className="w-full" variant="default" disabled={isLoadingManual}>
+            <Button 
+              onClick={handlePrepareManualSelection} 
+              variant="default"
+              className="w-full bg-accent text-accent-foreground hover:bg-accent/90" 
+              disabled={isLoadingManual}
+            >
               {isLoadingManual && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Users className="mr-2 h-4 w-4" /> Escolher Substituto Específico (Manual)
             </Button>
@@ -196,4 +201,3 @@ export function SubstitutionDialog({
     </Dialog>
   );
 }
-
