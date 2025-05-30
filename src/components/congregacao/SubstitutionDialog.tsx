@@ -78,9 +78,7 @@ export function SubstitutionDialog({
         currentAssignmentsForMonth
       );
       if (candidate) {
-        // Se um candidato for encontrado, proceder diretamente com a substituição
         onConfirmSubstitution(candidate.id);
-        // O fechamento do modal e a mensagem de sucesso serão tratados pelo onConfirmSubstitution
       } else {
         setError('Nenhum substituto automático elegível encontrado.');
         toast({ title: "Nenhum Substituto", description: "Não foi encontrado um substituto automático elegível.", variant: "default" });
@@ -156,7 +154,7 @@ export function SubstitutionDialog({
               {isLoadingAutomatic && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <ListChecks className="mr-2 h-4 w-4" /> Substituir pelo Próximo da Lista (Automático)
             </Button>
-            <Button onClick={handlePrepareManualSelection} className="w-full" variant="outline" disabled={isLoadingManual}>
+            <Button onClick={handlePrepareManualSelection} className="w-full" variant="default" disabled={isLoadingManual}>
               {isLoadingManual && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Users className="mr-2 h-4 w-4" /> Escolher Substituto Específico (Manual)
             </Button>
