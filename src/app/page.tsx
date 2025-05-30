@@ -32,7 +32,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2, History, Users, Settings2, ListChecks, BookUser } from 'lucide-react'; // Novo ícone
+import { Trash2, History, Users, Settings2, ListChecks, BookUser, BookOpen } from 'lucide-react'; // Corrigido
 
 
 export default function Home() {
@@ -339,12 +339,12 @@ export default function Home() {
     setSubstitutionDetails(null);
   };
 
-  const currentPublicAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null
-    ? allPublicMeetingAssignmentsData?.[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
+  const currentPublicAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null && allPublicMeetingAssignmentsData
+    ? allPublicMeetingAssignmentsData[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
     : null;
 
-  const currentNvmcAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null
-    ? allNvmcAssignmentsData?.[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
+  const currentNvmcAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null && allNvmcAssignmentsData
+    ? allNvmcAssignmentsData[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
     : null;
 
 
@@ -435,7 +435,7 @@ export default function Home() {
                     <History className="mr-2 h-4 w-4" /> Limpar Histórico de Todos
                 </Button>
                 <Button variant="outline" onClick={() => { setClearType('public_meeting'); handleOpenAdvancedOptions(null);}}>
-                    <BookOpenText className="mr-2 h-4 w-4" /> Limpar Dados da Reunião Pública
+                    <BookOpen className="mr-2 h-4 w-4" /> Limpar Dados da Reunião Pública
                 </Button>
                 <Button variant="outline" onClick={() => { setClearType('nvmc'); handleOpenAdvancedOptions(null);}}>
                     <BookUser className="mr-2 h-4 w-4" /> Limpar Dados NVMC
