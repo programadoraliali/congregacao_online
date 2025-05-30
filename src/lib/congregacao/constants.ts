@@ -20,13 +20,13 @@ export const PERMISSOES_BASE: PermissaoBase[] = [
   { id: 'indicadorDom', nome: 'Indicador Domingo', grupo: 'Indicadores' },
   { id: 'volanteQui', nome: 'Volante Quinta', grupo: 'Volantes' },
   { id: 'volanteDom', nome: 'Volante Domingo', grupo: 'Volantes' },
-  { id: 'leitorQui', nome: 'Leitor Quinta', grupo: 'Leitura/Presidência' },
-  { id: 'leitorDom', nome: 'Leitor Domingo', grupo: 'Leitura/Presidência' },
-  { id: 'presidente', nome: 'Presidente', grupo: 'Leitura/Presidência' },
+  { id: 'leitorQui', nome: 'Leitor (Meio Semana)', grupo: 'Leitura/Presidência' }, // Ajustado nome
+  { id: 'leitorDom', nome: 'Leitor (Fim Semana)', grupo: 'Leitura/Presidência' },  // Ajustado nome
+  { id: 'presidente', nome: 'Presidente/Instrutor', grupo: 'Leitura/Presidência' }, // Ajustado nome
+  // Poderia adicionar permissões mais granulares para NVMC se necessário no futuro
+  // Ex: { id: 'parteDemonstracao', nome: 'Parte Demonstração (FMM)', grupo: 'NVMC Específico'}
 ];
 
-// Funções para a primeira aba (Indicadores/Volantes/AV/Limpeza)
-// presidenteReuniaoPublicaDom e leitorASentinelaDom foram removidos pois serão gerenciados na aba "Reunião Pública"
 export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   // Indicadores
   { id: 'indicadorExternoQui', nome: 'Indicador Externo', tipoReuniao: ['meioSemana'], tabela: 'Indicadores', permissaoRequeridaBase: 'indicadorQui' },
@@ -38,13 +38,14 @@ export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   { id: 'volante2Qui', nome: 'Volante 2', tipoReuniao: ['meioSemana'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteQui' },
   { id: 'volante1Dom', nome: 'Volante 1', tipoReuniao: ['publica'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteDom' },
   { id: 'volante2Dom', nome: 'Volante 2', tipoReuniao: ['publica'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteDom' },
-  // Funções de meio de semana que permanecem automáticas
-  { id: 'presidenteMeioSemana', nome: 'Presidente', tipoReuniao: ['meioSemana'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'presidente' },
+  // A função de presidente da reunião de meio de semana será tratada na aba NVMC.
+  // { id: 'presidenteMeioSemana', nome: 'Presidente', tipoReuniao: ['meioSemana'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'presidente' },
 ];
 
 export const LOCAL_STORAGE_KEY_MEMBROS = 'congregacao_membros';
 export const LOCAL_STORAGE_KEY_SCHEDULE_CACHE = 'congregacao_schedule_cache';
 export const LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS = 'congregacao_public_meeting_assignments';
+export const LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS = 'congregacao_nvmc_assignments';
 
 
 export const BADGE_COLORS: Record<string, string> = {
@@ -61,4 +62,28 @@ export const DIAS_SEMANA_REUNIAO_CORES = {
   meioSemana: "bg-accent text-accent-foreground", // Sienna
   publica: "bg-primary text-primary-foreground",    // Ochre
   outroDia: "bg-muted text-muted-foreground",
+};
+
+// Constantes para NVMC (podem ser expandidas)
+export const NVMC_PART_SECTIONS = {
+  GERAL: "Geral e Orações",
+  TESOUROS: "Tesouros da Palavra de Deus",
+  FMM: "Faça Seu Melhor no Ministério",
+  VIDA_CRISTA: "Nossa Vida Cristã",
+};
+
+// Mapeamento de chaves de NVMCDailyAssignments para informações de UI e permissões
+export const NVMC_ASSIGNABLE_PARTS_CONFIG: Record<keyof NVMCDailyAssignments | string, { label: string; section: string; requiredPermissionId?: string; isFmmPart?: boolean; needsAssistant?: boolean }> = {
+  presidenteId: { label: "Presidente da Reunião", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' },
+  oracaoInicialId: { label: "Oração Inicial", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' }, // Tipicamente ancião/SM qualificado
+  tesourosDiscursoId: { label: "Discurso (Tesouros)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' }, // Instrutor qualificado
+  joiasEspirituaisId: { label: "Encontre Joias Espirituais", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' }, // Instrutor qualificado
+  leituraBibliaId: { label: "Leitura da Bíblia", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' }, // Irmão qualificado
+  fmmParte1: { label: "Parte 1 (FMM)", section: NVMC_PART_SECTIONS.FMM, isFmmPart: true, needsAssistant: true },
+  fmmParte2: { label: "Parte 2 (FMM)", section: NVMC_PART_SECTIONS.FMM, isFmmPart: true, needsAssistant: true },
+  fmmParte3: { label: "Parte 3 (FMM)", section: NVMC_PART_SECTIONS.FMM, isFmmPart: true, needsAssistant: false }, // Ex: Discurso FMM
+  vidaCristaParte1Id: { label: "Parte Vida Cristã", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'presidente' }, // e.g. Necessidades Locais, ancião
+  ebcDirigenteId: { label: "Dirigente do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'presidente' }, // Instrutor qualificado
+  ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' }, // Irmão qualificado
+  oracaoFinalId: { label: "Oração Final", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' }, // Tipicamente ancião/SM qualificado
 };

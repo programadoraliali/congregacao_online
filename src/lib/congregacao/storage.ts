@@ -1,11 +1,12 @@
 
 'use client';
 
-import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments } from './types';
+import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments } from './types';
 import { 
   LOCAL_STORAGE_KEY_MEMBROS, 
   LOCAL_STORAGE_KEY_SCHEDULE_CACHE,
-  LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS
+  LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS,
+  LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS
 } from './constants';
 import { validarEstruturaMembro } from './utils';
 
@@ -112,5 +113,44 @@ export function limparPublicMeetingAssignments(): void {
     localStorage.removeItem(LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS);
   } catch (error) {
     console.error("Erro ao limpar designações da Reunião Pública:", error);
+  }
+}
+
+// Funções para a aba "NVMC"
+export function carregarNVMCAssignments(): AllNVMCAssignments | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS);
+    if (dadosSalvos) {
+      const parsedData = JSON.parse(dadosSalvos) as AllNVMCAssignments;
+      if (parsedData && typeof parsedData === 'object') {
+        return parsedData;
+      } else {
+         console.warn("Cache de NVMC encontrado, mas com estrutura inválida. Limpando.");
+         localStorage.removeItem(LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS);
+         return null;
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao carregar designações NVMC:", error);
+  }
+  return null;
+}
+
+export function salvarNVMCAssignments(data: AllNVMCAssignments): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS, JSON.stringify(data));
+  } catch (error) {
+    console.error("Erro ao salvar designações NVMC:", error);
+  }
+}
+
+export function limparNVMCAssignments(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS);
+  } catch (error) {
+    console.error("Erro ao limpar designações NVMC:", error);
   }
 }

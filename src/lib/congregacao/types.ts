@@ -60,7 +60,7 @@ export interface SubstitutionDetails {
   currentFunctionGroupId: 'Indicadores' | 'Volantes' | string; // Para saber qual funcao especifica dentro do grupo
 }
 
-// Tipos para a nova aba "Reunião Pública"
+// Tipos para a aba "Reunião Pública"
 export interface PublicMeetingAssignment {
   tema?: string;
   orador?: string;
@@ -74,5 +74,40 @@ export interface AllPublicMeetingAssignments {
   [yearMonth: string]: {
     // Chave: "AAAA-MM-DD" (data completa de cada domingo)
     [dateStr: string]: PublicMeetingAssignment;
+  };
+}
+
+// Tipos para a nova aba "NVMC"
+export interface NVMCParticipantAssignment {
+  customTitle?: string;       // User-defined title for the part (e.g., theme of FMM part)
+  participantId?: string | null;
+  assistantId?: string | null;    // For demonstrations/parts with two people
+}
+
+export interface NVMCDailyAssignments {
+  // Geral
+  presidenteId?: string | null;
+  oracaoInicialId?: string | null;
+  // Tesouros da Palavra de Deus
+  tesourosDiscursoId?: string | null;
+  joiasEspirituaisId?: string | null;
+  leituraBibliaId?: string | null;
+  // Faça Seu Melhor no Ministério (example for 3 flexible parts)
+  fmmParte1?: NVMCParticipantAssignment;
+  fmmParte2?: NVMCParticipantAssignment;
+  fmmParte3?: NVMCParticipantAssignment;
+  // Nossa Vida Cristã
+  vidaCristaParte1CustomTitle?: string; // e.g., "Necessidades Locais" or specific article
+  vidaCristaParte1Id?: string | null;
+  ebcDirigenteId?: string | null;
+  ebcLeitorId?: string | null;
+  oracaoFinalId?: string | null;
+}
+
+export interface AllNVMCAssignments {
+  // Chave: "AAAA-MM" (ex: "2024-07")
+  [yearMonth: string]: {
+    // Chave: "YYYY-MM-DD" (data completa de cada reunião de meio de semana)
+    [dateStr: string]: NVMCDailyAssignments;
   };
 }

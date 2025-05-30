@@ -20,8 +20,9 @@ interface ConfirmClearDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   onClearHistory: () => void;
   onClearAllData: () => void;
-  onClearPublicMeetingData?: () => void; // Nova prop
-  clearType: 'history' | 'all' | 'public_meeting' | null; // Novo tipo
+  onClearPublicMeetingData?: () => void;
+  onClearNvmcData?: () => void; // Nova prop
+  clearType: 'history' | 'all' | 'public_meeting' | 'nvmc' | null; // Novo tipo
   targetMemberName?: string | null;
 }
 
@@ -31,6 +32,7 @@ export function ConfirmClearDialog({
   onClearHistory,
   onClearAllData,
   onClearPublicMeetingData,
+  onClearNvmcData, // Novo
   clearType,
   targetMemberName,
 }: ConfirmClearDialogProps) {
@@ -42,6 +44,8 @@ export function ConfirmClearDialog({
       onClearAllData();
     } else if (clearType === 'public_meeting' && onClearPublicMeetingData) {
       onClearPublicMeetingData();
+    } else if (clearType === 'nvmc' && onClearNvmcData) { // Novo
+      onClearNvmcData();
     }
     onOpenChange(false);
   };
@@ -59,9 +63,12 @@ export function ConfirmClearDialog({
   } else if (clearType === 'public_meeting') {
     title = "Limpar Dados da Reunião Pública?";
     description = "Tem certeza que deseja limpar todos os dados de Tema, Orador, Congregação, Dirigente e Leitor inseridos para as Reuniões Públicas? Esta ação não pode ser desfeita.";
+  } else if (clearType === 'nvmc') { // Novo
+    title = "Limpar Dados NVMC?";
+    description = "Tem certeza que deseja limpar todas as designações manuais da Reunião Nossa Vida e Ministério Cristão? Esta ação não pode ser desfeita.";
   } else if (clearType === 'all') {
     title = "Limpar TODOS os Dados?";
-    description = "ATENÇÃO! Isso removerá TODOS os membros, permissões, históricos, impedimentos e dados das reuniões públicas. Esta ação é EXTREMAMENTE destrutiva e não pode ser desfeita. Confirma que deseja prosseguir?";
+    description = "ATENÇÃO! Isso removerá TODOS os membros, permissões, históricos, impedimentos e dados de todas as abas de designação (Reunião Pública, NVMC, etc.). Esta ação é EXTREMAMENTE destrutiva e não pode ser desfeita. Confirma que deseja prosseguir?";
   }
 
 
@@ -81,7 +88,7 @@ export function ConfirmClearDialog({
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            className={(clearType === 'all' || clearType === 'public_meeting') ? "bg-destructive hover:bg-destructive/90" : ""}
+            className={(clearType === 'all' || clearType === 'public_meeting' || clearType === 'nvmc') ? "bg-destructive hover:bg-destructive/90" : ""}
           >
             Confirmar Limpeza
           </AlertDialogAction>

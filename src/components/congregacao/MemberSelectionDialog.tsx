@@ -23,11 +23,15 @@ interface MemberSelectionDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   allMembers: Membro[];
-  targetRole: 'dirigente' | 'leitor';
+  targetRole: 'dirigente' | 'leitor' | null; // Kept for PublicMeeting, can be null for NVMC
+  requiredPermissionId?: string | null; // For NVMC part-specific permissions
   currentDate: string; // YYYY-MM-DD
   onSelectMember: (memberId: string) => void;
   currentlyAssignedMemberId?: string | null;
-  excludedMemberId?: string | null; // ID of member already assigned to the *other* role on this date
+  excludedMemberId?: string | null; // ID of member already assigned to the *other* role on this date (PublicMeeting)
+  excludedMemberIds?: string[]; // Array of IDs to exclude (e.g. participant 1 when selecting participant 2 for FMM)
+  dialogTitle?: string; // Optional custom title
+  dialogDescription?: string; // Optional custom description
 }
 
 export function MemberSelectionDialog({
@@ -35,10 +39,14 @@ export function MemberSelectionDialog({
   onOpenChange,
   allMembers,
   targetRole,
+  requiredPermissionId,
   currentDate,
   onSelectMember,
   currentlyAssignedMemberId,
   excludedMemberId,
+  excludedMemberIds = [],
+  dialogTitle: customDialogTitle,
+  dialogDescription: customDialogDescription,
 }: MemberSelectionDialogProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const { toast } = useToast();
@@ -49,24 +57,33 @@ export function MemberSelectionDialog({
     }
   }, [isOpen, currentlyAssignedMemberId]);
 
+  const permissionIdToUse = requiredPermissionId !== undefined ? requiredPermissionId : 
+    (targetRole === 'dirigente' ? 'presidente' : (targetRole === 'leitor' ? 'leitorDom' : null));
+
+
   const eligibleMembers = useMemo(() => {
     return allMembers.filter(member => {
       // Check permission
-      const requiredPermission = targetRole === 'dirigente' ? 'presidente' : 'leitorDom';
-      if (!member.permissoesBase[requiredPermission]) {
-        return false;
-      }
+      if (permissionIdToUse) {
+        if (!member.permissoesBase[permissionIdToUse]) {
+          return false;
+        }
+      } // If permissionIdToUse is null, no specific permission is required (e.g. FMM parts)
+
       // Check impediments
       if (member.impedimentos.some(imp => currentDate >= imp.from && currentDate <= imp.to)) {
         return false;
       }
-      // Check if excluded (already assigned to the other role on the same day)
+      // Check if excluded (single ID for public meeting or multiple for NVMC)
       if (excludedMemberId && member.id === excludedMemberId) {
+        return false;
+      }
+      if (excludedMemberIds.includes(member.id)) {
         return false;
       }
       return true;
     }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [allMembers, targetRole, currentDate, excludedMemberId]);
+  }, [allMembers, permissionIdToUse, currentDate, excludedMemberId, excludedMemberIds]);
 
   const handleConfirmSelection = () => {
     if (selectedMember) {
@@ -81,7 +98,15 @@ export function MemberSelectionDialog({
     }
   };
 
-  const roleName = targetRole === 'dirigente' ? 'Dirigente de A Sentinela' : 'Leitor de A Sentinela';
+  const roleName = targetRole === 'dirigente' ? 'Dirigente de A Sentinela' : 
+                   targetRole === 'leitor' ? 'Leitor de A Sentinela' : 
+                   'Participante';
+  
+  const title = customDialogTitle || `Selecionar ${roleName}`;
+  const description = customDialogDescription || 
+    `Escolha um membro para a função em ${new Date(currentDate + "T00:00:00").toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}. 
+     A lista mostra membros ${permissionIdToUse ? 'com a permissão necessária' : 'elegíveis'} e sem impedimentos para esta data.`;
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -89,12 +114,9 @@ export function MemberSelectionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <UserCheck className="mr-2 h-5 w-5 text-primary" />
-            Selecionar {roleName}
+            {title}
           </DialogTitle>
-          <DialogDescription>
-            Escolha um membro para a função de {roleName} em {new Date(currentDate + "T00:00:00").toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}.
-            A lista mostra membros com a permissão necessária e sem impedimentos para esta data.
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         {eligibleMembers.length > 0 ? (
