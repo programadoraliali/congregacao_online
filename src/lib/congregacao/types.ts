@@ -79,17 +79,17 @@ export interface AllPublicMeetingAssignments {
 }
 
 // Tipos para a nova aba "NVMC"
-export interface NVMCParticipantDynamic { // Renomeado de NVMCParticipantAssignment para consistência
-  id: string; // Unique ID for this part instance
-  customTitle: string; // Tornando obrigatório, pois virá do parse ou entrada manual
+export interface NVMCParticipantDynamic {
+  id: string; 
+  customTitle: string; 
   needsAssistant?: boolean;
   participantId?: string | null;
   assistantId?: string | null;
 }
 
 export interface NVCVidaCristaDynamicPart {
-  id: string; // Unique ID for this part instance
-  customTitle: string; // Tornando obrigatório
+  id: string; 
+  customTitle: string; 
   participantId?: string | null;
 }
 
@@ -99,17 +99,19 @@ export interface NVMCDailyAssignments {
   oracaoInicialId?: string | null;
   // Tesouros da Palavra de Deus
   tesourosDiscursoId?: string | null;
+  tesourosDiscursoCustomTitle?: string; // Adicionado para o parser
   joiasEspirituaisId?: string | null;
+  joiasEspirituaisCustomTitle?: string; // Adicionado para o parser
   leituraBibliaId?: string | null;
-  leituraBibliaCustomTitle?: string; // Para armazenar o tema da leitura
+  leituraBibliaCustomTitle?: string; 
   // Faça Seu Melhor no Ministério (dynamic parts)
-  fmmParts: NVMCParticipantDynamic[]; // Mudou de opcional para obrigatório
+  fmmParts: NVMCParticipantDynamic[]; 
   // Nossa Vida Cristã (dynamic parts for talks/items)
-  vidaCristaParts: NVCVidaCristaDynamicPart[]; // Mudou de opcional para obrigatório
+  vidaCristaParts: NVCVidaCristaDynamicPart[]; 
   // EBC (fixed within VC section)
   ebcDirigenteId?: string | null;
   ebcLeitorId?: string | null;
-  ebcCustomTitle?: string; // Para armazenar o tema do EBC
+  ebcCustomTitle?: string; 
   oracaoFinalId?: string | null;
 }
 
@@ -124,7 +126,6 @@ export interface AllNVMCAssignments {
 // Tipos para o parser de texto NVMC
 export interface ParsedNvmcPart {
   customTitle: string;
-  // Se precisarmos de mais detalhes do parser, adicionamos aqui
 }
 
 export interface ParsedNvmcProgram {
@@ -135,3 +136,5 @@ export interface ParsedNvmcProgram {
   tesourosDiscursoTema?: string;
   joiasEspirituaisTema?: string;
 }
+
+    
