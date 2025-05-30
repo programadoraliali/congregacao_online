@@ -96,7 +96,8 @@ export interface NVCVidaCristaDynamicPart {
 
 export interface NVMCDailyAssignments {
   // Geral
-  comentariosIniciaisDetalhes?: string; // Novo campo para "Comentários iniciais (X min)"
+  canticoInicialNumero?: string;
+  comentariosIniciaisDetalhes?: string; 
   presidenteId?: string | null;
   oracaoInicialId?: string | null;
   // Tesouros da Palavra de Deus
@@ -110,6 +111,7 @@ export interface NVMCDailyAssignments {
   fmmParts: NVMCParticipantDynamic[];
   // Nossa Vida Cristã (dynamic parts for talks/items)
   vidaCristaParts: NVCVidaCristaDynamicPart[];
+  vidaCristaCantico?: string; // Para o cântico intermediário
   // EBC (fixed within VC section)
   ebcDirigenteId?: string | null;
   ebcLeitorId?: string | null;
@@ -134,9 +136,11 @@ export interface ParsedNvmcPart {
 }
 
 export interface ParsedNvmcProgram {
-  comentariosIniciaisDetalhes?: string; // Novo
+  canticoInicialNumero?: string;
+  comentariosIniciaisDetalhes?: string; 
   fmmParts: ParsedNvmcPart[];
   vidaCristaParts: ParsedNvmcPart[];
+  vidaCristaCantico?: string;
   leituraBibliaTema?: string;
   ebcTema?: string;
   tesourosDiscursoTema?: string;

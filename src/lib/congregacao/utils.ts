@@ -123,9 +123,11 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
 export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0 && !line.toLowerCase().startsWith('sua resposta') && !line.toLowerCase().startsWith('pergunto-se:'));
   const result: ParsedNvmcProgram = {
+    canticoInicialNumero: undefined,
     comentariosIniciaisDetalhes: undefined,
     fmmParts: [],
     vidaCristaParts: [],
+    vidaCristaCantico: undefined,
     leituraBibliaTema: undefined,
     ebcTema: undefined,
     tesourosDiscursoTema: undefined,
@@ -134,32 +136,35 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   };
 
   let currentSection: 'TESOUROS' | 'FMM' | 'VC' | null = null;
-  let isInitialCommentLine = false;
+  let isInitialCommentLineProcessed = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Identificar comentários iniciais
-    if (line.toUpperCase().includes('CÂNTICO') && line.toUpperCase().includes('ORAÇÃO') && line.toUpperCase().includes('COMENTÁRIOS INICIAIS')) {
-      isInitialCommentLine = true;
+    // Identificar Cântico Inicial e Comentários Iniciais
+    if (!isInitialCommentLineProcessed && line.toUpperCase().includes('CÂNTICO') && line.toUpperCase().includes('ORAÇÃO') && line.toUpperCase().includes('COMENTÁRIOS INICIAIS')) {
+      const canticoMatch = line.match(/Cântico\s+\d+/i);
+      if (canticoMatch) {
+        result.canticoInicialNumero = canticoMatch[0];
+      }
+
       const parts = line.split('|');
       if (parts.length > 1) {
         const commentPart = parts.slice(1).join('|').trim();
          if (commentPart.toLowerCase().startsWith('comentários iniciais')) {
-             result.comentariosIniciaisDetalhes = commentPart.substring('comentários iniciais'.length).trim();
+             result.comentariosIniciaisDetalhes = commentPart.substring('comentários iniciais'.length).trim().replace(/[()]/g, ''); // Remove parentheses
          } else {
-            result.comentariosIniciaisDetalhes = commentPart;
+            result.comentariosIniciaisDetalhes = commentPart.replace(/[()]/g, ''); // Remove parentheses
          }
       }
+      isInitialCommentLineProcessed = true;
       continue; 
     }
-    if (isInitialCommentLine && line.toLowerCase().startsWith('comentários iniciais')) {
-        // This case handles if "Comentários iniciais (X min)" is on a separate line
-        result.comentariosIniciaisDetalhes = line.substring('comentários iniciais'.length).trim();
-        isInitialCommentLine = false; // Reset flag
+    if (!isInitialCommentLineProcessed && line.toLowerCase().startsWith('comentários iniciais')) {
+        result.comentariosIniciaisDetalhes = line.substring('comentários iniciais'.length).trim().replace(/[()]/g, ''); // Remove parentheses
+        isInitialCommentLineProcessed = true; 
         continue;
     }
-    isInitialCommentLine = false; // Reset if not the initial comment line or the one immediately after
 
 
     if (line.toUpperCase().includes('TESOUROS DA PALAVRA DE DEUS')) {
@@ -180,22 +185,18 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
         details = details.substring(1).trim();
       }
       result.comentariosFinaisDetalhes = details;
-      currentSection = null; // End of sections for parts
+      currentSection = null; 
       continue;
     }
-    if (line.toUpperCase().startsWith('CÂNTICO')) { // General chant, ignore if not part of initial/final
-        if(currentSection === null && !line.includes('ORAÇÃO')) { // If it's just a chant before sections, skip
-             // This might be too aggressive if a VC part is *just* "Cântico X"
-        } else if (currentSection !== 'VC' && !line.includes('ORAÇÃO')){
-             // Only consider chants within VC or if it's the initial/final one.
-        } else if (!line.includes('ORAÇÃO')) {
-          // This is likely a chant within VC parts, treat it as a part
-          if(currentSection === 'VC'){
-            const chantPart : ParsedNvmcPart = { partName: line, partTheme: undefined};
-            result.vidaCristaParts.push(chantPart);
-          }
-        }
-      continue;
+    // Tratar Cântico intermediário em VC ou Cântico final com oração
+    if (line.toUpperCase().startsWith('CÂNTICO')) {
+      if (currentSection === 'VC' && !line.toUpperCase().includes('ORAÇÃO')) {
+        result.vidaCristaCantico = line; // Armazena apenas o cântico intermediário
+        continue; // Não processar como parte designável
+      } else if (currentSection === null && line.toUpperCase().includes('ORAÇÃO')) {
+        // Cântico final com oração é parte dos comentários finais, já tratado
+        continue;
+      }
     }
     
     // Skip instructional lines
@@ -217,24 +218,23 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
 
     if (partMatch) {
       const partNumber = parseInt(partMatch[1], 10);
-      let fullTitleSegment = partMatch[2].trim();
+      let fullTitleFromLine = partMatch[2].trim();
       
       let partName = "";
       let partTheme: string | undefined = undefined;
 
       const timeMatchRegex = /\s*\(\s*\d+(?:-\d+)?\s*min\s*\)/i;
-      const timeMatchResult = fullTitleSegment.match(timeMatchRegex);
+      const timeMatchResult = fullTitleFromLine.match(timeMatchRegex);
 
       if (timeMatchResult && timeMatchResult.index !== undefined) {
-          partName = fullTitleSegment.substring(0, timeMatchResult.index).trim();
-          partTheme = fullTitleSegment.substring(timeMatchResult.index).trim();
+          partName = fullTitleFromLine.substring(0, timeMatchResult.index).trim();
+          partTheme = fullTitleFromLine.substring(timeMatchResult.index).trim();
       } else {
-          partName = fullTitleSegment;
+          partName = fullTitleFromLine;
       }
-      partName = partName.replace(/:$/, '').trim(); // Remove trailing colon
+      partName = partName.replace(/:$/, '').trim(); 
 
       let nextLineIndex = i + 1;
-      // Consumir linhas subsequentes que não iniciam uma nova parte numerada ou seção
       while (nextLineIndex < lines.length) {
           const nextLine = lines[nextLineIndex].trim();
           const isNewNumberedPart = nextLine.match(/^\s*(\d+)\.\s*/);
@@ -242,7 +242,7 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
                                   nextLine.toUpperCase().includes('FAÇA SEU MELHOR NO MINISTÉRIO') ||
                                   nextLine.toUpperCase().includes('NOSSA VIDA CRISTÃ');
           const isFinalCommentOrChant = nextLine.toUpperCase().startsWith('COMENTÁRIOS FINAIS') || 
-                                        (nextLine.toUpperCase().startsWith('CÂNTICO') && nextLine.includes('ORAÇÃO')); // Final chant and prayer
+                                        (nextLine.toUpperCase().startsWith('CÂNTICO') && nextLine.includes('ORAÇÃO'));
           const isInstruction = nextLine.toLowerCase().startsWith('sua resposta') || 
                                 nextLine.toLowerCase().startsWith('pergunto-se:') ||
                                 nextLine.match(/ijwbq artigo/i) ||
