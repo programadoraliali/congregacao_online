@@ -359,7 +359,7 @@ export default function Home() {
       </header>
 
       <main className="flex-grow space-y-6">
-        <Accordion type="multiple" defaultValue={['item-1', 'item-2']} className="w-full">
+        <Accordion type="multiple" defaultValue={['item-2']} className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger className="text-xl font-semibold py-4 px-6 bg-card rounded-t-lg hover:bg-secondary transition-colors data-[state=open]:border-b">
                 <Users className="mr-3 h-6 w-6 text-primary" />
