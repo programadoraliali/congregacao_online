@@ -63,14 +63,14 @@ export const DIAS_SEMANA_REUNIAO_CORES = {
 };
 
 export const NVMC_PART_SECTIONS = {
-  GERAL: "Geral e Orações",
+  GERAL: "Cântico e Oração Inicial", // Alterado de "Geral e Orações"
   TESOUROS: "Tesouros da Palavra de Deus",
   FMM: "Faça Seu Melhor no Ministério",
   VIDA_CRISTA: "Nossa Vida Cristã",
 };
 
 // Configuration for fixed NVMC parts
-export const NVMC_FIXED_PARTS_CONFIG: Record<keyof Omit<NVMCDailyAssignments, 'fmmParts' | 'vidaCristaParts'> | string, { label: string; section: string; requiredPermissionId?: string; }> = {
+export const NVMC_FIXED_PARTS_CONFIG: Record<keyof Omit<NVMCDailyAssignments, 'fmmParts' | 'vidaCristaParts' | 'comentariosIniciaisDetalhes' | 'comentariosFinaisDetalhes' | 'tesourosDiscursoCustomTitle' | 'joiasEspirituaisCustomTitle' | 'leituraBibliaCustomTitle' | 'ebcCustomTitle'> | string, { label: string; section: string; requiredPermissionId?: string; }> = {
   presidenteId: { label: "Presidente da Reunião", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' },
   oracaoInicialId: { label: "Oração Inicial", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' }, // Typically elder/qualified MS
   tesourosDiscursoId: { label: "Discurso (Tesouros)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' }, // Qualified instructor
@@ -78,5 +78,5 @@ export const NVMC_FIXED_PARTS_CONFIG: Record<keyof Omit<NVMCDailyAssignments, 'f
   leituraBibliaId: { label: "Leitura da Bíblia", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' }, // Qualified brother
   ebcDirigenteId: { label: "Dirigente do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'presidente' }, // Qualified instructor
   ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' }, // Qualified brother
-  oracaoFinalId: { label: "Oração Final", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' }, // Typically elder/qualified MS
+  oracaoFinalId: { label: "Oração Final", section: "Comentários finais", requiredPermissionId: 'presidente' }, // Typically elder/qualified MS // Section alterada para fins de agrupamento visual
 };

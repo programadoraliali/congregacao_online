@@ -96,6 +96,7 @@ export interface NVCVidaCristaDynamicPart {
 
 export interface NVMCDailyAssignments {
   // Geral
+  comentariosIniciaisDetalhes?: string; // Novo campo para "Comentários iniciais (X min)"
   presidenteId?: string | null;
   oracaoInicialId?: string | null;
   // Tesouros da Palavra de Deus
@@ -114,7 +115,7 @@ export interface NVMCDailyAssignments {
   ebcLeitorId?: string | null;
   ebcCustomTitle?: string;
   // Encerramento
-  comentariosFinaisDetalhes?: string; // Para " (3 min) | Cântico X e oração"
+  comentariosFinaisDetalhes?: string; 
   oracaoFinalId?: string | null;
 }
 
@@ -133,6 +134,7 @@ export interface ParsedNvmcPart {
 }
 
 export interface ParsedNvmcProgram {
+  comentariosIniciaisDetalhes?: string; // Novo
   fmmParts: ParsedNvmcPart[];
   vidaCristaParts: ParsedNvmcPart[];
   leituraBibliaTema?: string;

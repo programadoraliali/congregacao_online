@@ -64,6 +64,7 @@ export function NvmcAssignmentsCard({
 
   const ensureDayAssignmentsStructure = (assignments: NVMCDailyAssignments | undefined): NVMCDailyAssignments => {
     return {
+      comentariosIniciaisDetalhes: assignments?.comentariosIniciaisDetalhes,
       presidenteId: assignments?.presidenteId,
       oracaoInicialId: assignments?.oracaoInicialId,
       tesourosDiscursoId: assignments?.tesourosDiscursoId,
@@ -288,6 +289,7 @@ export function NvmcAssignmentsCard({
     setCurrentMonthAssignments(prev => {
       const dayAssignments = ensureDayAssignmentsStructure(prev[dateForProgramImport]);
 
+      dayAssignments.comentariosIniciaisDetalhes = parsedProgram.comentariosIniciaisDetalhes;
       dayAssignments.fmmParts = parsedProgram.fmmParts.map(p => ({
         id: generatePartId(),
         partName: p.partName, 
@@ -482,6 +484,9 @@ export function NvmcAssignmentsCard({
               <div className="space-y-4">
                 <div>
                   <h4 className="text-md font-medium text-foreground mb-2 mt-3">{NVMC_PART_SECTIONS.GERAL}</h4>
+                  {dailyAssignments.comentariosIniciaisDetalhes && (
+                    <p className="text-sm text-muted-foreground mb-2 ml-1 pl-1">{dailyAssignments.comentariosIniciaisDetalhes}</p>
+                  )}
                   {renderFixedPart(dateStr, 'presidenteId', NVMC_FIXED_PARTS_CONFIG.presidenteId)}
                   {renderFixedPart(dateStr, 'oracaoInicialId', NVMC_FIXED_PARTS_CONFIG.oracaoInicialId)}
                 </div>
