@@ -1,5 +1,5 @@
 
-import type { PermissaoBase, FuncaoDesignada, DiasReuniao, NVMCDailyAssignments } from './types';
+import type { PermissaoBase, FuncaoDesignada, DiasReuniao, NVMCDailyAssignments, NVCVidaCristaDynamicPart } from './types';
 
 export const APP_NAME = "Congregação Online";
 
@@ -23,8 +23,6 @@ export const PERMISSOES_BASE: PermissaoBase[] = [
   { id: 'leitorQui', nome: 'Leitor (Meio Semana)', grupo: 'Leitura/Presidência' },
   { id: 'leitorDom', nome: 'Leitor (Fim Semana)', grupo: 'Leitura/Presidência' },
   { id: 'presidente', nome: 'Presidente/Instrutor', grupo: 'Leitura/Presidência' },
-  // NVMC parts might not need specific base permissions if any publisher can do them.
-  // Specific roles (Presidente, Leitor NVMC) will use 'presidente' or 'leitorQui'.
 ];
 
 export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
@@ -67,17 +65,33 @@ export const NVMC_PART_SECTIONS = {
   TESOUROS: "TESOUROS DA PALAVRA DE DEUS",
   FMM: "FAÇA SEU MELHOR NO MINISTÉRIO",
   VIDA_CRISTA: "NOSSA VIDA CRISTÃ",
+  COMENTARIOS_FINAIS: "COMENTÁRIOS FINAIS" // Added for consistency
 };
 
 // Configuration for fixed NVMC parts
-export const NVMC_FIXED_PARTS_CONFIG: Record<keyof Omit<NVMCDailyAssignments, 'fmmParts' | 'vidaCristaParts' | 'comentariosIniciaisDetalhes' | 'comentariosFinaisDetalhes' | 'tesourosDiscursoCustomTitle' | 'joiasEspirituaisCustomTitle' | 'leituraBibliaCustomTitle' | 'ebcCustomTitle'> | string, { label: string; section: string; requiredPermissionId?: string; }> = {
+type FixedPartKeys = Exclude<keyof NVMCDailyAssignments, 
+  'fmmParts' | 
+  'vidaCristaParts' | 
+  'comentariosIniciaisDetalhes' | 
+  'comentariosFinaisDetalhes' | 
+  'tesourosDiscursoCustomTitle' | 
+  'joiasEspirituaisCustomTitle' | 
+  'leituraBibliaCustomTitle' | 
+  'ebcCustomTitle' |
+  'canticoInicialNumero' |
+  'vidaCristaCantico'
+>;
+
+
+export const NVMC_FIXED_PARTS_CONFIG: Record<FixedPartKeys | string, { label: string; section: string; requiredPermissionId?: string; }> = {
   presidenteId: { label: "Presidente da Reunião", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' },
-  oracaoInicialId: { label: "Oração Inicial", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' }, // Typically elder/qualified MS
-  tesourosDiscursoId: { label: "Discurso (Tesouros)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' }, // Qualified instructor
-  joiasEspirituaisId: { label: "Encontre Joias Espirituais", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' }, // Qualified instructor
-  leituraBibliaId: { label: "Leitura da Bíblia", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' }, // Qualified brother
-  ebcDirigenteId: { label: "Dirigente do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'presidente' }, // Qualified instructor
-  ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' }, // Qualified brother
-  oracaoFinalId: { label: "Oração Final", section: "Comentários finais", requiredPermissionId: 'presidente' }, // Typically elder/qualified MS // Section alterada para fins de agrupamento visual
+  oracaoInicialId: { label: "Oração Inicial", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' },
+  tesourosDiscursoId: { label: "Discurso (Tesouros)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' },
+  joiasEspirituaisId: { label: "Encontre Joias Espirituais", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' },
+  leituraBibliaSalaAId: { label: "Leitura da Bíblia (Salão Principal)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' },
+  leituraBibliaSalaBId: { label: "Leitura da Bíblia (Sala B)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' },
+  ebcDirigenteId: { label: "Dirigente do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'presidente' },
+  ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' },
+  oracaoFinalId: { label: "Oração Final", section: NVMC_PART_SECTIONS.COMENTARIOS_FINAIS, requiredPermissionId: 'presidente' },
 };
 

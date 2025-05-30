@@ -80,11 +80,13 @@ export interface AllPublicMeetingAssignments {
 // Tipos para a nova aba "NVMC"
 export interface NVMCParticipantDynamic {
   id: string;
-  partName: string; 
-  partTheme?: string; 
+  partName: string;
+  partTheme?: string;
   needsAssistant?: boolean;
-  participantId?: string | null;
-  assistantId?: string | null;
+  participantSalaAId?: string | null; // Renamed
+  assistantSalaAId?: string | null;   // Renamed
+  participantSalaBId?: string | null; // Added
+  assistantSalaBId?: string | null;   // Added
 }
 
 export interface NVCVidaCristaDynamicPart {
@@ -97,7 +99,7 @@ export interface NVCVidaCristaDynamicPart {
 export interface NVMCDailyAssignments {
   // Geral
   canticoInicialNumero?: string;
-  comentariosIniciaisDetalhes?: string; 
+  comentariosIniciaisDetalhes?: string;
   presidenteId?: string | null;
   oracaoInicialId?: string | null;
   // Tesouros da Palavra de Deus
@@ -105,7 +107,8 @@ export interface NVMCDailyAssignments {
   tesourosDiscursoCustomTitle?: string;
   joiasEspirituaisId?: string | null;
   joiasEspirituaisCustomTitle?: string;
-  leituraBibliaId?: string | null;
+  leituraBibliaSalaAId?: string | null; // Renamed
+  leituraBibliaSalaBId?: string | null; // Added
   leituraBibliaCustomTitle?: string;
   // Faça Seu Melhor no Ministério (dynamic parts)
   fmmParts: NVMCParticipantDynamic[];
@@ -117,7 +120,7 @@ export interface NVMCDailyAssignments {
   ebcLeitorId?: string | null;
   ebcCustomTitle?: string;
   // Encerramento
-  comentariosFinaisDetalhes?: string; 
+  comentariosFinaisDetalhes?: string;
   oracaoFinalId?: string | null;
 }
 
@@ -137,9 +140,9 @@ export interface ParsedNvmcPart {
 
 export interface ParsedNvmcProgram {
   canticoInicialNumero?: string;
-  comentariosIniciaisDetalhes?: string; 
+  comentariosIniciaisDetalhes?: string;
   fmmParts: ParsedNvmcPart[];
-  vidaCristaParts: ParsedNvmcPart[];
+  vidaCristaParts: NVCVidaCristaDynamicPart[]; // Corrected type
   vidaCristaCantico?: string;
   leituraBibliaTema?: string;
   ebcTema?: string;
