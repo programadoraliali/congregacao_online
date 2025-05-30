@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'; // Removido CardTitle
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { NOMES_MESES } from '@/lib/congregacao/constants';
@@ -43,31 +43,41 @@ export function ScheduleGenerationCard({
   } | null>(null);
 
   useEffect(() => {
-    if (
-      currentSchedule &&
-      currentMes !== null && currentAno !== null &&
-      currentMes === parseInt(selectedMes, 10) &&
-      currentAno === parseInt(selectedAno, 10)
-    ) {
-      // Only update displayedScheduleData if the "Generate" button was effectively the source
-      // This means we check if isLoading is false (meaning a generation just completed)
-      // OR if displayedScheduleData is already set for this month/year (meaning it was previously generated and now a substitution happened)
-      if (!isLoading || (displayedScheduleData && displayedScheduleData.mes === currentMes && displayedScheduleData.ano === currentAno)) {
-         setDisplayedScheduleData({
-           schedule: currentSchedule,
-           mes: currentMes,
-           ano: currentAno,
-         });
+    const numSelectedMes = parseInt(selectedMes, 10);
+    const numSelectedAno = parseInt(selectedAno, 10);
+
+    // If selection has changed and no longer matches the effective current schedule from props,
+    // clear the displayed data. User must click "Generate" for the new selection.
+    if (currentMes !== numSelectedMes || currentAno !== numSelectedAno) {
+      if (displayedScheduleData !== null) { // Avoid unnecessary setState if already null
+        setDisplayedScheduleData(null);
+        setError(null); // Clear error when selection changes causing display to clear
       }
-      // Don't clear error here if it's a generation error for the current selection
-    } else if (
-        (currentMes !== parseInt(selectedMes, 10) || currentAno !== parseInt(selectedAno, 10))
-    ) {
-      // Clear display if month/year selection changes AND it doesn't match what's cached/current
-      setDisplayedScheduleData(null);
-      // setError(null); // Clear previous errors when selection changes
+    } else {
+      // Selection matches currentMes/currentAno (from props).
+      // This branch handles initial load with matching cache, or updates from parent (e.g., substitution).
+      if (currentSchedule) {
+        // If there's a schedule from props, and it's different from what's displayed, update.
+        if (
+            !displayedScheduleData ||
+            displayedScheduleData.schedule !== currentSchedule || 
+            displayedScheduleData.mes !== currentMes ||
+            displayedScheduleData.ano !== currentAno
+          ) {
+          setDisplayedScheduleData({
+            schedule: currentSchedule,
+            mes: currentMes,
+            ano: currentAno,
+          });
+        }
+      } else {
+        // No currentSchedule from props for this selection (e.g., cache was cleared in parent)
+        if (displayedScheduleData !== null) { // Avoid unnecessary setState
+          setDisplayedScheduleData(null);
+        }
+      }
     }
-  }, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno, isLoading, displayedScheduleData]);
+  }, [currentSchedule, currentMes, currentAno, selectedMes, selectedAno]);
 
 
   const handleGenerateSchedule = async () => {
@@ -118,7 +128,7 @@ export function ScheduleGenerationCard({
   return (
     <Card>
       <CardHeader>
-        {/* CardTitle removido */}
+        {/* CardTitle removido, nome da aba é suficiente */}
         <CardDescription>Selecione o mês e ano para gerar o cronograma de designações.</CardDescription>
       </CardHeader>
       <CardContent>
