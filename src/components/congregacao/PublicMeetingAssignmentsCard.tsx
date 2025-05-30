@@ -2,22 +2,24 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Membro, PublicMeetingAssignment } from '@/lib/congregacao/types';
-import { NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO } from '@/lib/congregacao/constants';
+import type { Membro, PublicMeetingAssignment, AllPublicMeetingAssignments } from '@/lib/congregacao/types';
+import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV } from '@/lib/congregacao/constants';
 import { formatarDataCompleta, formatarDataParaChave, obterNomeMes } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, BookOpenText, Save } from 'lucide-react';
-import { MemberSelectionDialog } from './MemberSelectionDialog'; // Novo componente
+import { MemberSelectionDialog } from './MemberSelectionDialog';
+import { useToast } from "@/hooks/use-toast";
 
 interface PublicMeetingAssignmentsCardProps {
   allMembers: Membro[];
-  currentPublicAssignmentsForMonth: { [dateStr: string]: PublicMeetingAssignment };
-  month: number; // 0-11
-  year: number;
+  allPublicAssignments: AllPublicMeetingAssignments | null;
+  initialMonth: number; // 0-11
+  initialYear: number;
   onSaveAssignments: (
     updatedMonthAssignments: { [dateStr: string]: PublicMeetingAssignment },
     month: number,
@@ -30,11 +32,13 @@ type MemberRole = 'dirigente' | 'leitor';
 
 export function PublicMeetingAssignmentsCard({
   allMembers,
-  currentPublicAssignmentsForMonth,
-  month,
-  year,
+  allPublicAssignments,
+  initialMonth,
+  initialYear,
   onSaveAssignments,
 }: PublicMeetingAssignmentsCardProps) {
+  const [displayMonth, setDisplayMonth] = useState<number>(initialMonth);
+  const [displayYear, setDisplayYear] = useState<number>(initialYear);
   const [assignments, setAssignments] = useState<{ [dateStr: string]: PublicMeetingAssignment }>({});
   const [isMemberSelectionOpen, setIsMemberSelectionOpen] = useState(false);
   const [memberSelectionContext, setMemberSelectionContext] = useState<{
@@ -42,22 +46,31 @@ export function PublicMeetingAssignmentsCard({
     role: MemberRole;
     currentMemberId?: string | null;
   } | null>(null);
+  const { toast } = useToast();
+
+  const currentYear = new Date().getFullYear();
+  const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   useEffect(() => {
-    setAssignments(currentPublicAssignmentsForMonth || {});
-  }, [currentPublicAssignmentsForMonth, month, year]);
+    if (allPublicAssignments) {
+      const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
+      setAssignments(allPublicAssignments[yearMonthKey] || {});
+    } else {
+      setAssignments({});
+    }
+  }, [displayMonth, displayYear, allPublicAssignments]);
 
   const sundaysInMonth = useMemo(() => {
     const dates: Date[] = [];
-    const firstDay = new Date(Date.UTC(year, month, 1));
-    const lastDay = new Date(Date.UTC(year, month + 1, 0));
+    const firstDay = new Date(Date.UTC(displayYear, displayMonth, 1));
+    const lastDay = new Date(Date.UTC(displayYear, displayMonth + 1, 0));
     for (let day = new Date(firstDay); day <= lastDay; day.setUTCDate(day.getUTCDate() + 1)) {
       if (day.getUTCDay() === DIAS_REUNIAO.publica) { // Domingo
         dates.push(new Date(day));
       }
     }
     return dates;
-  }, [month, year]);
+  }, [displayMonth, displayYear]);
 
   const handleInputChange = (dateStr: string, field: EditableField, value: string) => {
     setAssignments(prev => ({
@@ -98,28 +111,9 @@ export function PublicMeetingAssignmentsCard({
   };
   
   const handleSaveChanges = () => {
-    onSaveAssignments(assignments, month, year);
+    onSaveAssignments(assignments, displayMonth, displayYear);
+    // O toast de sucesso já é dado em page.tsx
   };
-
-  if (sundaysInMonth.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <BookOpenText className="mr-2 h-5 w-5 text-primary" /> Designações da Reunião Pública
-          </CardTitle>
-          <CardDescription>
-            Configure os detalhes para as reuniões públicas de {obterNomeMes(month)} de {year}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-4">
-            Não há domingos neste mês.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
@@ -128,21 +122,54 @@ export function PublicMeetingAssignmentsCard({
           <BookOpenText className="mr-2 h-5 w-5 text-primary" /> Designações da Reunião Pública
         </CardTitle>
         <CardDescription>
-          Configure os temas, oradores e participantes para as reuniões públicas de {obterNomeMes(month)} de {year}.
+          Configure os temas, oradores e participantes para as reuniões públicas.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="flex flex-col sm:flex-row gap-4 mb-6 items-end">
+          <div className="flex-1">
+            <Label htmlFor={`selectPublicMeetingMes-${initialYear}-${initialMonth}`}>Mês</Label>
+            <Select value={displayMonth.toString()} onValueChange={(val) => setDisplayMonth(parseInt(val))}>
+              <SelectTrigger id={`selectPublicMeetingMes-${initialYear}-${initialMonth}`}>
+                <SelectValue placeholder="Selecione o mês" />
+              </SelectTrigger>
+              <SelectContent>
+                {NOMES_MESES.map((nome, index) => (
+                  <SelectItem key={index} value={index.toString()}>{nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <Label htmlFor={`selectPublicMeetingAno-${initialYear}-${initialMonth}`}>Ano</Label>
+            <Select value={displayYear.toString()} onValueChange={(val) => setDisplayYear(parseInt(val))}>
+              <SelectTrigger id={`selectPublicMeetingAno-${initialYear}-${initialMonth}`}>
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearsForSelect.map(yearVal => (
+                  <SelectItem key={yearVal} value={yearVal.toString()}>{yearVal}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {sundaysInMonth.length === 0 && (
+           <p className="text-muted-foreground text-center py-4">
+            Não há domingos em {obterNomeMes(displayMonth)} de {displayYear}.
+          </p>
+        )}
+
         {sundaysInMonth.map((dateObj, index) => {
           const dateStr = formatarDataCompleta(dateObj);
           const dayAssignment = assignments[dateStr] || {};
           const dayAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
           const formattedDateDisplay = `${dayAbrev} ${dateObj.getUTCDate()}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
           
-          const otherRoleId = memberSelectionContext?.role === 'dirigente' ? dayAssignment.leitorId : dayAssignment.dirigenteId;
-
           return (
             <div key={dateStr}>
-              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay}</h3>
+              <h3 className="text-lg font-semibold text-primary mb-3">{formattedDateDisplay} - {obterNomeMes(displayMonth)} {displayYear}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                 <div>
                   <Label htmlFor={`tema-${dateStr}`}>Tema do Discurso</Label>
@@ -176,7 +203,7 @@ export function PublicMeetingAssignmentsCard({
                 <div>
                   <Label>Dirigente de A Sentinela</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm">
+                    <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm flex items-center">
                       {getMemberName(dayAssignment.dirigenteId)}
                     </span>
                     <Button variant="outline" size="sm" onClick={() => handleOpenMemberSelection(dateStr, 'dirigente')}>
@@ -187,7 +214,7 @@ export function PublicMeetingAssignmentsCard({
                 <div>
                   <Label>Leitor de A Sentinela</Label>
                    <div className="flex items-center gap-2 mt-1">
-                    <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm">
+                    <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm flex items-center">
                        {getMemberName(dayAssignment.leitorId)}
                     </span>
                     <Button variant="outline" size="sm" onClick={() => handleOpenMemberSelection(dateStr, 'leitor')}>
@@ -200,12 +227,14 @@ export function PublicMeetingAssignmentsCard({
             </div>
           );
         })}
-        <div className="mt-8 flex justify-end">
-          <Button onClick={handleSaveChanges}>
-            <Save className="mr-2 h-4 w-4" />
-            Salvar Designações da Reunião Pública
-          </Button>
-        </div>
+        {sundaysInMonth.length > 0 && (
+            <div className="mt-8 flex justify-end">
+            <Button onClick={handleSaveChanges}>
+                <Save className="mr-2 h-4 w-4" />
+                Salvar Designações da Reunião Pública
+            </Button>
+            </div>
+        )}
       </CardContent>
 
       {memberSelectionContext && (
@@ -227,3 +256,5 @@ export function PublicMeetingAssignmentsCard({
     </Card>
   );
 }
+
+    
