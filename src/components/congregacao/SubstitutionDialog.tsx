@@ -45,7 +45,7 @@ export function SubstitutionDialog({
   const [isLoadingManual, setIsLoadingManual] = useState(false);
   const [potentialSubstitutes, setPotentialSubstitutes] = useState<Membro[]>([]);
   const [selectedManualSubstitute, setSelectedManualSubstitute] = useState<string | null>(null);
-  const [automaticCandidate, setAutomaticCandidate] = useState<Membro | null>(null); // Estado para armazenar o candidato para evitar confirmação no mesmo fluxo
+  const [automaticCandidate, setAutomaticCandidate] = useState<Membro | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
@@ -53,7 +53,6 @@ export function SubstitutionDialog({
   const { date, functionId, originalMemberId, originalMemberName } = substitutionDetails;
 
   useEffect(() => {
-    // Reset state when dialog opens or details change
     if (isOpen) {
       setMode('options');
       setIsLoadingAutomatic(false);
@@ -73,18 +72,18 @@ export function SubstitutionDialog({
       const candidate = await findNextBestCandidateForSubstitution(
         date,
         functionId,
-        originalMemberId,
+        originalMemberId || null, // Pode ser null se estiver designando pela primeira vez
         allMembers,
         currentAssignmentsForMonth
       );
       if (candidate) {
         onConfirmSubstitution(candidate.id);
       } else {
-        setError('Nenhum substituto automático elegível encontrado.');
-        toast({ title: "Nenhum Substituto", description: "Não foi encontrado um substituto automático elegível.", variant: "default" });
+        setError('Nenhum candidato automático elegível encontrado.');
+        toast({ title: "Nenhum Candidato", description: "Não foi encontrado um candidato automático elegível.", variant: "default" });
       }
     } catch (e: any) {
-      setError('Erro ao buscar substituto automático: ' + e.message);
+      setError('Erro ao buscar candidato automático: ' + e.message);
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
       setIsLoadingAutomatic(false);
@@ -99,7 +98,7 @@ export function SubstitutionDialog({
       const substitutes = await getPotentialSubstitutesList(
         date,
         functionId,
-        originalMemberId,
+        originalMemberId || null, // Pode ser null
         allMembers,
         currentAssignmentsForMonth
       );
@@ -107,11 +106,11 @@ export function SubstitutionDialog({
         setPotentialSubstitutes(substitutes);
         setMode('manual_selection');
       } else {
-        setError('Nenhum membro elegível encontrado para substituição manual.');
-        toast({ title: "Nenhum Substituto", description: "Não há membros elegíveis para esta função e data.", variant: "default" });
+        setError('Nenhum membro elegível encontrado para seleção manual.');
+        toast({ title: "Nenhum Membro", description: "Não há membros elegíveis para esta função e data.", variant: "default" });
       }
     } catch (e: any) {
-      setError('Erro ao buscar lista de substitutos: ' + e.message);
+      setError('Erro ao buscar lista de membros: ' + e.message);
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
       setIsLoadingManual(false);
@@ -126,13 +125,17 @@ export function SubstitutionDialog({
     }
   };
 
-  const memberToReplaceName = originalMemberName || allMembers.find(m => m.id === originalMemberId)?.nome || 'Membro Desconhecido';
+  const isDesignatingNew = !originalMemberId || originalMemberId === '';
+  const dialogTitleText = isDesignatingNew ? `Designar para ${substitutionDetails.currentFunctionGroupId}` : `Substituir: ${originalMemberName}`;
+  const automaticButtonText = isDesignatingNew ? "Designar Próximo da Lista (Automático)" : "Substituir pelo Próximo da Lista (Automático)";
+  const manualButtonText = isDesignatingNew ? "Escolher Designado Específico (Manual)" : "Escolher Substituto Específico (Manual)";
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Substituir: {memberToReplaceName}</DialogTitle>
+          <DialogTitle>{dialogTitleText}</DialogTitle>
           <DialogDescription>
             Data: {new Date(date + "T00:00:00").toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })} <br />
             Função: {substitutionDetails.currentFunctionGroupId} - {functionId}
@@ -149,10 +152,10 @@ export function SubstitutionDialog({
 
         {mode === 'options' && (
           <div className="py-4 space-y-3">
-            <p className="text-sm text-muted-foreground">Escolha como deseja encontrar um substituto:</p>
+            <p className="text-sm text-muted-foreground">Escolha uma opção:</p>
             <Button onClick={handleFindAutomaticSubstitute} className="w-full" variant="default" disabled={isLoadingAutomatic}>
               {isLoadingAutomatic && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <ListChecks className="mr-2 h-4 w-4" /> Substituir pelo Próximo da Lista (Automático)
+              <ListChecks className="mr-2 h-4 w-4" /> {automaticButtonText}
             </Button>
             <Button 
               onClick={handlePrepareManualSelection} 
@@ -161,7 +164,7 @@ export function SubstitutionDialog({
               disabled={isLoadingManual}
             >
               {isLoadingManual && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Users className="mr-2 h-4 w-4" /> Escolher Substituto Específico (Manual)
+              <Users className="mr-2 h-4 w-4" /> {manualButtonText}
             </Button>
           </div>
         )}
@@ -181,11 +184,11 @@ export function SubstitutionDialog({
                 </RadioGroup>
               </ScrollArea>
             ) : (
-              <p className="text-sm text-muted-foreground">Nenhum substituto elegível encontrado.</p>
+              <p className="text-sm text-muted-foreground">Nenhum membro elegível encontrado.</p>
             )}
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setMode('options')}>Voltar</Button>
-              <Button onClick={handleConfirmManualSelection} disabled={!selectedManualSubstitute}>Confirmar Seleção Manual</Button>
+              <Button onClick={handleConfirmManualSelection} disabled={!selectedManualSubstitute}>Confirmar Seleção</Button>
             </div>
           </div>
         )}

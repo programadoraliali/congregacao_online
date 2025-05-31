@@ -22,7 +22,7 @@ interface PublicMeetingAssignmentsCardProps {
   initialMonth: number; // 0-11
   initialYear: number;
   onSaveAssignments: (
-    updatedMonthAssignments: { [dateStr: string]: PublicMeetingAssignment },
+    updatedMonthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> },
     month: number,
     year: number
   ) => void;
@@ -30,7 +30,7 @@ interface PublicMeetingAssignmentsCardProps {
 }
 
 type EditableField = 'tema' | 'orador' | 'congregacaoOrador';
-type MemberRole = 'dirigente'; // 'leitor' removido pois será automático
+type MemberRole = 'dirigente';
 
 export function PublicMeetingAssignmentsCard({
   allMembers,
@@ -43,13 +43,12 @@ export function PublicMeetingAssignmentsCard({
 }: PublicMeetingAssignmentsCardProps) {
   const [displayMonth, setDisplayMonth] = useState<number>(initialMonth ?? new Date().getMonth());
   const [displayYear, setDisplayYear] = useState<number>(initialYear ?? new Date().getFullYear());
-  // Este estado 'assignments' agora só cuida das partes manuais (tema, orador, congregacao, dirigenteId)
   const [assignments, setAssignments] = useState<{ [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> }>({});
   
   const [isMemberSelectionOpen, setIsMemberSelectionOpen] = useState(false);
   const [memberSelectionContext, setMemberSelectionContext] = useState<{
     dateStr: string;
-    role: MemberRole; // Apenas 'dirigente'
+    role: MemberRole;
     currentMemberId?: string | null;
   } | null>(null);
   const { toast } = useToast();
@@ -64,7 +63,7 @@ export function PublicMeetingAssignmentsCard({
       const newAssignmentsState: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> } = {};
       
       Object.keys(monthDataFromStorage).forEach(dateStr => {
-        const { leitorId, ...rest } = monthDataFromStorage[dateStr]; // Exclui leitorId
+        const { leitorId, ...rest } = monthDataFromStorage[dateStr];
         newAssignmentsState[dateStr] = rest;
       });
       setAssignments(newAssignmentsState);
@@ -98,7 +97,6 @@ export function PublicMeetingAssignmentsCard({
   };
 
   const handleOpenMemberSelection = (dateStr: string, role: MemberRole) => {
-    // Apenas para dirigente
     const currentAssignment = assignments[dateStr];
     const currentMemberId = currentAssignment?.dirigenteId;
     setMemberSelectionContext({ dateStr, role, currentMemberId });
@@ -106,7 +104,6 @@ export function PublicMeetingAssignmentsCard({
   };
 
   const handleSelectMember = (selectedMemberId: string) => {
-    // Apenas para dirigente
     if (memberSelectionContext && memberSelectionContext.role === 'dirigente') {
       const { dateStr } = memberSelectionContext;
       setAssignments(prev => ({
@@ -122,13 +119,12 @@ export function PublicMeetingAssignmentsCard({
   };
 
   const getMemberName = (memberId: string | null | undefined): string => {
-    if (!memberId) return 'Nenhum selecionado';
+    if (!memberId) return 'A ser designado';
     const member = allMembers.find(m => m.id === memberId);
     return member ? member.nome : 'Desconhecido';
   };
   
   const handleSaveChanges = () => {
-    // O leitorId não é mais salvo aqui. Ele vem do cache central.
     onSaveAssignments(assignments, displayMonth, displayYear);
   };
 
@@ -141,25 +137,17 @@ export function PublicMeetingAssignmentsCard({
 
   const handleOpenLeitorSubstitution = (dateStr: string, leitorId: string | null) => {
      const leitor = allMembers.find(m => m.id === leitorId);
-     const leitorNome = leitor ? leitor.nome : "Não Designado";
+     const leitorNome = leitor ? leitor.nome : "Ninguém Designado";
      const funcaoLeitorDom = FUNCOES_DESIGNADAS.find(f => f.id === 'leitorDom');
      const grupoFuncao = funcaoLeitorDom?.grupo || "Leitura/Presidência";
 
-     if (leitorId) {
-        onOpenSubstitutionModal({
-            date: dateStr,
-            functionId: 'leitorDom', // ID da função do leitor de domingo
-            originalMemberId: leitorId,
-            originalMemberName: leitorNome,
-            currentFunctionGroupId: grupoFuncao 
-        });
-     } else {
-        toast({
-            title: "Leitor Não Designado",
-            description: "Não há leitor designado para substituir. Gere o cronograma na primeira aba.",
-            variant: "default"
-        });
-     }
+     onOpenSubstitutionModal({
+         date: dateStr,
+         functionId: 'leitorDom', 
+         originalMemberId: leitorId || '', // Passa string vazia se null, diálogo trata
+         originalMemberName: leitorNome,
+         currentFunctionGroupId: grupoFuncao 
+     });
   };
 
   return (
@@ -170,7 +158,7 @@ export function PublicMeetingAssignmentsCard({
         </CardTitle>
         <CardDescription>
           Configure os temas, oradores e participantes para as reuniões públicas de {obterNomeMes(displayMonth)} de {displayYear}.
-          O Leitor de A Sentinela é designado automaticamente; use "Substituir" se necessário.
+          O Leitor de A Sentinela é designado automaticamente; use "Designar/Alterar" se necessário.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -214,7 +202,7 @@ export function PublicMeetingAssignmentsCard({
 
         {sundaysInMonth.map((dateObj, index) => {
           const dateStr = formatarDataCompleta(dateObj);
-          const dayAssignment = assignments[dateStr] || {}; // Contém tema, orador, congregacao, dirigenteId
+          const dayAssignment = assignments[dateStr] || {};
           const leitorDesignadoId = currentScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
           const nomeLeitorDesignado = getMemberName(leitorDesignadoId);
 
@@ -269,10 +257,10 @@ export function PublicMeetingAssignmentsCard({
                   <Label>Leitor de A Sentinela</Label>
                    <div className="flex items-center gap-2 mt-1">
                     <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm flex items-center">
-                       {nomeLeitorDesignado === 'Nenhum selecionado' ? 'A ser designado' : nomeLeitorDesignado}
+                       {nomeLeitorDesignado}
                     </span>
                     <Button variant="outline" size="sm" onClick={() => handleOpenLeitorSubstitution(dateStr, leitorDesignadoId)}>
-                      <Edit3 className="mr-1.5 h-4 w-4" /> Substituir
+                      <Edit3 className="mr-1.5 h-4 w-4" /> {leitorDesignadoId ? 'Alterar' : 'Designar'}
                     </Button>
                   </div>
                 </div>
@@ -296,11 +284,11 @@ export function PublicMeetingAssignmentsCard({
           isOpen={isMemberSelectionOpen}
           onOpenChange={setIsMemberSelectionOpen}
           allMembers={allMembers}
-          targetRole={memberSelectionContext.role} // Apenas 'dirigente'
+          targetRole={memberSelectionContext.role}
           currentDate={memberSelectionContext.dateStr}
           onSelectMember={handleSelectMember}
           currentlyAssignedMemberId={memberSelectionContext.currentMemberId}
-          excludedMemberId={null} // Não há leitor para excluir da lista de dirigentes
+          excludedMemberId={null}
         />
       )}
     </Card>

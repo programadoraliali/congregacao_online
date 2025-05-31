@@ -204,8 +204,6 @@ export default function Home() {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
-                        // Se o membro estava designado para esta função nesta data e foi substituído por outro,
-                        // ou se a função foi desatribuída (membroId === null), removemos do histórico.
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -226,27 +224,34 @@ export default function Home() {
   };
 
   const handleSavePublicMeetingAssignments = (
-    monthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> }, // leitorId não é mais salvo aqui
+    monthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> },
     mes: number,
     ano: number
   ) => {
     const yearMonthKey = formatarDataParaChave(new Date(ano, mes, 1));
     
-    // Pegamos os dados existentes para preservar o leitorId (se houver de dados antigos)
-    // ou outras informações que não são gerenciadas por este card.
     const existingDataForMonth = (allPublicMeetingAssignmentsData || {})[yearMonthKey] || {};
-    const updatedMonthAssignmentsWithLeitor: { [dateStr: string]: PublicMeetingAssignment } = {};
+    const updatedMonthAssignmentsWithExistingLeitor: { [dateStr: string]: PublicMeetingAssignment } = {};
 
     Object.keys(monthAssignments).forEach(dateStr => {
-      updatedMonthAssignmentsWithLeitor[dateStr] = {
-        ...existingDataForMonth[dateStr], // Mantém o leitorId existente (se houver)
-        ...monthAssignments[dateStr], // Sobrescreve com os dados manuais (tema, orador, dirigente)
+      updatedMonthAssignmentsWithExistingLeitor[dateStr] = {
+        // Preserva o leitorId e outros campos não gerenciados aqui
+        ...(existingDataForMonth[dateStr] || {}), 
+        ...monthAssignments[dateStr], 
       };
     });
+    // Garantir que datas que existiam no cache mas não no monthAssignments atual sejam mantidas
+    // (importante se o usuário apenas editou algumas datas no mês)
+    Object.keys(existingDataForMonth).forEach(dateStr => {
+        if (!updatedMonthAssignmentsWithExistingLeitor[dateStr]) {
+            updatedMonthAssignmentsWithExistingLeitor[dateStr] = existingDataForMonth[dateStr];
+        }
+    });
+
 
     const updatedAllAssignments = {
       ...(allPublicMeetingAssignmentsData || {}),
-      [yearMonthKey]: updatedMonthAssignmentsWithLeitor,
+      [yearMonthKey]: updatedMonthAssignmentsWithExistingLeitor,
     };
 
     setAllPublicMeetingAssignmentsData(updatedAllAssignments);
@@ -347,7 +352,6 @@ export default function Home() {
     const { date, functionId, originalMemberId } = substitutionDetails;
     const { mes, ano } = cachedScheduleInfo;
 
-    // Cópia profunda do cache de designações para evitar mutação direta do estado
     const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
     
     if (!novasDesignacoes[date]) {
@@ -359,13 +363,11 @@ export default function Home() {
 
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
-      // Remove a designação anterior do histórico do membro original
-      if (m.id === originalMemberId) {
+      if (originalMemberId && m.id === originalMemberId) {
         if (membroModificado.historicoDesignacoes[date] === functionId) {
              delete membroModificado.historicoDesignacoes[date];
         }
       }
-      // Adiciona a nova designação ao histórico do novo membro
       if (m.id === newMemberId) {
         membroModificado.historicoDesignacoes[date] = functionId;
       }
@@ -373,19 +375,11 @@ export default function Home() {
     });
     persistMembros(membrosAtualizados);
 
-    // Salva o cache de designações atualizado (que inclui a substituição)
     salvarCacheDesignacoes({schedule: novasDesignacoes, mes, ano});
     
-    // Atualiza o displayedScheduleData se a substituição for para o mês/ano atualmente exibido na primeira aba
-    // E se o displayedScheduleData já estiver definido.
-    // Isso garante que a UI da primeira aba reflita a substituição imediatamente.
     if (cachedScheduleInfo.mes === mes && cachedScheduleInfo.ano === ano) {
-       // Re-chamar onScheduleGenerated para que ScheduleGenerationCard atualize seu displayedScheduleData
-       // Isso é importante para que ScheduleDisplay reflita a mudança.
-       // Esta chamada também irá atualizar o histórico dos membros e salvar o cache.
        handleScheduleGenerated(novasDesignacoes, mes, ano);
     }
-
 
     toast({ title: "Substituição Realizada", description: "A designação foi atualizada com sucesso." });
     setIsSubstitutionModalOpen(false);
@@ -448,7 +442,7 @@ export default function Home() {
                   <PublicMeetingAssignmentsCard
                     allMembers={membros}
                     allPublicAssignments={allPublicMeetingAssignmentsData}
-                    currentScheduleForMonth={ // Passando o cache de designações para ler o leitor
+                    currentScheduleForMonth={
                       (cachedScheduleInfo && designacoesMensaisCache && 
                        cachedScheduleInfo.mes === (new Date(Date.UTC(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1)).getMonth()) && 
                        cachedScheduleInfo.ano === (new Date(Date.UTC(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1)).getFullYear())) 
@@ -458,7 +452,7 @@ export default function Home() {
                     initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
                     initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
                     onSaveAssignments={handleSavePublicMeetingAssignments}
-                    onOpenSubstitutionModal={handleOpenSubstitutionModal} // Passando a função de substituição
+                    onOpenSubstitutionModal={handleOpenSubstitutionModal}
                   />
                 </TabsContent>
                  <TabsContent value="nvmc" className="pt-0">
@@ -554,7 +548,7 @@ export default function Home() {
           onOpenChange={setIsSubstitutionModalOpen}
           substitutionDetails={substitutionDetails}
           allMembers={membros}
-          currentAssignmentsForMonth={designacoesMensaisCache} // Passa o cache correto
+          currentAssignmentsForMonth={designacoesMensaisCache}
           onConfirmSubstitution={handleConfirmSubstitution}
         />
       )}
