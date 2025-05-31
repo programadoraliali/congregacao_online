@@ -4,21 +4,32 @@
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import type { Designacao, Membro } from '@/lib/congregacao/types'; // Adicionado Membro
+import type { Designacao, Membro } from '@/lib/congregacao/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button'; // Adicionado Button
+import { Button } from '@/components/ui/button';
+import { UserPlus } from 'lucide-react'; // Para o botão de selecionar
 
 interface ScheduleTableProps {
   title: string;
   data: Designacao[];
   columns: { key: string; label: string }[];
-  allMembers: Membro[]; // Para encontrar o nome do membro a partir do ID
-  onNameClick?: (date: string, functionId: string, originalMemberId: string, originalMemberName: string | null, functionGroupId: string) => void;
-  currentFullDateStrings: string[]; // Array de "YYYY-MM-DD" para as linhas da tabela
+  allMembers: Membro[]; 
+  onCellClick?: (date: string, columnKey: string, originalMemberId: string | null, originalMemberName: string | null, tableTitle: string) => void;
+  currentFullDateStrings: string[];
+  isAVTable?: boolean;
 }
 
-export function ScheduleTable({ title, data, columns, allMembers, onNameClick, currentFullDateStrings }: ScheduleTableProps) {
-  if (!data || data.length === 0) {
+export function ScheduleTable({ title, data, columns, allMembers, onCellClick, currentFullDateStrings, isAVTable = false }: ScheduleTableProps) {
+  
+  const getMemberName = (memberId: string | null): string | null => {
+    if (!memberId) return null;
+    const member = allMembers.find(m => m.id === memberId);
+    return member ? member.nome : 'Desconhecido';
+  };
+
+  const noDataForTable = !data || data.length === 0 || data.every(row => columns.every(col => col.key === 'data' || !row[col.key]));
+
+  if (noDataForTable && !isAVTable) { // Para AV, sempre mostramos a estrutura
     return (
       <Card className="flex-1 min-w-[300px]">
         <CardHeader>
@@ -30,12 +41,7 @@ export function ScheduleTable({ title, data, columns, allMembers, onNameClick, c
       </Card>
     );
   }
-  
-  const getMemberName = (memberId: string | null): string | null => {
-    if (!memberId) return null;
-    const member = allMembers.find(m => m.id === memberId);
-    return member ? member.nome : 'Desconhecido';
-  };
+
 
   return (
     <Card className="flex-1 min-w-[300px]">
@@ -48,7 +54,12 @@ export function ScheduleTable({ title, data, columns, allMembers, onNameClick, c
             <TableHeader>
               <TableRow>
                 {columns.map((col) => (
-                  <TableHead key={col.key}>{col.label}</TableHead>
+                  <TableHead 
+                    key={col.key}
+                    className={isAVTable && col.key !== 'data' ? 'min-w-[100px]' : ''}
+                  >
+                    {col.label}
+                  </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -58,29 +69,39 @@ export function ScheduleTable({ title, data, columns, allMembers, onNameClick, c
                   {columns.map((col) => {
                     const memberId = row[col.key] as string | null;
                     const memberName = getMemberName(memberId);
-                    const fullDateStr = currentFullDateStrings[rowIndex]; // "YYYY-MM-DD"
+                    const fullDateStr = currentFullDateStrings[rowIndex]; 
 
-                    return (
-                      <TableCell key={col.key}>
-                        {col.key === 'data' ? (
+                    if (col.key === 'data') {
+                      return (
+                        <TableCell key={col.key} className={isAVTable && col.key === 'data' ? 'min-w-[100px]' : ''}>
                           <div className="flex items-center space-x-2">
                              <span>{row.data.split(' ')[0]}</span>
                              <Badge variant="outline" className={row.diaSemanaBadgeColor}>{row.data.split(' ')[1]}</Badge>
                           </div>
+                        </TableCell>
+                      );
+                    }
+
+                    // Células de designação
+                    return (
+                      <TableCell 
+                        key={col.key} 
+                        className={isAVTable ? 'min-w-[100px]' : ''}
+                      >
+                        {onCellClick ? (
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto text-sm font-normal text-primary hover:underline w-full justify-start"
+                            onClick={() => {
+                              if (onCellClick && fullDateStr) {
+                                onCellClick(fullDateStr, col.key, memberId, memberName, title);
+                              }
+                            }}
+                          >
+                            {memberName || (isAVTable ? <><UserPlus className="mr-1.5 h-3.5 w-3.5"/> Selecionar</> : '--')}
+                          </Button>
                         ) : (
-                          memberName ? (
-                            <Button
-                              variant="link"
-                              className="p-0 h-auto text-sm font-normal text-primary hover:underline"
-                              onClick={() => {
-                                if (onNameClick && memberId && fullDateStr) {
-                                  onNameClick(fullDateStr, col.key, memberId, memberName, title);
-                                }
-                              }}
-                            >
-                              {memberName}
-                            </Button>
-                          ) : '--'
+                          memberName || '--'
                         )}
                       </TableCell>
                     );

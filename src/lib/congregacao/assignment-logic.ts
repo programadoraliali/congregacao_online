@@ -17,7 +17,7 @@ function encontrarDataReuniaoAnterior(
   const diaSemanaAlvo = tipoReuniaoAtual === 'meioSemana' ? DIAS_REUNIAO.meioSemana : DIAS_REUNIAO.publica;
   let dataAnterior: Date | null = null;
   for (const dataCand of datasDeReuniaoNoMes) {
-    if (dataCand < dataAtual && dataCand.getDay() === diaSemanaAlvo) {
+    if (dataCand < dataAtual && dataCand.getUTCDay() === diaSemanaAlvo) {
       if (dataAnterior === null || dataCand > dataAnterior) {
         dataAnterior = new Date(dataCand);
       }
@@ -132,9 +132,24 @@ export async function getEligibleMembersForFunctionDate(
       return false;
     }
 
-    if (membrosDesignadosNesteDia.has(membro.id)) {
-      return false;
+    // Para funções de AV, um membro pode ter múltiplas designações de AV no mesmo dia,
+    // mas não pode ter uma designação de AV e uma não-AV no mesmo dia.
+    // Se a função atual é AV, não impede se o membro já tiver OUTRA função AV.
+    // Se a função atual NÃO é AV, impede se o membro já tiver QUALQUER função.
+    if (funcao.tabela !== 'AV' && membrosDesignadosNesteDia.has(membro.id)) {
+        return false;
     }
+    // Se a função atual é AV, só impede se o membro já está designado para uma função NÃO-AV.
+    if (funcao.tabela === 'AV') {
+        for (const funcIdDesignada in designacoesNoDia) {
+            const funcDef = FUNCOES_DESIGNADAS.find(f => f.id === funcIdDesignada);
+            if (funcDef && funcDef.tabela !== 'AV' && designacoesNoDia[funcIdDesignada] === membro.id) {
+                return false; // Membro já tem função não-AV, não pode fazer AV
+            }
+        }
+    }
+
+
     return true;
   });
 }
@@ -215,15 +230,19 @@ export async function calcularDesignacoesAction(
 
   for (const dataReuniao of datasDeReuniaoNoMes) {
     const dataReuniaoStr = formatarDataCompleta(dataReuniao);
-    designacoesFeitasNoMesAtual[dataReuniaoStr] = {};
+    designacoesFeitasNoMesAtual[dataReuniaoStr] = {}; // Inicializa as designações para o dia
     
     const tipoReuniaoAtual = dataReuniao.getUTCDay() === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
-    const funcoesParaEsteTipoReuniao = FUNCOES_DESIGNADAS.filter(f => f.tipoReuniao.includes(tipoReuniaoAtual));
+    
+    // Filtra apenas funções que NÃO são de AV para geração automática
+    const funcoesParaGeracaoAutomatica = FUNCOES_DESIGNADAS.filter(
+      f => f.tipoReuniao.includes(tipoReuniaoAtual) && f.tabela !== 'AV'
+    );
     
     const dataReuniaoAnteriorObj = encontrarDataReuniaoAnterior(dataReuniao, tipoReuniaoAtual, datasDeReuniaoNoMes, DIAS_REUNIAO);
     const dataReuniaoAnteriorStr = dataReuniaoAnteriorObj ? formatarDataCompleta(dataReuniaoAnteriorObj) : null;
 
-    for (const funcao of funcoesParaEsteTipoReuniao) {
+    for (const funcao of funcoesParaGeracaoAutomatica) {
       const membrosElegiveis = await getEligibleMembersForFunctionDate(
         funcao,
         dataReuniao,
@@ -252,6 +271,16 @@ export async function calcularDesignacoesAction(
       } else {
         designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
       }
+    }
+
+    // Inicializa funções de AV como nulas, elas serão preenchidas manualmente
+    const funcoesAVParaEsteTipo = FUNCOES_DESIGNADAS.filter(
+        f => f.tipoReuniao.includes(tipoReuniaoAtual) && f.tabela === 'AV'
+    );
+    for (const funcaoAV of funcoesAVParaEsteTipo) {
+        if (!designacoesFeitasNoMesAtual[dataReuniaoStr][funcaoAV.id]) { // Só inicializa se não foi preenchido (ex: vindo do cache)
+             designacoesFeitasNoMesAtual[dataReuniaoStr][funcaoAV.id] = null;
+        }
     }
   }
   
@@ -339,12 +368,7 @@ export async function getPotentialSubstitutesList(
     originalMemberId 
   );
 
-  return sortMembersByPriority(
-    eligibleMembers,
-    targetFunction,
-    dataReuniaoAnteriorStr,
-    currentAssignmentsForMonth,
-    dateStr,
-    allMembers
-  );
+  // Para seleção manual, não precisa ordenar por prioridade complexa, apenas alfabeticamente
+  return eligibleMembers.sort((a, b) => a.nome.localeCompare(b.nome));
 }
+

@@ -23,7 +23,7 @@ function prepararDadosTabela(
   Object.keys(designacoesFeitas).forEach(dataStr => {
     const dataObj = new Date(dataStr + 'T00:00:00');
     if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
-        const diaSemana = dataObj.getDay();
+        const diaSemana = dataObj.getUTCDay(); // Use getUTCDay para consistência
         if(diaSemana === DIAS_REUNIAO.meioSemana || diaSemana === DIAS_REUNIAO.publica) {
              datasNoMesComReuniao.add(dataStr);
         }
@@ -42,8 +42,8 @@ function prepararDadosTabela(
 
     sortedDates.forEach(dataStr => {
       const dataObj = new Date(dataStr + 'T00:00:00');
-      const dia = dataObj.getDate();
-      const diaSemanaIndex = dataObj.getDay();
+      const dia = dataObj.getUTCDate();
+      const diaSemanaIndex = dataObj.getUTCDay();
       const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
       
       let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
@@ -73,7 +73,7 @@ function prepararDadosTabela(
       }
       const remappedDataIndicadores = dataTabela.map((row, index) => {
         const dataObj = new Date(sortedDates[index] + 'T00:00:00');
-        const diaSemanaIndex = dataObj.getDay();
+        const diaSemanaIndex = dataObj.getUTCDay();
         return {
             ...row,
             indicador1: row[MAPPED_COL_KEYS_INDICADORES.indicador1(diaSemanaIndex)],
@@ -95,8 +95,8 @@ function prepararDadosTabela(
     const dataTabelaVolantes: Designacao[] = [];
      sortedDates.forEach(dataStr => {
       const dataObj = new Date(dataStr + 'T00:00:00');
-      const dia = dataObj.getDate();
-      const diaSemanaIndex = dataObj.getDay();
+      const dia = dataObj.getUTCDate();
+      const diaSemanaIndex = dataObj.getUTCDay();
       const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
       let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
       if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
@@ -117,7 +117,7 @@ function prepararDadosTabela(
 
      const remappedDataVolantes = dataTabelaVolantes.map((row, index) => {
         const dataObj = new Date(sortedDates[index] + 'T00:00:00');
-        const diaSemanaIndex = dataObj.getDay();
+        const diaSemanaIndex = dataObj.getUTCDay();
         return {
             ...row,
             volante1: row[MAPPED_COL_KEYS_VOLANTES.volante1(diaSemanaIndex)],
@@ -140,8 +140,8 @@ function prepararDadosTabela(
     const dataTabelaAV: Designacao[] = [];
     sortedDates.forEach(dataStr => {
         const dataObj = new Date(dataStr + 'T00:00:00');
-        const dia = dataObj.getDate();
-        const diaSemanaIndex = dataObj.getDay();
+        const dia = dataObj.getUTCDate();
+        const diaSemanaIndex = dataObj.getUTCDay();
         const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
         let badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.outroDia;
         if (diaSemanaIndex === DIAS_REUNIAO.meioSemana) badgeColorClass = DIAS_SEMANA_REUNIAO_CORES.meioSemana;
@@ -164,7 +164,7 @@ function prepararDadosTabela(
 
     const remappedDataAV = dataTabelaAV.map((row, index) => {
         const dataObj = new Date(sortedDates[index] + 'T00:00:00');
-        const diaSemanaIndex = dataObj.getDay();
+        const diaSemanaIndex = dataObj.getUTCDay();
         return {
             ...row,
             video: row[MAPPED_COL_KEYS_AV.video(diaSemanaIndex)],
@@ -180,9 +180,9 @@ function prepararDadosTabela(
   return { data: dataTabela, columns, fullDateStrings };
 }
 
-const getRealFunctionId = (columnKey: string, dateStr: string, tipoTabela: string): string => {
+export const getRealFunctionId = (columnKey: string, dateStr: string, tipoTabela: string): string => {
     const dataObj = new Date(dateStr + "T00:00:00");
-    const diaSemanaIndex = dataObj.getDay();
+    const diaSemanaIndex = dataObj.getUTCDay();
     const isMeioSemana = diaSemanaIndex === DIAS_REUNIAO.meioSemana;
 
     if (tipoTabela === 'Indicadores') {
@@ -191,7 +191,7 @@ const getRealFunctionId = (columnKey: string, dateStr: string, tipoTabela: strin
     } else if (tipoTabela === 'Volantes') {
         if (columnKey === 'volante1') return isMeioSemana ? 'volante1Qui' : 'volante1Dom';
         if (columnKey === 'volante2') return isMeioSemana ? 'volante2Qui' : 'volante2Dom';
-    } else if (tipoTabela === 'AV') {
+    } else if (tipoTabela === 'Áudio/Vídeo (AV)') { // Nome da tabela como usado no title
         if (columnKey === 'video') return isMeioSemana ? 'avVideoQui' : 'avVideoDom';
         if (columnKey === 'indicadorZoom') return isMeioSemana ? 'avIndicadorZoomQui' : 'avIndicadorZoomDom';
         if (columnKey === 'backupAV') return isMeioSemana ? 'avBackupQui' : 'avBackupDom';
@@ -205,9 +205,17 @@ interface ScheduleDisplayProps {
     mes: number;
     ano: number;
     onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
+    onOpenAVMemberSelectionDialog: (dateStr: string, functionId: string, columnKey: string, currentMemberId: string | null) => void;
 }
 
-export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano, onOpenSubstitutionModal }: ScheduleDisplayProps) {
+export function ScheduleDisplay({ 
+    designacoesFeitas, 
+    membros, 
+    mes, 
+    ano, 
+    onOpenSubstitutionModal,
+    onOpenAVMemberSelectionDialog
+}: ScheduleDisplayProps) {
   const { toast } = useToast();
 
   if (!designacoesFeitas || Object.keys(designacoesFeitas).length === 0) {
@@ -216,7 +224,6 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano, onOpenSu
     const anoAtual = hoje.getFullYear();
     if (mes === mesAtual && ano === anoAtual) {
       // Não mostra mensagem se for o mês/ano atual e não houver designações
-      // (assumindo que o usuário ainda vai gerar)
     } else {
       return <p className="text-muted-foreground text-center py-4">Nenhuma designação gerada para {NOMES_MESES[mes]} de {ano}.</p>;
     }
@@ -228,37 +235,42 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano, onOpenSu
   const dadosVolantes = prepararDadosTabela(designacoesFeitas, mes, ano, 'Volantes');
   const dadosAV = prepararDadosTabela(designacoesFeitas, mes, ano, 'AV');
 
-  const handleNameClick = (
+  const handleCellClick = (
     date: string, // YYYY-MM-DD
     columnKey: string, 
-    originalMemberId: string, 
+    originalMemberId: string | null, // Pode ser null se a célula estiver vazia
     originalMemberName: string | null,
-    functionGroupId: string 
+    tableTitle: string 
   ) => {
-    if (functionGroupId === 'AV') {
-      toast({
-        title: "Edição Manual (Em Breve)",
-        description: "As designações de AV são gerenciadas manualmente. A edição direta na tabela será implementada em breve.",
-        variant: "default"
-      });
-      return;
+    const realFunctionId = getRealFunctionId(columnKey, date, tableTitle);
+    
+    if (tableTitle === 'Áudio/Vídeo (AV)') {
+      onOpenAVMemberSelectionDialog(date, realFunctionId, columnKey, originalMemberId);
+    } else { // Indicadores ou Volantes
+      if (originalMemberId && originalMemberName) { // Só abre substituição se houver alguém designado
+        onOpenSubstitutionModal({ date, functionId: realFunctionId, originalMemberId, originalMemberName, currentFunctionGroupId: tableTitle });
+      } else {
+        toast({
+            title: "Célula Vazia",
+            description: "Não há ninguém designado para esta função para substituir.",
+            variant: "default"
+        });
+      }
     }
-    const realFunctionId = getRealFunctionId(columnKey, date, functionGroupId);
-    onOpenSubstitutionModal({ date, functionId: realFunctionId, originalMemberId, originalMemberName, currentFunctionGroupId: functionGroupId });
   };
 
-  // Só renderiza tabelas se houver dados para elas
-  const hasIndicadoresData = dadosIndicadores.data.length > 0;
-  const hasVolantesData = dadosVolantes.data.length > 0;
-  const hasAVData = dadosAV.data.length > 0; // Ou alguma lógica para verificar se há designações AV
+  const hasIndicadoresData = dadosIndicadores.data.length > 0 && dadosIndicadores.data.some(row => Object.keys(row).some(key => key !== 'data' && key !== 'diaSemanaBadgeColor' && row[key]));
+  const hasVolantesData = dadosVolantes.data.length > 0 && dadosVolantes.data.some(row => Object.keys(row).some(key => key !== 'data' && key !== 'diaSemanaBadgeColor' && row[key]));
+  // A tabela de AV será sempre exibida se houver datas de reunião no mês, para permitir preenchimento manual.
+  const hasAVDataStructure = dadosAV.data.length > 0;
 
-  // Verifica se existe alguma designação feita para o mês/ano atual para renderizar o container
+
   const hasAnyDataForMonth = Object.values(designacoesFeitas).some(dayAssignments => 
-    Object.keys(dayAssignments).length > 0
+    Object.keys(dayAssignments).length > 0 && Object.values(dayAssignments).some(val => val !== null)
   );
 
-  if (!hasAnyDataForMonth) {
-     return <p className="text-muted-foreground text-center py-4">Nenhuma designação gerada para {NOMES_MESES[mes]} de {ano}.</p>;
+  if (!hasAnyDataForMonth && !hasAVDataStructure) { // Se não há dados automáticos E nem estrutura para AV manual
+     return <p className="text-muted-foreground text-center py-4">Nenhuma designação para {NOMES_MESES[mes]} de {ano}. Gere o cronograma ou adicione manualmente.</p>;
   }
 
 
@@ -271,7 +283,7 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano, onOpenSu
             data={dadosIndicadores.data} 
             columns={dadosIndicadores.columns} 
             allMembers={membros}
-            onNameClick={handleNameClick}
+            onCellClick={handleCellClick}
             currentFullDateStrings={dadosIndicadores.fullDateStrings}
           />
         )}
@@ -281,19 +293,21 @@ export function ScheduleDisplay({ designacoesFeitas, membros, mes, ano, onOpenSu
             data={dadosVolantes.data} 
             columns={dadosVolantes.columns} 
             allMembers={membros}
-            onNameClick={handleNameClick}
+            onCellClick={handleCellClick}
             currentFullDateStrings={dadosVolantes.fullDateStrings}
           />
         )}
-        {/* A tabela AV será renderizada mesmo se vazia, para mostrar a estrutura */}
-        <ScheduleTable 
+        {hasAVDataStructure && ( // Mostrar tabela de AV se houver datas de reunião, mesmo que vazia
+          <ScheduleTable 
             title="Áudio/Vídeo (AV)" 
             data={dadosAV.data} 
             columns={dadosAV.columns} 
             allMembers={membros}
-            onNameClick={handleNameClick}
+            onCellClick={handleCellClick}
             currentFullDateStrings={dadosAV.fullDateStrings}
-        />
+            isAVTable={true}
+          />
+        )}
       </div>
     </div>
   );
