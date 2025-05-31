@@ -26,10 +26,7 @@ export const PERMISSOES_BASE: PermissaoBase[] = [
   { id: 'volanteDom', nome: 'Volante Domingo', grupo: 'Volantes' },
   { id: 'leitorQui', nome: 'Leitor (Meio Semana)', grupo: 'Leitura/Presidência' },
   { id: 'leitorDom', nome: 'Leitor (Fim Semana)', grupo: 'Leitura/Presidência' },
-  { id: 'presidente', nome: 'Presidente/Instrutor', grupo: 'Leitura/Presidência' },
-  { id: 'avVideo', nome: 'AV Vídeo', grupo: 'Áudio/Vídeo' },
-  { id: 'avZoom', nome: 'AV Indicador Zoom', grupo: 'Áudio/Vídeo' },
-  { id: 'avBackup', nome: 'AV Backup', grupo: 'Áudio/Vídeo' },
+  { id: 'presidente', nome: 'Presidente/Instrutor', grupo: 'Leitura/Presidência' },  { id: 'av', nome: 'Áudio/Vídeo', grupo: 'Áudio/Vídeo' },
 ];
 
 export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
@@ -47,11 +44,11 @@ export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   { id: 'leitorDom', nome: 'Leitor A Sentinela (Dom)', tipoReuniao: ['publica'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'leitorDom' },
   // Áudio/Vídeo
   { id: 'avVideoQui', nome: 'Vídeo (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avVideo' },
-  { id: 'avIndicadorZoomQui', nome: 'Indicador Zoom (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avZoom' },
-  { id: 'avBackupQui', nome: 'Backup (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avBackup' },
+  { id: 'avIndicadorZoomQui', nome: 'Indicador Zoom (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'av' },
+  { id: 'avBackupQui', nome: 'Backup (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'av' },
   { id: 'avVideoDom', nome: 'Vídeo (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avVideo' },
-  { id: 'avIndicadorZoomDom', nome: 'Indicador Zoom (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avZoom' },
-  { id: 'avBackupDom', nome: 'Backup (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avBackup' },
+  { id: 'avIndicadorZoomDom', nome: 'Indicador Zoom (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'av' },
+  { id: 'avBackupDom', nome: 'Backup (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'av' },
 ];
 
 export const LOCAL_STORAGE_KEY_MEMBROS = 'congregacao_membros';

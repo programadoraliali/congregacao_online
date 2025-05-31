@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useMemberManagement } from '@/hooks/congregacao/useMemberManagement';
 import { MemberManagementCard } from '@/components/congregacao/MemberManagementCard';
 import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerationCard';
 import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard';
@@ -13,23 +14,21 @@ import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog'
 import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog';
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
 import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAssignments, PublicMeetingAssignment, AllNVMCAssignments, NVMCDailyAssignments, AllFieldServiceAssignments, FieldServiceMonthlyData } from '@/lib/congregacao/types';
-import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants';
-import { validarEstruturaMembro, gerarIdMembro, formatarDataParaChave } from '@/lib/congregacao/utils';
+import { APP_NAME } from '@/lib/congregacao/constants';
+import { formatarDataParaChave } from '@/lib/congregacao/utils';
 import { 
-  carregarMembrosLocalmente, 
-  salvarMembrosLocalmente, 
   carregarCacheDesignacoes, 
   salvarCacheDesignacoes, 
-  limparCacheDesignacoes,
+  limparCacheDesignacoes as limparStorageCacheDesignacoes, // Renomeado para evitar conflito
   carregarPublicMeetingAssignments,
   salvarPublicMeetingAssignments,
-  limparPublicMeetingAssignments,
+  limparPublicMeetingAssignments as limparStoragePublicMeetingAssignments,
   carregarNVMCAssignments,
   salvarNVMCAssignments,
-  limparNVMCAssignments,
+  limparNVMCAssignments as limparStorageNVMCAssignments,
   carregarFieldServiceAssignments,
   salvarFieldServiceAssignments,
-  limparFieldServiceAssignments
+  limparFieldServiceAssignments as limparStorageFieldServiceAssignments
 } from '@/lib/congregacao/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -40,17 +39,33 @@ import { Trash2, History, Users, Settings2, ListChecks, BookUser, BookOpen, Clip
 
 
 export default function Home() {
-  const [membros, setMembros] = useState<Membro[]>([]);
+  const {
+    membros,
+    isMemberFormOpen,
+    setIsMemberFormOpen,
+    memberToEdit,
+    isBulkAddOpen,
+    setIsBulkAddOpen,
+    openNewMemberForm,
+    openEditMemberForm,
+    handleSaveMember,
+    handleDeleteMember,
+    handleBulkAddMembers,
+    handleExportMembers,
+    handleImportMembers: hookHandleImportMembers,
+    updateMemberHistory,
+    persistMembros: hookPersistMembros,
+  } = useMemberManagement();
+
   const [designacoesMensaisCache, setDesignacoesMensaisCache] = useState<DesignacoesFeitas | null>(null);
   const [cachedScheduleInfo, setCachedScheduleInfo] = useState<{mes: number, ano: number} | null>(null);
   const [allPublicMeetingAssignmentsData, setAllPublicMeetingAssignmentsData] = useState<AllPublicMeetingAssignments | null>(null);
   const [allNvmcAssignmentsData, setAllNvmcAssignmentsData] = useState<AllNVMCAssignments | null>(null);
   const [allFieldServiceAssignmentsData, setAllFieldServiceAssignmentsData] = useState<AllFieldServiceAssignments | null>(null);
+  
+  const [publicMeetingCardKey, setPublicMeetingCardKey] = useState(0);
 
 
-  const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
-  const [memberToEdit, setMemberToEdit] = useState<Membro | null>(null);
-  const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [clearType, setClearType] = useState<'history' | 'all' | 'public_meeting' | 'nvmc' | 'field_service' | null>(null);
   const [memberIdForAdvancedOptions, setMemberIdForAdvancedOptions] = useState<string | null>(null);
@@ -61,7 +76,7 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setMembros(carregarMembrosLocalmente());
+    // Membros são carregados pelo hook useMemberManagement
     const cachedScheduleObject = carregarCacheDesignacoes();
     if (cachedScheduleObject) {
         setDesignacoesMensaisCache(cachedScheduleObject.schedule);
@@ -72,124 +87,39 @@ export default function Home() {
     setAllFieldServiceAssignmentsData(carregarFieldServiceAssignments());
   }, []);
 
-  const persistMembros = (novosMembros: Membro[]) => {
-    const membrosOrdenados = novosMembros.sort((a, b) => a.nome.localeCompare(b.nome));
-    setMembros(membrosOrdenados);
-    salvarMembrosLocalmente(membrosOrdenados);
-  };
 
-  const handleSaveMember = (memberData: Membro) => {
-    let novosMembros;
-    const membroExistentePeloNome = membros.find(m => m.nome.toLowerCase() === memberData.nome.toLowerCase() && m.id !== memberData.id);
-    if (membroExistentePeloNome) {
-        toast({ title: "Erro", description: `Já existe um membro com o nome '${memberData.nome}'.`, variant: "destructive" });
-        return;
-    }
+  const limparCacheDesignacoesPrimeiraAba = useCallback(() => {
+    setDesignacoesMensaisCache(null);
+    setCachedScheduleInfo(null);
+    limparStorageCacheDesignacoes();
+  }, []);
 
-    if (memberData.id) {
-      novosMembros = membros.map(m => m.id === memberData.id ? validarEstruturaMembro(memberData, false) : m);
-    } else {
-      const novoMembro = validarEstruturaMembro({ ...memberData, id: gerarIdMembro() }, false);
-      if(novoMembro) novosMembros = [...membros, novoMembro];
-      else {
-        toast({ title: "Erro", description: "Não foi possível criar o membro.", variant: "destructive" });
-        return;
-      }
-    }
-    persistMembros(novosMembros.filter(Boolean) as Membro[]);
-    toast({ title: "Sucesso", description: `Membro ${memberData.id ? 'atualizado' : 'adicionado'} com sucesso.` });
-    setIsMemberFormOpen(false);
-    setMemberToEdit(null);
-  };
+  const limparCacheDesignacoesPublicMeeting = useCallback(() => {
+    setAllPublicMeetingAssignmentsData(null);
+    limparStoragePublicMeetingAssignments();
+    setPublicMeetingCardKey(prev => prev + 1);
+  }, []);
 
-  const handleEditMember = (member: Membro) => {
-    setMemberToEdit(member);
-    setIsMemberFormOpen(true);
-  };
+  const limparCacheNVMCAssignments = useCallback(() => {
+    setAllNvmcAssignmentsData(null);
+    limparStorageNVMCAssignments();
+  }, []);
 
-  const handleDeleteMember = (memberId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este membro?')) {
-      const membro = membros.find(m => m.id === memberId);
-      persistMembros(membros.filter(m => m.id !== memberId));
-      toast({ title: "Membro Excluído", description: `Membro ${membro?.nome || ''} excluído com sucesso.` });
-    }
-  };
+  const limparCacheFieldService = useCallback(() => {
+    setAllFieldServiceAssignmentsData(null);
+    limparStorageFieldServiceAssignments();
+  }, []);
 
-  const handleBulkAddMembers = (names: string[]) => {
-    const nomesExistentes = new Set(membros.map(m => m.nome.toLowerCase()));
-    let adicionadosCount = 0;
-    const novosMembrosParaAdicionar: Membro[] = [];
-
-    names.forEach(nome => {
-      if (nome.trim() && !nomesExistentes.has(nome.toLowerCase())) {
-        const novoMembro = validarEstruturaMembro({ nome, permissoesBase: {}, historicoDesignacoes: {}, impedimentos: [] }, true);
-        if (novoMembro) {
-          novosMembrosParaAdicionar.push(novoMembro);
-          nomesExistentes.add(nome.toLowerCase());
-          adicionadosCount++;
-        }
-      }
-    });
-    persistMembros([...membros, ...novosMembrosParaAdicionar]);
-    toast({ title: "Membros Adicionados", description: `${adicionadosCount} membros adicionados em massa.` });
-    setIsBulkAddOpen(false);
-  };
-
-  const handleExportMembers = () => {
-    if (membros.length === 0) {
-        toast({ title: "Sem Dados", description: "Nenhum membro para exportar.", variant: "default" });
-        return;
-    }
-    const jsonData = JSON.stringify(membros, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `membros_congregacao_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast({ title: "Exportado", description: "Dados dos membros exportados." });
-  };
-
-  const handleImportMembers = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const importedData = JSON.parse(event.target?.result as string);
-        if (!Array.isArray(importedData)) {
-          throw new Error("O arquivo JSON não é um array válido.");
-        }
-
-        if (membros.length > 0 && !window.confirm("Isso substituirá todos os dados de membros existentes. Deseja continuar?")) {
-            return;
-        }
-
-        const nomesUnicosNoArquivo = new Set<string>();
-        const membrosValidosImportados = importedData.map(obj => {
-            const membroValidado = validarEstruturaMembro(obj, true);
-            if (membroValidado && !nomesUnicosNoArquivo.has(membroValidado.nome.toLowerCase())) {
-                nomesUnicosNoArquivo.add(membroValidado.nome.toLowerCase());
-                return membroValidado;
-            }
-            if(membroValidado) console.warn(`Membro duplicado no arquivo ou inválido: ${obj.nome}, pulando.`);
-            return null;
-        }).filter(Boolean) as Membro[];
-
-        persistMembros(membrosValidosImportados);
+  const handleImportMembersWithUICallback = (file: File) => {
+    hookHandleImportMembers(file, () => {
+        // Callback para limpar estados da UI de page.tsx
         limparCacheDesignacoesPrimeiraAba(); 
         limparCacheDesignacoesPublicMeeting(); 
         limparCacheNVMCAssignments(); 
         limparCacheFieldService();
-        toast({ title: "Importado", description: `${membrosValidosImportados.length} membros importados com sucesso.` });
-      } catch (err: any) {
-        console.error("Erro ao importar membros:", err);
-        toast({ title: "Erro de Importação", description: err.message || "Falha ao processar o arquivo JSON.", variant: "destructive" });
-      }
-    };
-    reader.readAsText(file);
+    });
   };
+
 
   const handleScheduleGenerated = (designacoes: DesignacoesFeitas, mes: number, ano: number) => {
     setDesignacoesMensaisCache(designacoes);
@@ -204,7 +134,6 @@ export default function Home() {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
-                        // Remove do histórico se o membro NÃO está mais designado para essa função nessa data
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -214,15 +143,10 @@ export default function Home() {
         });
         return membroAtualizado;
     });
-    persistMembros(novosMembros);
+    updateMemberHistory(novosMembros); // Usa a função do hook para persistir
     salvarCacheDesignacoes({schedule: designacoes, mes, ano});
   };
   
-  const limparCacheDesignacoesPrimeiraAba = () => {
-    setDesignacoesMensaisCache(null);
-    setCachedScheduleInfo(null);
-    limparCacheDesignacoes();
-  };
 
   const handleSavePublicMeetingAssignments = (
     monthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> },
@@ -256,10 +180,6 @@ export default function Home() {
     toast({ title: "Sucesso", description: "Designações da Reunião Pública salvas." });
   };
 
-  const limparCacheDesignacoesPublicMeeting = () => {
-    setAllPublicMeetingAssignmentsData(null);
-    limparPublicMeetingAssignments();
-  };
 
   const handleSaveNvmcAssignments = (
     monthAssignments: { [dateStr: string]: NVMCDailyAssignments },
@@ -276,10 +196,6 @@ export default function Home() {
     toast({ title: "Sucesso", description: "Designações NVMC salvas." });
   };
 
-  const limparCacheNVMCAssignments = () => {
-    setAllNvmcAssignmentsData(null);
-    limparNVMCAssignments();
-  };
 
   const handleSaveFieldServiceAssignments = (
     monthAssignments: FieldServiceMonthlyData,
@@ -296,11 +212,6 @@ export default function Home() {
     toast({ title: "Sucesso", description: "Designações do Serviço de Campo salvas." });
   };
 
-  const limparCacheFieldService = () => {
-    setAllFieldServiceAssignmentsData(null);
-    limparFieldServiceAssignments();
-  };
-
 
   const handleOpenAdvancedOptions = (memberId: string | null) => {
     setMemberIdForAdvancedOptions(memberId);
@@ -315,19 +226,19 @@ export default function Home() {
             const membrosAtualizados = membros.map(m =>
                 m.id === memberIdForAdvancedOptions ? { ...m, historicoDesignacoes: {} } : m
             );
-            persistMembros(membrosAtualizados);
+            hookPersistMembros(membrosAtualizados);
             toast({ title: "Histórico Limpo", description: `Histórico de ${membro.nome} foi limpo.` });
         }
     } else {
         const membrosAtualizados = membros.map(m => ({ ...m, historicoDesignacoes: {} }));
-        persistMembros(membrosAtualizados);
+        hookPersistMembros(membrosAtualizados);
         toast({ title: "Histórico Limpo", description: "Histórico de todos os membros foi limpo." });
     }
     setMemberIdForAdvancedOptions(null);
   };
 
   const handleClearAllData = () => {
-    persistMembros([]);
+    hookPersistMembros([]); // Limpa membros usando o hook
     limparCacheDesignacoesPrimeiraAba();
     limparCacheDesignacoesPublicMeeting();
     limparCacheNVMCAssignments();
@@ -350,44 +261,34 @@ export default function Home() {
     const { mes, ano } = cachedScheduleInfo;
     const isNewDesignation = !originalMemberId || originalMemberId === '';
   
-    // Crie uma cópia profunda do cache para modificação
     const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
     
-    // Garante que a estrutura para a data exista
     if (!novasDesignacoes[date]) {
       novasDesignacoes[date] = {};
     }
-    novasDesignacoes[date][functionId] = newMemberId; // Atribui o novo membro
+    novasDesignacoes[date][functionId] = newMemberId; 
     
-    // Atualiza o estado do cache localmente
     setDesignacoesMensaisCache(novasDesignacoes);
   
-    // Atualiza o histórico dos membros
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
       
-      // Remove a designação antiga do histórico do membro original, SE ele existia e não é uma nova designação
       if (originalMemberId && originalMemberId !== '' && m.id === originalMemberId) {
         if (membroModificado.historicoDesignacoes[date] === functionId) {
              delete membroModificado.historicoDesignacoes[date];
         }
       }
-      // Adiciona a nova designação ao histórico do novo membro
       if (m.id === newMemberId) {
         membroModificado.historicoDesignacoes[date] = functionId;
       }
       return membroModificado;
     });
-    persistMembros(membrosAtualizados); // Salva os membros com histórico atualizado
+    updateMemberHistory(membrosAtualizados); 
   
-    // Salva o cache de designações no localStorage
     salvarCacheDesignacoes({schedule: novasDesignacoes, mes, ano});
     
-    // Se a substituição foi feita no mesmo mês/ano que está sendo exibido na primeira aba,
-    // chame handleScheduleGenerated para atualizar também a exibição lá e garantir consistência.
-    // É importante chamar isso *depois* de atualizar o cache e os membros.
     if (cachedScheduleInfo.mes === mes && cachedScheduleInfo.ano === ano) {
-       handleScheduleGenerated(novasDesignacoes, mes, ano); // Isso também salva o cache e atualiza membros novamente, mas é bom para consistência de estado.
+       handleScheduleGenerated(novasDesignacoes, mes, ano); 
     }
   
     toast({ 
@@ -418,12 +319,12 @@ export default function Home() {
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <MemberManagementCard
                 members={membros}
-                onAddMember={() => { setMemberToEdit(null); setIsMemberFormOpen(true); }}
-                onEditMember={handleEditMember}
+                onAddMember={openNewMemberForm}
+                onEditMember={openEditMemberForm}
                 onDeleteMember={handleDeleteMember}
                 onBulkAdd={() => setIsBulkAddOpen(true)}
                 onExportMembers={handleExportMembers}
-                onImportMembers={handleImportMembers}
+                onImportMembers={handleImportMembersWithUICallback}
               />
             </AccordionContent>
           </AccordionItem>
@@ -452,6 +353,7 @@ export default function Home() {
                 </TabsContent>
                 <TabsContent value="reuniao-publica" className="pt-0">
                   <PublicMeetingAssignmentsCard
+                    key={`public-meeting-card-${publicMeetingCardKey}`}
                     allMembers={membros}
                     allPublicAssignments={allPublicMeetingAssignmentsData}
                     currentScheduleForMonth={designacoesMensaisCache} 
