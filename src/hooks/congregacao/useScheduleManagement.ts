@@ -7,6 +7,9 @@ import {
   carregarCacheDesignacoes,
   salvarCacheDesignacoes,
   limparCacheDesignacoes as limparStorageCacheDesignacoes,
+  salvarDesignacoesUsuario, // Importar a nova função
+  carregarDesignacoesUsuario, // Importar a nova função
+  limparDesignacoesUsuario, // Importar a nova função
 } from '@/lib/congregacao/storage';
 import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
 
@@ -28,12 +31,18 @@ export function useScheduleManagement({ membros, updateMemberHistory }: UseSched
     ano: null,
   });
 
+  // Carregar do cache ou das designações salvas pelo usuário ao iniciar
   useEffect(() => {
     const cached = carregarCacheDesignacoes();
     if (cached) {
       setScheduleState({ designacoes: cached.schedule, mes: cached.mes, ano: cached.ano });
+      return; // Se encontrou cache, usa o cache
     }
-  }, []);
+    const saved = carregarDesignacoesUsuario(); // Tenta carregar designações do usuário
+    if (saved) {
+       setScheduleState({ designacoes: saved.schedule, mes: saved.mes, ano: saved.ano });
+    }
+  }, []); // Dependência vazia para rodar apenas uma vez na montagem
 
   const persistSchedule = useCallback((newSchedule: DesignacoesFeitas | null, newMes: number | null, newAno: number | null) => {
     setScheduleState({ designacoes: newSchedule, mes: newMes, ano: newAno });
@@ -170,6 +179,32 @@ export function useScheduleManagement({ membros, updateMemberHistory }: UseSched
     // pois o hook não sabe o contexto completo para limpar todo o histórico.
   }, [persistSchedule]);
 
+  // Nova função para salvar as designações explicitamente pelo usuário
+  const salvarDesignacoes = useCallback(() => {
+    if (scheduleState.designacoes && scheduleState.mes !== null && scheduleState.ano !== null) {
+      salvarDesignacoesUsuario({ schedule: scheduleState.designacoes, mes: scheduleState.mes, ano: scheduleState.ano });
+      console.log("Designações salvas pelo usuário."); // Feedback visual no console por enquanto
+      // TODO: Adicionar um toast ou outro feedback para o usuário na interface
+    } else {
+      console.warn("Nenhuma designação para salvar."); // Feedback no console
+       // TODO: Adicionar um toast ou outro feedback para o usuário na interface (ex: "Nenhuma designação gerada para salvar.")
+    }
+  }, [scheduleState]); // Depende de scheduleState para pegar os dados atuais
+
+
+  // Nova função para carregar as designações salvas pelo usuário
+  const carregarDesignacoes = useCallback(() => {
+    const saved = carregarDesignacoesUsuario();
+    if (saved) {
+      setScheduleState({ designacoes: saved.schedule, mes: saved.mes, ano: saved.ano });
+      console.log("Designações carregadas pelo usuário."); // Feedback visual no console por enquanto
+      // TODO: Adicionar um toast ou outro feedback para o usuário na interface
+    } else {
+      console.warn("Nenhuma designação salva pelo usuário encontrada."); // Feedback no console
+      // TODO: Adicionar um toast ou outro feedback para o usuário na interface (ex: "Nenhuma designação salva encontrada.")
+    }
+  }, []); // Sem dependências que mudam o comportamento, apenas chama a função de storage
+
   return {
     scheduleData: scheduleState.designacoes,
     scheduleMes: scheduleState.mes,
@@ -178,5 +213,7 @@ export function useScheduleManagement({ membros, updateMemberHistory }: UseSched
     confirmManualAssignmentOrSubstitution,
     updateLimpezaAssignment,
     clearMainScheduleAndCache,
+    salvarDesignacoes, // Exportar a nova função de salvar
+    carregarDesignacoes, // Exportar a nova função de carregar
   };
 }

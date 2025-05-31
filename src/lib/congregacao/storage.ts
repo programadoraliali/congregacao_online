@@ -10,6 +10,7 @@ import {
   LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS,
   LOCAL_STORAGE_KEY_FIELD_SERVICE_MODALITIES,
   LOCAL_STORAGE_KEY_FIELD_SERVICE_LOCATIONS
+ LOCAL_STORAGE_KEY_USER_SCHEDULE,
 } from './constants';
 import { validarEstruturaMembro } from './utils';
 
@@ -76,6 +77,47 @@ export function limparCacheDesignacoes(): void {
     localStorage.removeItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE);
   } catch (error) {
     console.error("Erro ao limpar cache de designações (aba 1):", error);
+  }
+}
+
+export function salvarDesignacoesUsuario(data: { schedule: DesignacoesFeitas, mes: number, ano: number }): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_USER_SCHEDULE, JSON.stringify(data));
+  } catch (error) {
+    console.error("Erro ao salvar designações do usuário:", error);
+  }
+}
+
+export function carregarDesignacoesUsuario(): { schedule: DesignacoesFeitas, mes: number, ano: number } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
+    if (dadosSalvos) {
+      const parsedData = JSON.parse(dadosSalvos);
+      if (parsedData && typeof parsedData === 'object' &&
+          'schedule' in parsedData && 'mes' in parsedData && 'ano' in parsedData &&
+          typeof parsedData.schedule === 'object' &&
+          typeof parsedData.mes === 'number' && typeof parsedData.ano === 'number') {
+        return parsedData as { schedule: DesignacoesFeitas, mes: number, ano: number };
+      } else {
+        console.warn("Designações de usuário encontradas, mas com estrutura inválida. Limpando.");
+        localStorage.removeItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
+        return null;
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao carregar designações do usuário:", error);
+  }
+  return null;
+}
+
+export function limparDesignacoesUsuario(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
+  } catch (error) {
+    console.error("Erro ao limpar designações do usuário:", error);
   }
 }
 
