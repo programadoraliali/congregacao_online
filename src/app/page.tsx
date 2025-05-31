@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useMemberManagement } from '@/hooks/congregacao/useMemberManagement';
+import { useScheduleManagement } from '@/hooks/congregacao/useScheduleManagement'; // Novo Hook
 import { MemberManagementCard } from '@/components/congregacao/MemberManagementCard';
 import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerationCard';
 import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard';
@@ -17,9 +18,6 @@ import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAs
 import { APP_NAME } from '@/lib/congregacao/constants';
 import { formatarDataParaChave } from '@/lib/congregacao/utils';
 import { 
-  carregarCacheDesignacoes, 
-  salvarCacheDesignacoes, 
-  limparCacheDesignacoes as limparStorageCacheDesignacoes, // Renomeado para evitar conflito
   carregarPublicMeetingAssignments,
   salvarPublicMeetingAssignments,
   limparPublicMeetingAssignments as limparStoragePublicMeetingAssignments,
@@ -57,17 +55,24 @@ export default function Home() {
     persistMembros: hookPersistMembros,
   } = useMemberManagement();
 
-  const [designacoesMensaisCache, setDesignacoesMensaisCache] = useState<DesignacoesFeitas | null>(null);
-  const [cachedScheduleInfo, setCachedScheduleInfo] = useState<{mes: number, ano: number} | null>(null);
+  const {
+    scheduleData,
+    scheduleMes,
+    scheduleAno,
+    generateNewSchedule,
+    confirmManualAssignmentOrSubstitution,
+    updateLimpezaAssignment,
+    clearMainScheduleAndCache,
+  } = useScheduleManagement({ membros, updateMemberHistory });
+
   const [allPublicMeetingAssignmentsData, setAllPublicMeetingAssignmentsData] = useState<AllPublicMeetingAssignments | null>(null);
   const [allNvmcAssignmentsData, setAllNvmcAssignmentsData] = useState<AllNVMCAssignments | null>(null);
   const [allFieldServiceAssignmentsData, setAllFieldServiceAssignmentsData] = useState<AllFieldServiceAssignments | null>(null);
   
   const [publicMeetingCardKey, setPublicMeetingCardKey] = useState(0);
 
-
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
-  const [clearType, setClearType] = useState<'history' | 'all' | 'public_meeting' | 'nvmc' | 'field_service' | null>(null);
+  const [clearType, setClearType] = useState<'history' | 'all' | 'public_meeting' | 'nvmc' | 'field_service' | 'main_schedule' | null>(null);
   const [memberIdForAdvancedOptions, setMemberIdForAdvancedOptions] = useState<string | null>(null);
 
   const [isSubstitutionModalOpen, setIsSubstitutionModalOpen] = useState(false);
@@ -76,23 +81,21 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Membros são carregados pelo hook useMemberManagement
-    const cachedScheduleObject = carregarCacheDesignacoes();
-    if (cachedScheduleObject) {
-        setDesignacoesMensaisCache(cachedScheduleObject.schedule);
-        setCachedScheduleInfo({ mes: cachedScheduleObject.mes, ano: cachedScheduleObject.ano });
-    }
     setAllPublicMeetingAssignmentsData(carregarPublicMeetingAssignments());
     setAllNvmcAssignmentsData(carregarNVMCAssignments());
     setAllFieldServiceAssignmentsData(carregarFieldServiceAssignments());
   }, []);
 
 
-  const limparCacheDesignacoesPrimeiraAba = useCallback(() => {
-    setDesignacoesMensaisCache(null);
-    setCachedScheduleInfo(null);
-    limparStorageCacheDesignacoes();
-  }, []);
+  const handleLimparCachePrincipal = useCallback(() => {
+    clearMainScheduleAndCache();
+    // Se a limpeza do cache principal implicar limpeza de histórico de membros,
+    // uma chamada a hookPersistMembros com o histórico zerado para o mês seria necessária aqui.
+    // Por ora, o hook `useScheduleManagement` não faz isso automaticamente.
+    // A lógica de `internalUpdateMemberHistoryForMonth` no hook é para *popular* o histórico.
+    // Limpar o histórico relacionado a esta aba pode ser uma ação separada se necessário.
+  }, [clearMainScheduleAndCache]);
+
 
   const limparCacheDesignacoesPublicMeeting = useCallback(() => {
     setAllPublicMeetingAssignmentsData(null);
@@ -112,42 +115,23 @@ export default function Home() {
 
   const handleImportMembersWithUICallback = (file: File) => {
     hookHandleImportMembers(file, () => {
-        // Callback para limpar estados da UI de page.tsx
-        limparCacheDesignacoesPrimeiraAba(); 
+        handleLimparCachePrincipal(); 
         limparCacheDesignacoesPublicMeeting(); 
         limparCacheNVMCAssignments(); 
         limparCacheFieldService();
     });
   };
 
-
-  const handleScheduleGenerated = (designacoes: DesignacoesFeitas, mes: number, ano: number) => {
-    setDesignacoesMensaisCache(designacoes);
-    setCachedScheduleInfo({mes, ano});
-
-    const novosMembros = [...membros].map(m => {
-        const membroAtualizado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
-        Object.entries(designacoes).forEach(([dataStr, funcoesDoDia]) => {
-            const dataObj = new Date(dataStr + "T00:00:00");
-            if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
-                 Object.entries(funcoesDoDia).forEach(([funcaoId, membroId]) => {
-                    if (membroId === m.id) {
-                        membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
-                    } else {
-                        if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
-                           delete membroAtualizado.historicoDesignacoes[dataStr];
-                        }
-                    }
-                });
-            }
-        });
-        return membroAtualizado;
-    });
-    updateMemberHistory(novosMembros); // Usa a função do hook para persistir
-    salvarCacheDesignacoes({schedule: designacoes, mes, ano});
+  const handleScheduleGeneratedCallback = async (mes: number, ano: number) => {
+    const { success, error, generatedSchedule } = await generateNewSchedule(mes, ano);
+    if (success && generatedSchedule) {
+      toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
+    } else if (error) {
+      toast({ title: "Erro ao Gerar Designações", description: error, variant: "destructive" });
+    }
+    return { success, error };
   };
   
-
   const handleSavePublicMeetingAssignments = (
     monthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> },
     mes: number,
@@ -219,27 +203,27 @@ export default function Home() {
     setIsConfirmClearOpen(true);
   };
 
-  const handleClearHistory = () => {
+  const handleClearMemberHistory = () => {
     if (memberIdForAdvancedOptions) {
         const membro = membros.find(m => m.id === memberIdForAdvancedOptions);
         if (membro) {
             const membrosAtualizados = membros.map(m =>
                 m.id === memberIdForAdvancedOptions ? { ...m, historicoDesignacoes: {} } : m
             );
-            hookPersistMembros(membrosAtualizados);
+            hookPersistMembros(membrosAtualizados); // Persiste todos os membros (hook atualiza o estado e localStorage)
             toast({ title: "Histórico Limpo", description: `Histórico de ${membro.nome} foi limpo.` });
         }
-    } else {
+    } else { // Limpar histórico de todos
         const membrosAtualizados = membros.map(m => ({ ...m, historicoDesignacoes: {} }));
         hookPersistMembros(membrosAtualizados);
-        toast({ title: "Histórico Limpo", description: "Histórico de todos os membros foi limpo." });
+        toast({ title: "Histórico Limpo", description: "Histórico de designações de TODOS os membros foi limpo." });
     }
     setMemberIdForAdvancedOptions(null);
   };
 
   const handleClearAllData = () => {
-    hookPersistMembros([]); // Limpa membros usando o hook
-    limparCacheDesignacoesPrimeiraAba();
+    hookPersistMembros([]); 
+    handleLimparCachePrincipal();
     limparCacheDesignacoesPublicMeeting();
     limparCacheNVMCAssignments();
     limparCacheFieldService();
@@ -252,44 +236,23 @@ export default function Home() {
   };
 
   const handleConfirmSubstitution = (newMemberId: string) => {
-    if (!substitutionDetails || !designacoesMensaisCache || cachedScheduleInfo === null) {
-      toast({ title: "Erro", description: "Não foi possível processar a substituição. Dados ausentes.", variant: "destructive" });
+    if (!substitutionDetails || scheduleData === null || scheduleMes === null || scheduleAno === null) {
+      toast({ title: "Erro", description: "Não foi possível processar a substituição. Dados do cronograma ausentes.", variant: "destructive" });
       return;
     }
   
     const { date, functionId, originalMemberId } = substitutionDetails;
-    const { mes, ano } = cachedScheduleInfo;
     const isNewDesignation = !originalMemberId || originalMemberId === '';
-  
-    const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
-    
-    if (!novasDesignacoes[date]) {
-      novasDesignacoes[date] = {};
-    }
-    novasDesignacoes[date][functionId] = newMemberId; 
-    
-    setDesignacoesMensaisCache(novasDesignacoes);
-  
-    const membrosAtualizados = membros.map(m => {
-      const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
-      
-      if (originalMemberId && originalMemberId !== '' && m.id === originalMemberId) {
-        if (membroModificado.historicoDesignacoes[date] === functionId) {
-             delete membroModificado.historicoDesignacoes[date];
-        }
-      }
-      if (m.id === newMemberId) {
-        membroModificado.historicoDesignacoes[date] = functionId;
-      }
-      return membroModificado;
-    });
-    updateMemberHistory(membrosAtualizados); 
-  
-    salvarCacheDesignacoes({schedule: novasDesignacoes, mes, ano});
-    
-    if (cachedScheduleInfo.mes === mes && cachedScheduleInfo.ano === ano) {
-       handleScheduleGenerated(novasDesignacoes, mes, ano); 
-    }
+
+    confirmManualAssignmentOrSubstitution(
+      date,
+      functionId,
+      newMemberId,
+      originalMemberId,
+      scheduleData,
+      scheduleMes,
+      scheduleAno
+    );
   
     toast({ 
       title: isNewDesignation ? "Designação Realizada" : "Substituição Realizada", 
@@ -344,11 +307,12 @@ export default function Home() {
                 <TabsContent value="indicadores-volantes-av-limpeza" className="pt-0">
                   <ScheduleGenerationCard
                     membros={membros}
-                    onScheduleGenerated={handleScheduleGenerated}
-                    currentSchedule={designacoesMensaisCache}
-                    currentMes={cachedScheduleInfo?.mes ?? null}
-                    currentAno={cachedScheduleInfo?.ano ?? null}
+                    onScheduleGenerated={handleScheduleGeneratedCallback}
+                    currentSchedule={scheduleData}
+                    currentMes={scheduleMes}
+                    currentAno={scheduleAno}
                     onOpenSubstitutionModal={handleOpenSubstitutionModal}
+                    onLimpezaChange={updateLimpezaAssignment}
                   />
                 </TabsContent>
                 <TabsContent value="reuniao-publica" className="pt-0">
@@ -356,9 +320,9 @@ export default function Home() {
                     key={`public-meeting-card-${publicMeetingCardKey}`}
                     allMembers={membros}
                     allPublicAssignments={allPublicMeetingAssignmentsData}
-                    currentScheduleForMonth={designacoesMensaisCache} 
-                    initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
-                    initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
+                    currentScheduleForMonth={scheduleData} 
+                    initialMonth={scheduleMes ?? new Date().getMonth()}
+                    initialYear={scheduleAno ?? new Date().getFullYear()}
                     onSaveAssignments={handleSavePublicMeetingAssignments}
                     onOpenSubstitutionModal={handleOpenSubstitutionModal}
                   />
@@ -367,16 +331,16 @@ export default function Home() {
                   <NvmcAssignmentsCard
                     allMembers={membros}
                     allNvmcAssignments={allNvmcAssignmentsData}
-                    initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
-                    initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
+                    initialMonth={scheduleMes ?? new Date().getMonth()}
+                    initialYear={scheduleAno ?? new Date().getFullYear()}
                     onSaveNvmcAssignments={handleSaveNvmcAssignments}
                   />
                 </TabsContent>
                 <TabsContent value="servico-de-campo" className="pt-0">
                   <FieldServiceAssignmentsCard
                     allFieldServiceAssignments={allFieldServiceAssignmentsData}
-                    initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
-                    initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
+                    initialMonth={scheduleMes ?? new Date().getMonth()}
+                    initialYear={scheduleAno ?? new Date().getFullYear()}
                     onSaveFieldServiceAssignments={handleSaveFieldServiceAssignments}
                   />
                 </TabsContent>
@@ -394,6 +358,9 @@ export default function Home() {
                 <CardDescription>Use com cuidado. Estas ações são irreversíveis.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col sm:flex-row flex-wrap gap-2">
+                <Button variant="outline" onClick={() => { setClearType('main_schedule'); handleOpenAdvancedOptions(null);}}>
+                     <ListChecks className="mr-2 h-4 w-4" /> Limpar Designações (Indicadores/Volantes/AV/Limpeza)
+                </Button>
                  <Button variant="outline" onClick={() => { setClearType('history'); handleOpenAdvancedOptions(null);}}>
                     <History className="mr-2 h-4 w-4" /> Limpar Histórico de Todos
                 </Button>
@@ -433,8 +400,12 @@ export default function Home() {
       <ConfirmClearDialog
         isOpen={isConfirmClearOpen}
         onOpenChange={setIsConfirmClearOpen}
-        onClearHistory={handleClearHistory}
+        onClearHistory={handleClearMemberHistory}
         onClearAllData={handleClearAllData}
+        onClearMainScheduleData={() => {
+          handleLimparCachePrincipal();
+          toast({ title: "Dados Limpos", description: "Designações de Indicadores/Volantes/AV/Limpeza foram limpas." });
+        }}
         onClearPublicMeetingData={() => {
           limparCacheDesignacoesPublicMeeting();
           toast({ title: "Dados Limpos", description: "Dados da Reunião Pública foram limpos." });
@@ -450,13 +421,13 @@ export default function Home() {
         clearType={clearType}
         targetMemberName={memberIdForAdvancedOptions ? membros.find(m=>m.id === memberIdForAdvancedOptions)?.nome : null}
       />
-       {isSubstitutionModalOpen && substitutionDetails && designacoesMensaisCache && (
+       {isSubstitutionModalOpen && substitutionDetails && scheduleData && (
         <SubstitutionDialog
           isOpen={isSubstitutionModalOpen}
           onOpenChange={setIsSubstitutionModalOpen}
           substitutionDetails={substitutionDetails}
           allMembers={membros}
-          currentAssignmentsForMonth={designacoesMensaisCache}
+          currentAssignmentsForMonth={scheduleData}
           onConfirmSubstitution={handleConfirmSubstitution}
         />
       )}

@@ -10,7 +10,7 @@ import { NOMES_MESES, FUNCOES_DESIGNADAS, DIAS_REUNIAO } from '@/lib/congregacao
 import type { DesignacoesFeitas, FuncaoDesignada, Membro, SubstitutionDetails } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { MemberSelectionDialog } from './MemberSelectionDialog'; 
-import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
+// import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic'; // Agora tratado no hook
 import { useToast } from "@/hooks/use-toast";
 import { FileText, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
 import { getPermissaoRequerida, formatarDataCompleta } from '@/lib/congregacao/utils';
@@ -19,11 +19,12 @@ import { generateSchedulePdf } from '@/lib/congregacao/pdf-generator';
 
 interface ScheduleGenerationCardProps {
   membros: Membro[];
-  onScheduleGenerated: (designacoes: DesignacoesFeitas, mes: number, ano: number) => void;
+  onScheduleGenerated: (mes: number, ano: number) => Promise<{ success: boolean; error?: string; generatedSchedule?: DesignacoesFeitas }>;
   currentSchedule: DesignacoesFeitas | null;
   currentMes: number | null;
   currentAno: number | null;
   onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
+  onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
 }
 
 interface AVSelectionContext {
@@ -36,11 +37,12 @@ interface AVSelectionContext {
 
 export function ScheduleGenerationCard({
   membros,
-  onScheduleGenerated,
-  currentSchedule,
-  currentMes,
-  currentAno,
-  onOpenSubstitutionModal
+  onScheduleGenerated, // Agora é generateNewSchedule do hook
+  currentSchedule,   // Agora é scheduleData do hook
+  currentMes,        // Agora é scheduleMes do hook
+  currentAno,         // Agora é scheduleAno do hook
+  onOpenSubstitutionModal,
+  onLimpezaChange // Nova prop
 }: ScheduleGenerationCardProps) {
   const [selectedMes, setSelectedMes] = useState<string>(currentMes !== null ? currentMes.toString() : new Date().getMonth().toString());
   const [selectedAno, setSelectedAno] = useState<string>(currentAno !== null ? currentAno.toString() : new Date().getFullYear().toString());
@@ -48,31 +50,27 @@ export function ScheduleGenerationCard({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [displayedScheduleData, setDisplayedScheduleData] = useState<{
-    schedule: DesignacoesFeitas;
-    mes: number;
-    ano: number;
-  } | null>(null);
+  // O schedule exibido agora vem diretamente das props (currentSchedule, currentMes, currentAno)
+  // que são alimentadas pelo hook useScheduleManagement.
+  // Não precisamos mais do estado local `displayedScheduleData` aqui.
 
   const [isAVMemberSelectionOpen, setIsAVMemberSelectionOpen] = useState(false);
   const [avSelectionContext, setAVSelectionContext] = useState<AVSelectionContext | null>(null);
 
 
   useEffect(() => {
-    if (currentSchedule && currentMes === parseInt(selectedMes) && currentAno === parseInt(selectedAno)) {
-      // Não definir displayedScheduleData aqui para que não apareça ao carregar.
-      // Apenas certifique-se de que error é limpo.
-    } else {
-      setDisplayedScheduleData(null); // Limpa se o mês/ano mudar
+    // Sincroniza os seletores de mês/ano se as props mudarem (ex: ao carregar cache)
+    if (currentMes !== null && currentAno !== null) {
+      setSelectedMes(currentMes.toString());
+      setSelectedAno(currentAno.toString());
     }
-    setError(null);
-  }, [selectedMes, selectedAno, currentSchedule, currentMes, currentAno]);
+    setError(null); // Limpa o erro se o mês/ano mudar ou o schedule for carregado
+  }, [currentMes, currentAno]);
 
 
   const handleGenerateSchedule = async () => {
     setError(null);
     setIsLoading(true);
-    setDisplayedScheduleData(null); 
     const mes = parseInt(selectedMes, 10);
     const ano = parseInt(selectedAno, 10);
 
@@ -84,34 +82,26 @@ export function ScheduleGenerationCard({
       return;
     }
 
-    try {
-      const result = await calcularDesignacoesAction(mes, ano, membros);
-      if ('error' in result) {
+    // Chama a função passada por prop, que agora é do hook useScheduleManagement
+    const result = await onScheduleGenerated(mes, ano); 
+    
+    if (result.error) {
         setError(result.error);
-        toast({ title: "Erro ao Gerar Designações", description: result.error, variant: "destructive" });
-      } else {
-        onScheduleGenerated(result.designacoesFeitas, mes, ano); 
-        setDisplayedScheduleData({ schedule: result.designacoesFeitas, mes, ano });
-        toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
-      }
-    } catch (e: any) {
-      console.error("Erro ao gerar designações:", e);
-      const errMsg = e.message || "Ocorreu um erro desconhecido ao gerar o cronograma.";
-      setError(errMsg);
-      toast({ title: "Erro Crítico", description: "Falha ao contatar o serviço de IA ou processar os dados.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
+        // O toast de erro já é tratado dentro do page.tsx ao chamar a função do hook
     }
+    // O toast de sucesso também é tratado em page.tsx
+    
+    setIsLoading(false);
   };
 
   const handleExportPDF = () => {
-    if (displayedScheduleData && displayedScheduleData.schedule && membros.length > 0) {
+    if (currentSchedule && currentMes !== null && currentAno !== null && membros.length > 0) {
       try {
         generateSchedulePdf(
-          displayedScheduleData.schedule,
+          currentSchedule,
           membros,
-          displayedScheduleData.mes,
-          displayedScheduleData.ano
+          currentMes,
+          currentAno
         );
         toast({ title: "PDF Gerado", description: "O download do PDF deve iniciar em breve." });
       } catch (e: any) {
@@ -145,67 +135,36 @@ export function ScheduleGenerationCard({
   };
 
   const handleConfirmAVSelection = (newMemberId: string | null) => {
-    if (!avSelectionContext || !displayedScheduleData) return;
+    if (!avSelectionContext || !currentSchedule || currentMes === null || currentAno === null) return;
 
     const { dateStr, functionId } = avSelectionContext;
-    const mes = displayedScheduleData.mes;
-    const ano = displayedScheduleData.ano;
-
-    const updatedSchedule = JSON.parse(JSON.stringify(displayedScheduleData.schedule)) as DesignacoesFeitas;
+    // A lógica de atualização agora está no hook `useScheduleManagement`, 
+    // chamada através de `confirmManualAssignmentOrSubstitution` em `page.tsx`
+    // Este card precisa de uma forma de comunicar essa alteração para `page.tsx`
+    // que então chamará o hook. A maneira mais direta é usar o onOpenSubstitutionModal
+    // mas adaptando-o ou criando uma nova prop para designações diretas de AV.
+    // Por simplicidade, vamos reusar a lógica de substituição, tratando como uma "nova designação" se não havia ninguém.
     
-    if (!updatedSchedule[dateStr]) {
-      updatedSchedule[dateStr] = {};
-    }
-    updatedSchedule[dateStr][functionId] = newMemberId;
+    const originalMemberId = avSelectionContext.currentMemberId || ''; // Se null, é uma nova designação
+    const originalMemberName = originalMemberId ? membros.find(m=>m.id === originalMemberId)?.nome || 'Desconhecido' : 'Ninguém Designado';
 
-    setDisplayedScheduleData({ schedule: updatedSchedule, mes, ano });
-    onScheduleGenerated(updatedSchedule, mes, ano); 
-    
+    onOpenSubstitutionModal({
+        date: dateStr,
+        functionId: functionId,
+        originalMemberId: originalMemberId,
+        originalMemberName: originalMemberName,
+        currentFunctionGroupId: 'AV' // Identificador para o tipo de função
+    });
+    // Ao confirmar no SubstitutionDialog, ele chamará handleConfirmSubstitution em page.tsx
+    // que por sua vez chamará confirmManualAssignmentOrSubstitution do hook useScheduleManagement
+
+    // A linha abaixo que atualizava o schedule localmente é removida, pois o estado vem do hook.
+    // onScheduleGenerated(updatedSchedule, mes, ano); 
+
     setIsAVMemberSelectionOpen(false);
     setAVSelectionContext(null);
-    toast({ title: "Designação AV Atualizada", description: "A designação de Áudio/Vídeo foi atualizada." });
-  };
-
-  const handleLimpezaChange = (
-    dateKey: string, 
-    type: 'aposReuniao' | 'semanal',
-    value: string | null 
-  ) => {
-    if (!displayedScheduleData) {
-        // Se não há cronograma exibido, tentamos carregar o cache ou inicializar um novo.
-        // Isso pode acontecer se o usuário tentar editar limpeza antes de gerar o cronograma principal.
-        const mes = parseInt(selectedMes, 10);
-        const ano = parseInt(selectedAno, 10);
-        let baseSchedule = currentSchedule && currentMes === mes && currentAno === ano ? currentSchedule : {};
-        
-        // Garante que a estrutura para a data exista.
-        if (!baseSchedule[dateKey]) {
-          baseSchedule = { ...baseSchedule, [dateKey]: {} };
-        }
-
-        if (type === 'aposReuniao') {
-            (baseSchedule[dateKey] as any).limpezaAposReuniaoGrupoId = value;
-        } else if (type === 'semanal') {
-            (baseSchedule[dateKey] as any).limpezaSemanalResponsavel = value;
-        }
-        setDisplayedScheduleData({ schedule: baseSchedule, mes, ano });
-        onScheduleGenerated(baseSchedule, mes, ano);
-        return;
-    }
-
-    const updatedSchedule = JSON.parse(JSON.stringify(displayedScheduleData.schedule)) as DesignacoesFeitas;
-    if (!updatedSchedule[dateKey]) {
-      updatedSchedule[dateKey] = {};
-    }
-
-    if (type === 'aposReuniao') {
-      updatedSchedule[dateKey].limpezaAposReuniaoGrupoId = value;
-    } else if (type === 'semanal') {
-      updatedSchedule[dateKey].limpezaSemanalResponsavel = value || ''; // Garante string
-    }
-    
-    setDisplayedScheduleData(prev => ({ ...prev!, schedule: updatedSchedule }));
-    onScheduleGenerated(updatedSchedule, displayedScheduleData.mes, displayedScheduleData.ano);
+    // O toast será mostrado por page.tsx após a confirmação do hook.
+    // toast({ title: "Designação AV Atualizada", description: "A designação de Áudio/Vídeo foi atualizada." });
   };
 
 
@@ -267,28 +226,28 @@ export function ScheduleGenerationCard({
               <p className="text-muted-foreground">Gerando designações, por favor aguarde...</p>
             </div>
           )}
-          {!isLoading && displayedScheduleData && (
+          {!isLoading && currentSchedule && currentMes !== null && currentAno !== null && (
             <>
               <h3 className="text-xl font-semibold mb-4 text-center text-foreground">
-                Designações para {NOMES_MESES[displayedScheduleData.mes]} de {displayedScheduleData.ano}
+                Designações para {NOMES_MESES[currentMes]} de {currentAno}
               </h3>
               <ScheduleDisplay
-                designacoesFeitas={displayedScheduleData.schedule}
+                designacoesFeitas={currentSchedule}
                 membros={membros}
-                mes={displayedScheduleData.mes}
-                ano={displayedScheduleData.ano}
+                mes={currentMes}
+                ano={currentAno}
                 onOpenSubstitutionModal={onOpenSubstitutionModal}
                 onOpenAVMemberSelectionDialog={handleOpenAVMemberSelection}
-                onLimpezaChange={handleLimpezaChange}
+                onLimpezaChange={onLimpezaChange} // Passa a prop adiante
               />
               <div className="mt-6 text-center">
-                <Button variant="outline" onClick={handleExportPDF} disabled={!displayedScheduleData || isLoading}>
+                <Button variant="outline" onClick={handleExportPDF} disabled={!currentSchedule || isLoading}>
                   <FileText className="mr-2 h-4 w-4" /> Exportar como PDF
                 </Button>
               </div>
             </>
           )}
-          {!isLoading && !displayedScheduleData && !error && (
+          {!isLoading && !currentSchedule && !error && (
              <p className="text-muted-foreground text-center py-4">
               Selecione o mês e ano e clique em "Gerar Cronograma" para ver as designações de Indicadores/Volantes.
               As designações de AV e Limpeza são preenchidas manualmente.
