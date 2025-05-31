@@ -58,6 +58,7 @@ export const LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS = 'congregacao_nvmc_assignments'
 export const LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS = 'congregacao_field_service_assignments';
 export const LOCAL_STORAGE_KEY_FIELD_SERVICE_MODALITIES = 'congregacao_field_service_modalities';
 export const LOCAL_STORAGE_KEY_FIELD_SERVICE_LOCATIONS = 'congregacao_field_service_locations';
+export const LOCAL_STORAGE_KEY_USER_SCHEDULE = 'congregacao_user_schedule';
 
 
 export const BADGE_COLORS: Record<string, string> = {
@@ -132,3 +133,4 @@ export const FIELD_SERVICE_TIME_OPTIONS: { value: string; label: string }[] = Ar
   const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   return { value: formattedTime, label: formattedTime };
 });
+
