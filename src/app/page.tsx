@@ -204,6 +204,7 @@ export default function Home() {
                     if (membroId === m.id) {
                         membroAtualizado.historicoDesignacoes[dataStr] = funcaoId;
                     } else {
+                        // Remove do histórico se o membro NÃO está mais designado para essa função nessa data
                         if (membroAtualizado.historicoDesignacoes[dataStr] === funcaoId) {
                            delete membroAtualizado.historicoDesignacoes[dataStr];
                         }
@@ -235,19 +236,15 @@ export default function Home() {
 
     Object.keys(monthAssignments).forEach(dateStr => {
       updatedMonthAssignmentsWithExistingLeitor[dateStr] = {
-        // Preserva o leitorId e outros campos não gerenciados aqui
         ...(existingDataForMonth[dateStr] || {}), 
         ...monthAssignments[dateStr], 
       };
     });
-    // Garantir que datas que existiam no cache mas não no monthAssignments atual sejam mantidas
-    // (importante se o usuário apenas editou algumas datas no mês)
     Object.keys(existingDataForMonth).forEach(dateStr => {
         if (!updatedMonthAssignmentsWithExistingLeitor[dateStr]) {
             updatedMonthAssignmentsWithExistingLeitor[dateStr] = existingDataForMonth[dateStr];
         }
     });
-
 
     const updatedAllAssignments = {
       ...(allPublicMeetingAssignmentsData || {}),
@@ -348,39 +345,50 @@ export default function Home() {
       toast({ title: "Erro", description: "Não foi possível processar a substituição. Dados ausentes.", variant: "destructive" });
       return;
     }
-
+  
     const { date, functionId, originalMemberId } = substitutionDetails;
     const { mes, ano } = cachedScheduleInfo;
-
+  
+    // Crie uma cópia profunda do cache para modificação
     const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
     
+    // Garante que a estrutura para a data exista
     if (!novasDesignacoes[date]) {
       novasDesignacoes[date] = {};
     }
-    novasDesignacoes[date][functionId] = newMemberId;
+    novasDesignacoes[date][functionId] = newMemberId; // Atribui o novo membro
     
+    // Atualiza o estado do cache localmente
     setDesignacoesMensaisCache(novasDesignacoes);
-
+  
+    // Atualiza o histórico dos membros
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
+      
+      // Remove a designação antiga do histórico do membro original, SE ele existia
       if (originalMemberId && m.id === originalMemberId) {
         if (membroModificado.historicoDesignacoes[date] === functionId) {
              delete membroModificado.historicoDesignacoes[date];
         }
       }
+      // Adiciona a nova designação ao histórico do novo membro
       if (m.id === newMemberId) {
         membroModificado.historicoDesignacoes[date] = functionId;
       }
       return membroModificado;
     });
-    persistMembros(membrosAtualizados);
-
+    persistMembros(membrosAtualizados); // Salva os membros com histórico atualizado
+  
+    // Salva o cache de designações no localStorage
     salvarCacheDesignacoes({schedule: novasDesignacoes, mes, ano});
     
+    // Se a substituição foi feita no mesmo mês/ano que está sendo exibido na primeira aba,
+    // chame handleScheduleGenerated para atualizar também a exibição lá e garantir consistência.
+    // É importante chamar isso *depois* de atualizar o cache e os membros.
     if (cachedScheduleInfo.mes === mes && cachedScheduleInfo.ano === ano) {
-       handleScheduleGenerated(novasDesignacoes, mes, ano);
+       handleScheduleGenerated(novasDesignacoes, mes, ano); // Isso também salva o cache e atualiza membros novamente, mas é bom para consistência de estado.
     }
-
+  
     toast({ title: "Substituição Realizada", description: "A designação foi atualizada com sucesso." });
     setIsSubstitutionModalOpen(false);
     setSubstitutionDetails(null);
@@ -442,13 +450,7 @@ export default function Home() {
                   <PublicMeetingAssignmentsCard
                     allMembers={membros}
                     allPublicAssignments={allPublicMeetingAssignmentsData}
-                    currentScheduleForMonth={
-                      (cachedScheduleInfo && designacoesMensaisCache && 
-                       cachedScheduleInfo.mes === (new Date(Date.UTC(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1)).getMonth()) && 
-                       cachedScheduleInfo.ano === (new Date(Date.UTC(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1)).getFullYear())) 
-                      ? designacoesMensaisCache 
-                      : null
-                    }
+                    currentScheduleForMonth={designacoesMensaisCache}
                     initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
                     initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
                     onSaveAssignments={handleSavePublicMeetingAssignments}
