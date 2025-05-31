@@ -132,21 +132,24 @@ export async function getEligibleMembersForFunctionDate(
       return false;
     }
 
-    // Para funções de AV, um membro pode ter múltiplas designações de AV no mesmo dia,
-    // mas não pode ter uma designação de AV e uma não-AV no mesmo dia.
-    // Se a função atual é AV, não impede se o membro já tiver OUTRA função AV.
-    // Se a função atual NÃO é AV, impede se o membro já tiver QUALQUER função.
     if (funcao.tabela !== 'AV' && membrosDesignadosNesteDia.has(membro.id)) {
         return false;
     }
-    // Se a função atual é AV, só impede se o membro já está designado para uma função NÃO-AV.
     if (funcao.tabela === 'AV') {
+        let countAVAssignmentsForMember = 0;
+        let memberHasNonAVAssignment = false;
         for (const funcIdDesignada in designacoesNoDia) {
-            const funcDef = FUNCOES_DESIGNADAS.find(f => f.id === funcIdDesignada);
-            if (funcDef && funcDef.tabela !== 'AV' && designacoesNoDia[funcIdDesignada] === membro.id) {
-                return false; // Membro já tem função não-AV, não pode fazer AV
+            if (designacoesNoDia[funcIdDesignada] === membro.id) {
+                const funcDef = FUNCOES_DESIGNADAS.find(f => f.id === funcIdDesignada);
+                if (funcDef && funcDef.tabela === 'AV') {
+                    countAVAssignmentsForMember++;
+                } else if (funcDef && funcDef.tabela !== 'AV') {
+                    memberHasNonAVAssignment = true;
+                }
             }
         }
+        if (memberHasNonAVAssignment) return false; // Cannot do AV if has non-AV assignment
+        // Allow multiple AV assignments if the function itself is AV
     }
 
 
@@ -163,7 +166,6 @@ export async function sortMembersByPriority(
   membrosComHistoricoCompleto: Membro[] // Para acessar o histórico original completo
 ): Promise<Membro[]> {
   
-  // Criar uma cópia para não modificar o array original diretamente
   const membrosOrdenados = [...membrosElegiveis];
 
   membrosOrdenados.sort((membroA, membroB) => {
@@ -210,7 +212,7 @@ export async function calcularDesignacoesAction(
   
   const DIAS_REUNIAO: DiasReuniao = DIAS_REUNIAO_CONFIG;
   const designacoesFeitasNoMesAtual: DesignacoesFeitas = {};
-  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[]; // Deep copy for manipulation
+  const membrosDisponiveis = JSON.parse(JSON.stringify(membros)) as Membro[]; 
 
   const datasDeReuniaoNoMes: Date[] = [];
   const primeiroDiaDoMes = new Date(Date.UTC(ano, mes, 1));
@@ -230,11 +232,14 @@ export async function calcularDesignacoesAction(
 
   for (const dataReuniao of datasDeReuniaoNoMes) {
     const dataReuniaoStr = formatarDataCompleta(dataReuniao);
-    designacoesFeitasNoMesAtual[dataReuniaoStr] = {}; // Inicializa as designações para o dia
+    designacoesFeitasNoMesAtual[dataReuniaoStr] = {
+      ...designacoesFeitasNoMesAtual[dataReuniaoStr], // Preserve existing if any (from cache)
+      limpezaAposReuniaoGrupoId: designacoesFeitasNoMesAtual[dataReuniaoStr]?.limpezaAposReuniaoGrupoId || null,
+      limpezaSemanalResponsavel: designacoesFeitasNoMesAtual[dataReuniaoStr]?.limpezaSemanalResponsavel || '',
+    };
     
     const tipoReuniaoAtual = dataReuniao.getUTCDay() === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
     
-    // Filtra apenas funções que NÃO são de AV para geração automática
     const funcoesParaGeracaoAutomatica = FUNCOES_DESIGNADAS.filter(
       f => f.tipoReuniao.includes(tipoReuniaoAtual) && f.tabela !== 'AV'
     );
@@ -252,33 +257,38 @@ export async function calcularDesignacoesAction(
       );
 
       if (membrosElegiveis.length === 0) {
-        designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
+        if (!designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id]) { // Only set to null if not already set (from cache)
+            designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
+        }
         continue;
       }
 
       const membrosOrdenados = await sortMembersByPriority(
         membrosElegiveis,
         funcao,
-        dataReuniaoAnteriorStr,
+        dataReuniaoAnteriorStr, 
         designacoesFeitasNoMesAtual,
         dataReuniaoStr,
-        membros // Passa a lista original para consulta de histórico
+        membros 
       );
 
       const membroEscolhido = membrosOrdenados[0];
       if (membroEscolhido) {
-        designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = membroEscolhido.id;
+         if (!designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id]) {
+            designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = membroEscolhido.id;
+         }
       } else {
-        designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
+         if (!designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id]) {
+            designacoesFeitasNoMesAtual[dataReuniaoStr][funcao.id] = null;
+         }
       }
     }
 
-    // Inicializa funções de AV como nulas, elas serão preenchidas manualmente
     const funcoesAVParaEsteTipo = FUNCOES_DESIGNADAS.filter(
         f => f.tipoReuniao.includes(tipoReuniaoAtual) && f.tabela === 'AV'
     );
     for (const funcaoAV of funcoesAVParaEsteTipo) {
-        if (!designacoesFeitasNoMesAtual[dataReuniaoStr][funcaoAV.id]) { // Só inicializa se não foi preenchido (ex: vindo do cache)
+        if (designacoesFeitasNoMesAtual[dataReuniaoStr][funcaoAV.id] === undefined) { 
              designacoesFeitasNoMesAtual[dataReuniaoStr][funcaoAV.id] = null;
         }
     }
@@ -368,7 +378,6 @@ export async function getPotentialSubstitutesList(
     originalMemberId 
   );
 
-  // Para seleção manual, não precisa ordenar por prioridade complexa, apenas alfabeticamente
   return eligibleMembers.sort((a, b) => a.nome.localeCompare(b.nome));
 }
 

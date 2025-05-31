@@ -72,10 +72,10 @@ export const DIAS_SEMANA_REUNIAO_CORES = {
 };
 
 export const NVMC_PART_SECTIONS = {
-  GERAL: "CÂNTICO E ORAÇÃO INICIAL",
-  TESOUROS: "TESOUROS DA PALAVRA DE DEUS",
-  FMM: "FAÇA SEU MELHOR NO MINISTÉRIO",
-  VIDA_CRISTA: "NOSSA VIDA CRISTÃ",
+  CANTICO_E_ORACAO_INICIAL: "CÂNTICO E ORAÇÃO INICIAL",
+  TESOUROS_DA_PALAVRA_DE_DEUS: "TESOUROS DA PALAVRA DE DEUS",
+  FACA_SEU_MELHOR_NO_MINISTERIO: "FAÇA SEU MELHOR NO MINISTÉRIO",
+  NOSSA_VIDA_CRISTA: "NOSSA VIDA CRISTÃ",
   COMENTARIOS_FINAIS: "COMENTÁRIOS FINAIS"
 };
 
@@ -95,13 +95,22 @@ type FixedPartKeys = Exclude<keyof NVMCDailyAssignments,
 
 
 export const NVMC_FIXED_PARTS_CONFIG: Record<FixedPartKeys | string, { label: string; section: string; requiredPermissionId?: string; }> = {
-  presidenteId: { label: "Presidente da Reunião", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' },
-  oracaoInicialId: { label: "Oração Inicial", section: NVMC_PART_SECTIONS.GERAL, requiredPermissionId: 'presidente' },
-  tesourosDiscursoId: { label: "Discurso (Tesouros)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' },
-  joiasEspirituaisId: { label: "Encontre Joias Espirituais", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'presidente' },
-  leituraBibliaSalaAId: { label: "Leitura da Bíblia (Salão Principal)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' },
-  leituraBibliaSalaBId: { label: "Leitura da Bíblia (Sala B)", section: NVMC_PART_SECTIONS.TESOUROS, requiredPermissionId: 'leitorQui' },
-  ebcDirigenteId: { label: "Dirigente do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'presidente' },
-  ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' },
+  presidenteId: { label: "Presidente da Reunião", section: NVMC_PART_SECTIONS.CANTICO_E_ORACAO_INICIAL, requiredPermissionId: 'presidente' },
+  oracaoInicialId: { label: "Oração Inicial", section: NVMC_PART_SECTIONS.CANTICO_E_ORACAO_INICIAL, requiredPermissionId: 'presidente' },
+  tesourosDiscursoId: { label: "Discurso (Tesouros)", section: NVMC_PART_SECTIONS.TESOUROS_DA_PALAVRA_DE_DEUS, requiredPermissionId: 'presidente' },
+  joiasEspirituaisId: { label: "Encontre Joias Espirituais", section: NVMC_PART_SECTIONS.TESOUROS_DA_PALAVRA_DE_DEUS, requiredPermissionId: 'presidente' },
+  leituraBibliaSalaAId: { label: "Leitura da Bíblia (Salão Principal)", section: NVMC_PART_SECTIONS.TESOUROS_DA_PALAVRA_DE_DEUS, requiredPermissionId: 'leitorQui' },
+  leituraBibliaSalaBId: { label: "Leitura da Bíblia (Sala B)", section: NVMC_PART_SECTIONS.TESOUROS_DA_PALAVRA_DE_DEUS, requiredPermissionId: 'leitorQui' },
+  ebcDirigenteId: { label: "Dirigente do EBC", section: NVMC_PART_SECTIONS.NOSSA_VIDA_CRISTA, requiredPermissionId: 'presidente' },
+  ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.NOSSA_VIDA_CRISTA, requiredPermissionId: 'leitorQui' },
   oracaoFinalId: { label: "Oração Final", section: NVMC_PART_SECTIONS.COMENTARIOS_FINAIS, requiredPermissionId: 'presidente' },
 };
+
+export const GRUPOS_LIMPEZA_APOS_REUNIAO = [
+  { id: 'grupo1', nome: 'Grupo 1 - Luiz Aguinaldo' },
+  { id: 'grupo2', nome: 'Grupo 2 - Marcos Camillo' },
+  { id: 'grupo3', nome: 'Grupo 3 - Ângelo Berben' },
+  { id: 'grupo4', nome: 'Grupo 4 - Marcelo Teixeira' },
+  { id: 'grupo5', nome: 'Grupo 5 - Tai Lee' },
+  { id: 'grupo6', nome: 'Grupo 6 - Marco Saudo' },
+];

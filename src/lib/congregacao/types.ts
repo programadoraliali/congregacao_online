@@ -37,6 +37,8 @@ export interface DesignacoesFeitas {
   [dataStr: string]: {
     // Key: idFuncao
     [funcaoId: string]: string | null; // Value: idMembro or null if unassigned
+    limpezaAposReuniaoGrupoId?: string | null;
+    limpezaSemanalResponsavel?: string;
   };
 }
 
@@ -140,7 +142,7 @@ export interface ParsedNvmcPart {
 
 export interface ParsedNvmcProgram {
   canticoInicialNumero?: string;
-  comentariosIniciaisDetalhes?: string; // Deve ser apenas o tempo, ex: (1 min)
+  comentariosIniciaisDetalhes?: string; 
   fmmParts: ParsedNvmcPart[];
   vidaCristaParts: NVCVidaCristaDynamicPart[];
   vidaCristaCantico?: string;
@@ -148,5 +150,5 @@ export interface ParsedNvmcProgram {
   ebcTema?: string;
   tesourosDiscursoTema?: string;
   joiasEspirituaisTema?: string;
-  comentariosFinaisDetalhes?: string; // Deve ser o tempo, cântico e oração, ex: (3 min) | Cântico X e oração
+  comentariosFinaisDetalhes?: string; 
 }

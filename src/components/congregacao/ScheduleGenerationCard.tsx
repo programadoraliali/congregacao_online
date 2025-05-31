@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { NOMES_MESES, FUNCOES_DESIGNADAS, DIAS_REUNIAO } from '@/lib/congregacao/constants';
 import type { DesignacoesFeitas, FuncaoDesignada, Membro, SubstitutionDetails } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
-import { MemberSelectionDialog } from './MemberSelectionDialog'; // Para seleção manual de AV
+import { MemberSelectionDialog } from './MemberSelectionDialog'; 
 import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
 import { useToast } from "@/hooks/use-toast";
 import { FileText, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
@@ -26,8 +26,8 @@ interface ScheduleGenerationCardProps {
 
 interface AVSelectionContext {
   dateStr: string;
-  functionId: string; // ID real da função (ex: 'avVideoQui')
-  columnKey: string; // Chave da coluna na tabela (ex: 'video')
+  functionId: string; 
+  columnKey: string; 
   currentMemberId: string | null;
   requiredPermissionId: string | null;
 }
@@ -52,18 +52,16 @@ export function ScheduleGenerationCard({
     ano: number;
   } | null>(null);
 
-  // Estado para o diálogo de seleção de membros AV
   const [isAVMemberSelectionOpen, setIsAVMemberSelectionOpen] = useState(false);
   const [avSelectionContext, setAVSelectionContext] = useState<AVSelectionContext | null>(null);
 
 
   useEffect(() => {
-    // Se o currentSchedule (cache do pai) for para o mês/ano selecionado, usa-o.
-    // Caso contrário, limpa. A geração é sempre explícita.
     if (currentSchedule && currentMes === parseInt(selectedMes) && currentAno === parseInt(selectedAno)) {
-        setDisplayedScheduleData({ schedule: currentSchedule, mes: currentMes, ano: currentAno });
+      // Não definir displayedScheduleData aqui para que não apareça ao carregar.
+      // Apenas certifique-se de que error é limpo.
     } else {
-        setDisplayedScheduleData(null);
+      setDisplayedScheduleData(null); // Limpa se o mês/ano mudar
     }
     setError(null);
   }, [selectedMes, selectedAno, currentSchedule, currentMes, currentAno]);
@@ -113,7 +111,7 @@ export function ScheduleGenerationCard({
 
   const handleOpenAVMemberSelection = (
     dateStr: string, 
-    functionId: string, // ID real da função
+    functionId: string, 
     columnKey: string,
     currentMemberId: string | null
   ) => {
@@ -143,11 +141,53 @@ export function ScheduleGenerationCard({
     updatedSchedule[dateStr][functionId] = newMemberId;
 
     setDisplayedScheduleData({ schedule: updatedSchedule, mes, ano });
-    onScheduleGenerated(updatedSchedule, mes, ano); // Salva no cache principal
+    onScheduleGenerated(updatedSchedule, mes, ano); 
     
     setIsAVMemberSelectionOpen(false);
     setAVSelectionContext(null);
     toast({ title: "Designação AV Atualizada", description: "A designação de Áudio/Vídeo foi atualizada." });
+  };
+
+  const handleLimpezaChange = (
+    dateKey: string, 
+    type: 'aposReuniao' | 'semanal',
+    value: string | null 
+  ) => {
+    if (!displayedScheduleData) {
+        // Se não há cronograma exibido, tentamos carregar o cache ou inicializar um novo.
+        // Isso pode acontecer se o usuário tentar editar limpeza antes de gerar o cronograma principal.
+        const mes = parseInt(selectedMes, 10);
+        const ano = parseInt(selectedAno, 10);
+        let baseSchedule = currentSchedule && currentMes === mes && currentAno === ano ? currentSchedule : {};
+        
+        // Garante que a estrutura para a data exista.
+        if (!baseSchedule[dateKey]) {
+          baseSchedule = { ...baseSchedule, [dateKey]: {} };
+        }
+
+        if (type === 'aposReuniao') {
+            (baseSchedule[dateKey] as any).limpezaAposReuniaoGrupoId = value;
+        } else if (type === 'semanal') {
+            (baseSchedule[dateKey] as any).limpezaSemanalResponsavel = value;
+        }
+        setDisplayedScheduleData({ schedule: baseSchedule, mes, ano });
+        onScheduleGenerated(baseSchedule, mes, ano);
+        return;
+    }
+
+    const updatedSchedule = JSON.parse(JSON.stringify(displayedScheduleData.schedule)) as DesignacoesFeitas;
+    if (!updatedSchedule[dateKey]) {
+      updatedSchedule[dateKey] = {};
+    }
+
+    if (type === 'aposReuniao') {
+      updatedSchedule[dateKey].limpezaAposReuniaoGrupoId = value;
+    } else if (type === 'semanal') {
+      updatedSchedule[dateKey].limpezaSemanalResponsavel = value || ''; // Garante string
+    }
+    
+    setDisplayedScheduleData(prev => ({ ...prev!, schedule: updatedSchedule }));
+    onScheduleGenerated(updatedSchedule, displayedScheduleData.mes, displayedScheduleData.ano);
   };
 
 
@@ -157,7 +197,9 @@ export function ScheduleGenerationCard({
   return (
     <Card>
       <CardHeader>
-        <CardDescription>Selecione o mês e ano para gerar o cronograma de designações. As designações de AV são manuais.</CardDescription>
+        <CardDescription>
+          Selecione o mês e ano para gerar o cronograma de designações. As designações de AV e Limpeza são manuais/editáveis.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row gap-4 mb-6 items-end">
@@ -219,6 +261,7 @@ export function ScheduleGenerationCard({
                 ano={displayedScheduleData.ano}
                 onOpenSubstitutionModal={onOpenSubstitutionModal}
                 onOpenAVMemberSelectionDialog={handleOpenAVMemberSelection}
+                onLimpezaChange={handleLimpezaChange}
               />
               <div className="mt-6 text-center">
                 <Button variant="outline" onClick={handleExportPDF}>
@@ -230,7 +273,7 @@ export function ScheduleGenerationCard({
           {!isLoading && !displayedScheduleData && !error && (
              <p className="text-muted-foreground text-center py-4">
               Selecione o mês e ano e clique em "Gerar Cronograma" para ver as designações de Indicadores/Volantes.
-              As designações de AV são preenchidas manualmente clicando nas células da tabela de AV.
+              As designações de AV e Limpeza são preenchidas manualmente.
             </p>
           )}
         </div>
@@ -240,7 +283,7 @@ export function ScheduleGenerationCard({
           isOpen={isAVMemberSelectionOpen}
           onOpenChange={setIsAVMemberSelectionOpen}
           allMembers={membros}
-          targetRole={null} // Não é um "cargo" específico, mas uma função de AV
+          targetRole={null} 
           requiredPermissionId={avSelectionContext.requiredPermissionId}
           currentDate={avSelectionContext.dateStr}
           onSelectMember={(memberId) => handleConfirmAVSelection(memberId)}

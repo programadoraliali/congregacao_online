@@ -3,9 +3,15 @@
 
 import React from 'react';
 import type { Membro, DesignacoesFeitas, Designacao, SubstitutionDetails } from '@/lib/congregacao/types';
-import { FUNCOES_DESIGNADAS, NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO, DIAS_SEMANA_REUNIAO_CORES } from '@/lib/congregacao/constants';
+import { FUNCOES_DESIGNADAS, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO, DIAS_SEMANA_REUNIAO_CORES, GRUPOS_LIMPEZA_APOS_REUNIAO } from '@/lib/congregacao/constants';
 import { ScheduleTable } from './ScheduleTable';
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { formatarDataCompleta } from '@/lib/congregacao/utils';
+import { Badge } from '@/components/ui/badge';
 
 
 function prepararDadosTabela(
@@ -21,9 +27,13 @@ function prepararDadosTabela(
   const fullDateStrings: string[] = [];
 
   Object.keys(designacoesFeitas).forEach(dataStr => {
+    // Validar se a dataStr é uma data válida antes de criar o objeto Date
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) return; 
     const dataObj = new Date(dataStr + 'T00:00:00');
+    if (isNaN(dataObj.getTime())) return; 
+
     if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
-        const diaSemana = dataObj.getUTCDay(); // Use getUTCDay para consistência
+        const diaSemana = dataObj.getUTCDay(); 
         if(diaSemana === DIAS_REUNIAO.meioSemana || diaSemana === DIAS_REUNIAO.publica) {
              datasNoMesComReuniao.add(dataStr);
         }
@@ -191,12 +201,12 @@ export const getRealFunctionId = (columnKey: string, dateStr: string, tipoTabela
     } else if (tipoTabela === 'Volantes') {
         if (columnKey === 'volante1') return isMeioSemana ? 'volante1Qui' : 'volante1Dom';
         if (columnKey === 'volante2') return isMeioSemana ? 'volante2Qui' : 'volante2Dom';
-    } else if (tipoTabela === 'Áudio/Vídeo (AV)') { // Nome da tabela como usado no title
+    } else if (tipoTabela === 'Áudio/Vídeo (AV)') { 
         if (columnKey === 'video') return isMeioSemana ? 'avVideoQui' : 'avVideoDom';
         if (columnKey === 'indicadorZoom') return isMeioSemana ? 'avIndicadorZoomQui' : 'avIndicadorZoomDom';
         if (columnKey === 'backupAV') return isMeioSemana ? 'avBackupQui' : 'avBackupDom';
     }
-    return columnKey; // Fallback
+    return columnKey; 
 };
 
 interface ScheduleDisplayProps {
@@ -206,7 +216,18 @@ interface ScheduleDisplayProps {
     ano: number;
     onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
     onOpenAVMemberSelectionDialog: (dateStr: string, functionId: string, columnKey: string, currentMemberId: string | null) => void;
+    onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
 }
+
+// Helper function to get ISO week number
+function getISOWeek(date: Date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d.valueOf() - yearStart.valueOf()) / 86400000) + 1)/7);
+}
+
 
 export function ScheduleDisplay({ 
     designacoesFeitas, 
@@ -214,20 +235,13 @@ export function ScheduleDisplay({
     mes, 
     ano, 
     onOpenSubstitutionModal,
-    onOpenAVMemberSelectionDialog
+    onOpenAVMemberSelectionDialog,
+    onLimpezaChange,
 }: ScheduleDisplayProps) {
   const { toast } = useToast();
 
   if (!designacoesFeitas || Object.keys(designacoesFeitas).length === 0) {
-    const hoje = new Date();
-    const mesAtual = hoje.getMonth();
-    const anoAtual = hoje.getFullYear();
-    if (mes === mesAtual && ano === anoAtual) {
-      // Não mostra mensagem se for o mês/ano atual e não houver designações
-    } else {
-      return <p className="text-muted-foreground text-center py-4">Nenhuma designação gerada para {NOMES_MESES[mes]} de {ano}.</p>;
-    }
-    return null;
+    return null; 
   }
 
 
@@ -236,9 +250,9 @@ export function ScheduleDisplay({
   const dadosAV = prepararDadosTabela(designacoesFeitas, mes, ano, 'AV');
 
   const handleCellClick = (
-    date: string, // YYYY-MM-DD
+    date: string, 
     columnKey: string, 
-    originalMemberId: string | null, // Pode ser null se a célula estiver vazia
+    originalMemberId: string | null, 
     originalMemberName: string | null,
     tableTitle: string 
   ) => {
@@ -246,8 +260,8 @@ export function ScheduleDisplay({
     
     if (tableTitle === 'Áudio/Vídeo (AV)') {
       onOpenAVMemberSelectionDialog(date, realFunctionId, columnKey, originalMemberId);
-    } else { // Indicadores ou Volantes
-      if (originalMemberId && originalMemberName) { // Só abre substituição se houver alguém designado
+    } else { 
+      if (originalMemberId && originalMemberName) { 
         onOpenSubstitutionModal({ date, functionId: realFunctionId, originalMemberId, originalMemberName, currentFunctionGroupId: tableTitle });
       } else {
         toast({
@@ -261,17 +275,57 @@ export function ScheduleDisplay({
 
   const hasIndicadoresData = dadosIndicadores.data.length > 0 && dadosIndicadores.data.some(row => Object.keys(row).some(key => key !== 'data' && key !== 'diaSemanaBadgeColor' && row[key]));
   const hasVolantesData = dadosVolantes.data.length > 0 && dadosVolantes.data.some(row => Object.keys(row).some(key => key !== 'data' && key !== 'diaSemanaBadgeColor' && row[key]));
-  // A tabela de AV será sempre exibida se houver datas de reunião no mês, para permitir preenchimento manual.
   const hasAVDataStructure = dadosAV.data.length > 0;
 
-
   const hasAnyDataForMonth = Object.values(designacoesFeitas).some(dayAssignments => 
-    Object.keys(dayAssignments).length > 0 && Object.values(dayAssignments).some(val => val !== null)
+    Object.keys(dayAssignments).length > 0 && Object.values(dayAssignments).some(val => val !== null && val !== '')
   );
 
-  if (!hasAnyDataForMonth && !hasAVDataStructure) { // Se não há dados automáticos E nem estrutura para AV manual
+  if (!hasAnyDataForMonth && !hasAVDataStructure && !Object.values(designacoesFeitas).some(d => d.limpezaAposReuniaoGrupoId || d.limpezaSemanalResponsavel)) {
      return <p className="text-muted-foreground text-center py-4">Nenhuma designação para {NOMES_MESES[mes]} de {ano}. Gere o cronograma ou adicione manualmente.</p>;
   }
+
+  const getMeetingDatesForMonth = (currentMes: number, currentAno: number): Date[] => {
+    const dates: Date[] = [];
+    const firstDay = new Date(Date.UTC(currentAno, currentMes, 1));
+    const lastDayOfMonth = new Date(Date.UTC(currentAno, currentMes + 1, 0)).getUTCDate();
+    for (let day = 1; day <= lastDayOfMonth; day++) {
+        const currentDate = new Date(Date.UTC(currentAno, currentMes, day));
+        const dayOfWeek = currentDate.getUTCDay();
+        if (dayOfWeek === DIAS_REUNIAO.meioSemana || dayOfWeek === DIAS_REUNIAO.publica) {
+            dates.push(currentDate);
+        }
+    }
+    return dates.sort((a,b) => a.getTime() - b.getTime());
+  };
+
+  const meetingDatesForCleaning = getMeetingDatesForMonth(mes, ano);
+
+  const weeksForCleaning = React.useMemo(() => {
+    if (!meetingDatesForCleaning || meetingDatesForCleaning.length === 0) return [];
+    const weeks: { weekLabel: string, dateKey: string }[] = [];
+    const processedWeeks = new Set<string>(); 
+
+    meetingDatesForCleaning.forEach(date => {
+      const sunday = new Date(date);
+      sunday.setUTCDate(date.getUTCDate() - date.getUTCDay()); 
+
+      const year = sunday.getUTCFullYear();
+      const month = sunday.getUTCMonth(); 
+      const day = sunday.getUTCDate();
+      
+      const dateKey = formatarDataCompleta(sunday);
+      const weekIdForSet = `${year}-${getISOWeek(sunday)}`; 
+
+      if (!processedWeeks.has(weekIdForSet)) {
+        const monthAbbrev = NOMES_MESES[month]?.substring(0, 3).toLowerCase() || '';
+        const weekLabel = `Semana ${day.toString().padStart(2, '0')}-${monthAbbrev}.`;
+        weeks.push({ weekLabel, dateKey });
+        processedWeeks.add(weekIdForSet);
+      }
+    });
+    return weeks.sort((a,b) => a.dateKey.localeCompare(b.dateKey));
+  }, [mes, ano, meetingDatesForCleaning]);
 
 
   return (
@@ -297,7 +351,7 @@ export function ScheduleDisplay({
             currentFullDateStrings={dadosVolantes.fullDateStrings}
           />
         )}
-        {hasAVDataStructure && ( // Mostrar tabela de AV se houver datas de reunião, mesmo que vazia
+        {hasAVDataStructure && ( 
           <ScheduleTable 
             title="Áudio/Vídeo (AV)" 
             data={dadosAV.data} 
@@ -309,6 +363,74 @@ export function ScheduleDisplay({
           />
         )}
       </div>
+
+      {/* Seção de Limpeza */}
+      {(meetingDatesForCleaning.length > 0 || weeksForCleaning.length > 0) && (
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Limpeza</CardTitle></CardHeader>
+          <CardContent className="flex flex-col md:flex-row gap-x-6 gap-y-4">
+            {/* Coluna Limpeza Após Reunião */}
+            <div className="flex-1 space-y-3 min-w-[280px]">
+              <h4 className="font-medium text-md text-foreground">Limpeza Após a Reunião</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {meetingDatesForCleaning.map(dateObj => {
+                  const dateStr = formatarDataCompleta(dateObj);
+                  const dia = dateObj.getUTCDate();
+                  const diaSemanaIndex = dateObj.getUTCDay();
+                  const diaAbrev = NOMES_DIAS_SEMANA_ABREV[diaSemanaIndex];
+                  const badgeColorClass = diaSemanaIndex === DIAS_REUNIAO.meioSemana ? DIAS_SEMANA_REUNIAO_CORES.meioSemana : DIAS_SEMANA_REUNIAO_CORES.publica;
+                  const currentGroupId = designacoesFeitas[dateStr]?.limpezaAposReuniaoGrupoId;
+
+                  return (
+                    <div key={dateStr} className="flex items-center gap-3">
+                      <div className="flex items-center space-x-2 w-24">
+                         <span>{dia.toString().padStart(2,'0')}</span>
+                         <Badge variant="outline" className={badgeColorClass}>{diaAbrev}</Badge>
+                      </div>
+                      <Select
+                        value={currentGroupId || ''}
+                        onValueChange={(value) => onLimpezaChange(dateStr, 'aposReuniao', value)}
+                      >
+                        <SelectTrigger className="flex-1 h-9 text-sm">
+                          <SelectValue placeholder="Selecione o grupo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Nenhum</SelectItem>
+                          {GRUPOS_LIMPEZA_APOS_REUNIAO.map(grupo => (
+                            <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Coluna Limpeza Semanal */}
+            <div className="flex-1 space-y-3 min-w-[280px]">
+              <h4 className="font-medium text-md text-foreground">Limpeza Semanal</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {weeksForCleaning.map(week => {
+                  const currentResponsavel = designacoesFeitas[week.dateKey]?.limpezaSemanalResponsavel || '';
+                  return (
+                    <div key={week.dateKey} className="flex items-center gap-3">
+                      <Label htmlFor={`limpeza-semanal-${week.dateKey}`} className="w-32 text-sm">{week.weekLabel}</Label>
+                      <Input
+                        id={`limpeza-semanal-${week.dateKey}`}
+                        value={currentResponsavel}
+                        onChange={(e) => onLimpezaChange(week.dateKey, 'semanal', e.target.value)}
+                        placeholder="Responsáveis"
+                        className="flex-1 h-9 text-sm"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
