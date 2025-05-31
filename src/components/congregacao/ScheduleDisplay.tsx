@@ -46,8 +46,8 @@ export function prepararDadosTabela(
   if (tipoTabela === 'Indicadores') {
     columns = [
       { key: 'data', label: 'Data' },
-      { key: 'indicador1', label: 'Indicador 1' },
-      { key: 'indicador2', label: 'Indicador 2' },
+      { key: 'indicadorExterno', label: 'Indicador Externo' },
+      { key: 'indicadorPalco', label: 'Indicador Palco' },
     ];
 
     sortedDates.forEach(dataStr => {
@@ -78,16 +78,16 @@ export function prepararDadosTabela(
     });
     
       const MAPPED_COL_KEYS_INDICADORES = {
-        indicador1: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom',
-        indicador2: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom',
+        indicadorExterno: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom',
+        indicadorPalco: (diaSemanaIndex: number) => diaSemanaIndex === DIAS_REUNIAO.meioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom',
       }
       const remappedDataIndicadores = dataTabela.map((row, index) => {
         const dataObj = new Date(sortedDates[index] + 'T00:00:00');
         const diaSemanaIndex = dataObj.getUTCDay();
         return {
             ...row,
-            indicador1: row[MAPPED_COL_KEYS_INDICADORES.indicador1(diaSemanaIndex)],
-            indicador2: row[MAPPED_COL_KEYS_INDICADORES.indicador2(diaSemanaIndex)],
+            indicadorExterno: row[MAPPED_COL_KEYS_INDICADORES.indicadorExterno(diaSemanaIndex)],
+            indicadorPalco: row[MAPPED_COL_KEYS_INDICADORES.indicadorPalco(diaSemanaIndex)],
         }
       });
       return { data: remappedDataIndicadores, columns, fullDateStrings };

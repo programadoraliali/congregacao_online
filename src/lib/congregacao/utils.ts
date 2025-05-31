@@ -93,43 +93,10 @@ export function agruparPermissoes(permissoes: PermissaoBase[]): Record<string, P
 export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana' | 'publica'): string | undefined {
     const funcaoDef = FUNCOES_DESIGNADAS.find(f => f.id === funcaoId);
     if (funcaoDef && funcaoDef.permissaoRequeridaBase) {
+        // Priorizar a permissão base definida diretamente na função
         return funcaoDef.permissaoRequeridaBase;
     }
-
-    switch (funcaoId) {
-        case 'indicadorExternoQui':
-        case 'indicadorPalcoQui':
-            return 'indicadorQui';
-        case 'indicadorExternoDom':
-        case 'indicadorPalcoDom':
-            return 'indicadorDom';
-        case 'volante1Qui':
-        case 'volante2Qui':
-            return 'volanteQui';
-        case 'volante1Dom':
-        case 'volante2Dom':
-            return 'volanteDom';
-        case 'leitorDom':
-             return 'leitorDom';
-        case 'leitorQui':
-             return 'leitorQui';
-        case 'presidenteReuniaoPublicaDom':
-        case 'presidenteMeioSemana':
-            return 'presidente';
-        default:
-            if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'meioSemana') return 'leitorQui';
-            if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'publica') return 'leitorDom';
-            if (funcaoId.toLowerCase().includes('presidente') || funcaoId.toLowerCase().includes('instrutor')) return 'presidente';
-            if (funcaoId.toLowerCase().includes('indicador') && tipoReuniao === 'meioSemana') return 'indicadorQui';
-            if (funcaoId.toLowerCase().includes('indicador') && tipoReuniao === 'publica') return 'indicadorDom';
-            if (funcaoId.toLowerCase().includes('volante') && tipoReuniao === 'meioSemana') return 'volanteQui';
-            if (funcaoId.toLowerCase().includes('volante') && tipoReuniao === 'publica') return 'volanteDom';
-            if (funcaoId.startsWith('avVideo')) return 'avVideo';
-            if (funcaoId.startsWith('avZoom') || funcaoId.startsWith('avIndicadorZoom')) return 'avZoom';
-            if (funcaoId.startsWith('avBackup')) return 'avBackup';
-            
-            return undefined;
-    }
+    return undefined; // Retorna undefined se nenhuma permissão base específica for encontrada
 }
 
 

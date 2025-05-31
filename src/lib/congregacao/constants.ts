@@ -43,10 +43,10 @@ export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   // Leitura/Presidência
   { id: 'leitorDom', nome: 'Leitor A Sentinela (Dom)', tipoReuniao: ['publica'], tabela: 'LeitorPresidente', permissaoRequeridaBase: 'leitorDom' },
   // Áudio/Vídeo
-  { id: 'avVideoQui', nome: 'Vídeo (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avVideo' },
+  { id: 'avVideoQui', nome: 'Vídeo (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'av' },
   { id: 'avIndicadorZoomQui', nome: 'Indicador Zoom (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'av' },
   { id: 'avBackupQui', nome: 'Backup (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'av' },
-  { id: 'avVideoDom', nome: 'Vídeo (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avVideo' },
+  { id: 'avVideoDom', nome: 'Vídeo (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'av' },
   { id: 'avIndicadorZoomDom', nome: 'Indicador Zoom (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'av' },
   { id: 'avBackupDom', nome: 'Backup (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'av' },
 ];

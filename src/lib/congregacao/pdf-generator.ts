@@ -66,8 +66,8 @@ export function generateSchedulePdf(
   const commonTableOptions: any = {
     theme: 'grid',
     styles: {
-      fontSize: 8.5, // Aumentado
-      cellPadding: 2.5, // Aumentado
+      fontSize: 8.5, 
+      cellPadding: 2.5, 
       overflow: 'linebreak',
       font: "helvetica",
     },
@@ -76,8 +76,8 @@ export function generateSchedulePdf(
       textColor: [245, 241, 232], 
       fontStyle: 'bold',
       halign: 'center',
-      fontSize: 9, // Aumentado
-      cellPadding: 3, // Adicionado
+      fontSize: 9, 
+      cellPadding: 3, 
     },
     bodyStyles: {
         valign: 'middle',
@@ -86,7 +86,7 @@ export function generateSchedulePdf(
     columnStyles: {
         0: { halign: 'left', cellWidth: 'auto'}, // Date column
     },
-    margin: { top: 0, right: pageMargin, bottom: 30, left: pageMargin }, // margin.top é para o documento, startY controla tabelas
+    margin: { top: 0, right: pageMargin, bottom: 30, left: pageMargin }, 
     pageBreak: 'auto',
   };
   
@@ -95,12 +95,18 @@ export function generateSchedulePdf(
   ): { head: any[][], body: any[][], title: string, hasData: boolean } => {
     const { data: dadosFormatados, columns } = prepararDadosTabelaOriginal(scheduleData, mes, ano, tipoTabela);
 
-    const head = [columns.map(col => col.label)];
+    const head = [columns.map(col => {
+        if (tipoTabela === 'Indicadores') {
+            if (col.key === 'indicadorExterno') return 'Indicador Externo';
+            if (col.key === 'indicadorPalco') return 'Indicador Palco';
+        }
+        return col.label;
+    })];
     const body = dadosFormatados.map((row) => {
         return columns.map(col => {
             if (col.key === 'data') {
                  const [dia, diaAbrev] = (row.data as string).split(' ');
-                 return `${dia} ${diaAbrev}`; // Data em uma linha
+                 return `${dia} ${diaAbrev}`; 
             }
             const memberId = row[col.key] as string | null;
             return getMemberName(memberId, membros);
@@ -114,21 +120,21 @@ export function generateSchedulePdf(
 
   const addTableToDoc = (title: string, head: any[][], body: any[][], currentStartY: number, tableOptions: any = commonTableOptions): number => {
     const tableTitleHeight = 20; 
-    const estimatedCellHeight = 15; // Ajustado para novo fontSize/padding
-    const headerHeight = 20; // Ajustado
+    const estimatedCellHeight = 18; // Ajustado para novo fontSize/padding
+    const headerHeight = 22; // Ajustado
     const estimatedTableHeight = headerHeight + (body.length * estimatedCellHeight) + tableTitleHeight;
 
     let newStartY = currentStartY;
-    if (newStartY === commonTableOptions.margin.top) { // Se for a primeira tabela na página, usa o startY global
+    if (newStartY === commonTableOptions.margin.top) { 
         newStartY = startY;
     }
 
     if (newStartY + estimatedTableHeight > pageHeight - tableOptions.margin.bottom && body.length > 0) { 
         doc.addPage();
-        newStartY = commonTableOptions.margin.top || 40; // Usa a margem top global ou um valor padrão
-        doc.setFontSize(18); // Recria título principal na nova página
+        newStartY = commonTableOptions.margin.top || 40; 
+        doc.setFontSize(18); 
         doc.text(tituloPrincipal, pageWidth / 2, 45, { align: 'center' });
-        newStartY = 70; // Posição do primeiro elemento na nova página
+        newStartY = 70; 
     }
     doc.setFontSize(12);
     doc.setTextColor(52, 73, 94); 
@@ -158,7 +164,6 @@ export function generateSchedulePdf(
     startY = addTableToDoc("Áudio/Vídeo (AV)", headAV, bodyAV, startY);
   }
 
-  // Seção de Limpeza - Lado a Lado
   const limpezaAposReuniaoData: string[][] = [];
   const limpezaSemanalData: string[][] = [];
   
@@ -204,7 +209,7 @@ export function generateSchedulePdf(
   if (limpezaAposReuniaoData.length > 0 || limpezaSemanalData.length > 0) {
      const cleaningSectionTitleHeight = 30; 
      const maxRowsCleaning = Math.max(limpezaAposReuniaoData.length, limpezaSemanalData.length);
-     const estimatedCleaningSectionHeight = (maxRowsCleaning * 18) + 50 + cleaningSectionTitleHeight; // 18 é uma estimativa para altura da célula com novo padding/fonte
+     const estimatedCleaningSectionHeight = (maxRowsCleaning * 20) + 60 + cleaningSectionTitleHeight; 
      
      if (startY + estimatedCleaningSectionHeight > pageHeight - commonTableOptions.margin.bottom) { 
         doc.addPage();
@@ -217,13 +222,13 @@ export function generateSchedulePdf(
     doc.setTextColor(52, 73, 94);
     const cleaningTitleY = startY - 8;
     doc.text("Limpeza", pageMargin, cleaningTitleY);
-    startY = cleaningTitleY + 8; // Ajustar startY para a primeira tabela de limpeza
+    startY = cleaningTitleY + 8;
 
-    const cleaningTableOptions = {
+    const cleaningTableOptions: any = {
         theme: 'grid',
         styles: {
-            fontSize: 8, // Aumentado
-            cellPadding: 2, // Aumentado
+            fontSize: 8, 
+            cellPadding: 2, 
             overflow: 'linebreak',
             font: "helvetica",
         },
@@ -232,35 +237,34 @@ export function generateSchedulePdf(
             textColor: [245, 241, 232],
             fontStyle: 'bold',
             halign: 'center',
-            fontSize: 8.5, // Aumentado
-            cellPadding: 2.5, // Adicionado
+            fontSize: 8.5,
+            cellPadding: 2.5,
         },
         bodyStyles: {
             valign: 'middle',
             halign: 'center',
         },
         pageBreak: 'auto',
-        margin: { top: 0, right: 0, bottom: commonTableOptions.margin.bottom, left: 0 }, // Margens internas para o autotable
+        margin: { top: 0, right: 0, bottom: commonTableOptions.margin.bottom, left: 0 },
     };
 
-    const tableWidthLimpeza = contentWidth / 2 - 5; 
-    let finalYLimpezaApos = startY;
-    let finalYLimpezaSemanal = startY;
+    const tableWidth = contentWidth / 2 - 5; 
+    let finalYLimpeza = startY;
 
     if (limpezaAposReuniaoData.length > 0) {
         autoTable(doc, {
             ...cleaningTableOptions,
             head: [['Data', 'Grupo Pós Reunião']],
             body: limpezaAposReuniaoData,
-            tableWidth: tableWidthLimpeza,
+            tableWidth: tableWidth,
             startY: startY,
-            margin: { ...cleaningTableOptions.margin, left: pageMargin, right: pageWidth - pageMargin - tableWidthLimpeza },
+            margin: { ...cleaningTableOptions.margin, left: pageMargin, right: pageWidth - pageMargin - tableWidth },
             columnStyles: {
                 0: { halign: 'left', cellWidth: 60 }, 
                 1: { halign: 'left', cellWidth: 'auto' },
             },
         });
-        finalYLimpezaApos = (doc as any).lastAutoTable.finalY;
+        finalYLimpeza = Math.max(finalYLimpeza, (doc as any).lastAutoTable.finalY);
     }
 
     if (limpezaSemanalData.length > 0) {
@@ -268,20 +272,18 @@ export function generateSchedulePdf(
             ...cleaningTableOptions,
             head: [['Semana', 'Responsáveis (Semanal)']],
             body: limpezaSemanalData,
-            tableWidth: tableWidthLimpeza,
-            startY: startY, // Começa no mesmo startY
-            margin: { ...cleaningTableOptions.margin, left: pageMargin + tableWidthLimpeza + 10, right: pageMargin },
+            tableWidth: tableWidth,
+            startY: startY, 
+            margin: { ...cleaningTableOptions.margin, left: pageMargin + tableWidth + 10, right: pageMargin },
             columnStyles: {
                 0: { halign: 'left', cellWidth: 60 }, 
                 1: { halign: 'left', cellWidth: 'auto' },
             },
         });
-        finalYLimpezaSemanal = (doc as any).lastAutoTable.finalY;
+        finalYLimpeza = Math.max(finalYLimpeza, (doc as any).lastAutoTable.finalY);
     }
-    startY = Math.max(finalYLimpezaApos, finalYLimpezaSemanal) + 15;
+    startY = finalYLimpeza + 15;
   }
 
   doc.save(`designacoes_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
-
-    
