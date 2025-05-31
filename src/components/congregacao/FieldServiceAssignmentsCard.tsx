@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { AllFieldServiceAssignments, FieldServiceDayOfWeekSlots, FieldServiceMeetingDateEntry, FieldServiceMeetingSlot, FieldServiceMonthlyData } from '@/lib/congregacao/types';
-import { NOMES_MESES, NOMES_DIAS_SEMANA_COMPLETOS } from '@/lib/congregacao/constants';
+import type { AllFieldServiceAssignments, FieldServiceMeetingSlot, FieldServiceMonthlyData } from '@/lib/congregacao/types';
+import { NOMES_MESES, NOMES_DIAS_SEMANA_COMPLETOS, FIELD_SERVICE_TIME_OPTIONS } from '@/lib/congregacao/constants';
 import { formatarDataParaChave, formatarDataCompleta } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,8 +41,8 @@ export function FieldServiceAssignmentsCard({
   const currentYearValue = new Date().getFullYear();
   const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYearValue - 2 + i);
 
-  const generateMeetingDatesForSlot = useCallback((dayOfWeek: number, year: number, month: number): FieldServiceMeetingDateEntry[] => {
-    const dates: FieldServiceMeetingDateEntry[] = [];
+  const generateMeetingDatesForSlot = useCallback((dayOfWeek: number, year: number, month: number) => {
+    const dates = [];
     const firstDay = new Date(Date.UTC(year, month, 1));
     const lastDayNum = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
@@ -72,6 +72,10 @@ export function FieldServiceAssignmentsCard({
             slots: existingDaySlots.map(slot => ({
                 ...slot,
                 id: slot.id || generateSlotId(),
+                time: slot.time || FIELD_SERVICE_TIME_OPTIONS[0].value, // Default to first time option
+                modalityId: slot.modalityId || null,
+                baseLocationId: slot.baseLocationId || null,
+                additionalDetails: slot.additionalDetails || '',
                 assignedDates: slot.assignedDates && slot.assignedDates.length > 0 
                                 ? slot.assignedDates 
                                 : generateMeetingDatesForSlot(i, displayYear, displayMonth)
@@ -86,8 +90,10 @@ export function FieldServiceAssignmentsCard({
     const dayOfWeekStr = dayOfWeek.toString();
     const newSlot: FieldServiceMeetingSlot = {
       id: generateSlotId(),
-      time: '',
-      locationDetails: '',
+      time: FIELD_SERVICE_TIME_OPTIONS[0].value, // Default time
+      modalityId: null,
+      baseLocationId: null,
+      additionalDetails: '',
       assignedDates: generateMeetingDatesForSlot(dayOfWeek, displayYear, displayMonth),
     };
     setCurrentMonthData(prev => ({
@@ -108,7 +114,12 @@ export function FieldServiceAssignmentsCard({
     }));
   };
 
-  const handleSlotInputChange = (dayOfWeek: number, slotId: string, field: 'time' | 'locationDetails', value: string) => {
+  const handleSlotInputChange = (
+    dayOfWeek: number, 
+    slotId: string, 
+    field: keyof Pick<FieldServiceMeetingSlot, 'time' | 'modalityId' | 'baseLocationId' | 'additionalDetails'>, 
+    value: string | null
+    ) => {
     const dayOfWeekStr = dayOfWeek.toString();
     setCurrentMonthData(prev => ({
       ...prev,
@@ -220,20 +231,26 @@ export function FieldServiceAssignmentsCard({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor={`slot-time-${slot.id}`}>Horário</Label>
-                      <Input
-                        id={`slot-time-${slot.id}`}
+                      <Select
                         value={slot.time}
-                        onChange={(e) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'time', e.target.value)}
-                        placeholder="Ex: 8h45"
-                        className="h-9"
-                      />
+                        onValueChange={(value) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'time', value)}
+                      >
+                        <SelectTrigger id={`slot-time-${slot.id}`} className="h-9">
+                          <SelectValue placeholder="Selecione o horário" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FIELD_SERVICE_TIME_OPTIONS.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <Label htmlFor={`slot-location-${slot.id}`}>Local / Detalhes</Label>
+                      <Label htmlFor={`slot-location-${slot.id}`}>Local / Detalhes (será atualizado)</Label>
                       <Input
                         id={`slot-location-${slot.id}`}
-                        value={slot.locationDetails}
-                        onChange={(e) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'locationDetails', e.target.value)}
+                        value={slot.additionalDetails || ''} // Temporariamente usando additionalDetails aqui
+                        onChange={(e) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'additionalDetails', e.target.value)}
                         placeholder="Ex: TPL - Metrô Paraíso (Grupos 1,2)"
                         className="h-9"
                       />
@@ -243,7 +260,6 @@ export function FieldServiceAssignmentsCard({
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {slot.assignedDates.map((dateEntry) => {
                       const dateObj = new Date(dateEntry.specificDateKey + 'T00:00:00');
-                      // Adicionar +1 ao mês porque getUTCMonth() é 0-indexado
                       const formattedDate = `${dateObj.getUTCDate().toString().padStart(2, '0')}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
                       return (
                         <div key={dateEntry.specificDateKey} className="grid grid-cols-[auto_1fr_1fr] items-center gap-x-2 gap-y-1 text-sm">
@@ -273,5 +289,3 @@ export function FieldServiceAssignmentsCard({
     </Card>
   );
 }
-
-    

@@ -1,13 +1,15 @@
 
 'use client';
 
-import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments, AllFieldServiceAssignments } from './types';
+import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments, AllFieldServiceAssignments, ManagedListItem } from './types';
 import { 
   LOCAL_STORAGE_KEY_MEMBROS, 
   LOCAL_STORAGE_KEY_SCHEDULE_CACHE,
   LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS,
   LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS,
-  LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS
+  LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS,
+  LOCAL_STORAGE_KEY_FIELD_SERVICE_MODALITIES,
+  LOCAL_STORAGE_KEY_FIELD_SERVICE_LOCATIONS
 } from './constants';
 import { validarEstruturaMembro } from './utils';
 
@@ -164,6 +166,7 @@ export function carregarFieldServiceAssignments(): AllFieldServiceAssignments | 
     if (dadosSalvos) {
       const parsedData = JSON.parse(dadosSalvos) as AllFieldServiceAssignments;
       if (parsedData && typeof parsedData === 'object') {
+        // Adicionar aqui uma validação mais profunda da estrutura se necessário
         return parsedData;
       } else {
          console.warn("Cache de Serviço de Campo encontrado, mas com estrutura inválida. Limpando.");
@@ -193,4 +196,55 @@ export function limparFieldServiceAssignments(): void {
   } catch (error) {
     console.error("Erro ao limpar designações do Serviço de Campo:", error);
   }
+}
+
+// Funções para listas gerenciadas do Serviço de Campo (Modalidades e Locais Base)
+function carregarManagedList(key: string): ManagedListItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const dadosSalvos = localStorage.getItem(key);
+    if (dadosSalvos) {
+      const items = JSON.parse(dadosSalvos) as ManagedListItem[];
+      if (Array.isArray(items) && items.every(item => item && typeof item.id === 'string' && typeof item.name === 'string')) {
+        return items.sort((a, b) => a.name.localeCompare(b.name));
+      } else {
+        console.warn(`Lista gerenciada em '${key}' com estrutura inválida. Limpando.`);
+        localStorage.removeItem(key);
+      }
+    }
+  } catch (error) {
+    console.error(`Erro ao carregar lista gerenciada de '${key}':`, error);
+  }
+  return [];
+}
+
+function salvarManagedList(key: string, items: ManagedListItem[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(items));
+  } catch (error) {
+    console.error(`Erro ao salvar lista gerenciada em '${key}':`, error);
+  }
+}
+
+export function carregarModalidades(): ManagedListItem[] {
+  return carregarManagedList(LOCAL_STORAGE_KEY_FIELD_SERVICE_MODALITIES);
+}
+export function salvarModalidades(items: ManagedListItem[]): void {
+  salvarManagedList(LOCAL_STORAGE_KEY_FIELD_SERVICE_MODALITIES, items);
+}
+export function limparModalidades(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(LOCAL_STORAGE_KEY_FIELD_SERVICE_MODALITIES);
+}
+
+export function carregarLocaisBase(): ManagedListItem[] {
+  return carregarManagedList(LOCAL_STORAGE_KEY_FIELD_SERVICE_LOCATIONS);
+}
+export function salvarLocaisBase(items: ManagedListItem[]): void {
+  salvarManagedList(LOCAL_STORAGE_KEY_FIELD_SERVICE_LOCATIONS, items);
+}
+export function limparLocaisBase(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(LOCAL_STORAGE_KEY_FIELD_SERVICE_LOCATIONS);
 }

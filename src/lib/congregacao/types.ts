@@ -142,7 +142,7 @@ export interface ParsedNvmcPart {
 
 export interface ParsedNvmcProgram {
   canticoInicialNumero?: string;
-  comentariosIniciaisDetalhes?: string; 
+  comentariosIniciaisDetalhes?: string;
   fmmParts: ParsedNvmcPart[];
   vidaCristaParts: NVCVidaCristaDynamicPart[];
   vidaCristaCantico?: string;
@@ -150,5 +150,41 @@ export interface ParsedNvmcProgram {
   ebcTema?: string;
   tesourosDiscursoTema?: string;
   joiasEspirituaisTema?: string;
-  comentariosFinaisDetalhes?: string; 
+  comentariosFinaisDetalhes?: string;
+}
+
+// --- Tipos para Serviço de Campo ---
+export interface ManagedListItem {
+  id: string;
+  name: string;
+}
+
+export interface FieldServiceMeetingDateEntry {
+  specificDateKey: string; // YYYY-MM-DD
+  leaderName: string;
+  specialNote: string;
+}
+
+export interface FieldServiceMeetingSlot {
+  id: string;
+  time: string; // Agora será um valor do seletor, ex: "08:45"
+  modalityId?: string | null; // ID da lista de modalidades gerenciadas
+  baseLocationId?: string | null; // ID da lista de locais base gerenciados
+  additionalDetails?: string; // Campo de texto para "Grupos 1,2" ou "1º Sábado"
+  // locationDetails: string; // <- Campo antigo, será substituído
+  assignedDates: FieldServiceMeetingDateEntry[];
+}
+
+export interface FieldServiceDayOfWeekSlots {
+  slots: FieldServiceMeetingSlot[];
+}
+
+export interface FieldServiceMonthlyData {
+  // Chave: Dia da semana (0-6, onde 0 é Domingo) como string
+  [dayOfWeek: string]: FieldServiceDayOfWeekSlots;
+}
+
+export interface AllFieldServiceAssignments {
+  // Chave: "AAAA-MM" (ex: "2024-07")
+  [yearMonth: string]: FieldServiceMonthlyData;
 }
