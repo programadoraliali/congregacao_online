@@ -9,7 +9,7 @@ export interface FuncaoDesignada {
   id: string;
   nome: string;
   tipoReuniao: ('meioSemana' | 'publica')[];
-  tabela: 'Indicadores' | 'Volantes' | 'LeitorPresidente'; // Helps group functions in schedule display
+  tabela: 'Indicadores' | 'Volantes' | 'LeitorPresidente' | 'AV'; // Helps group functions in schedule display
   permissaoRequeridaBase?: string; // e.g., 'indicador', 'volante', 'leitor', 'presidente' - base permission part
 }
 
@@ -57,7 +57,7 @@ export interface SubstitutionDetails {
   functionId: string;
   originalMemberId: string;
   originalMemberName: string | null;
-  currentFunctionGroupId: 'Indicadores' | 'Volantes' | string; // Para saber qual funcao especifica dentro do grupo
+  currentFunctionGroupId: 'Indicadores' | 'Volantes' | 'AV' | string; // Para saber qual funcao especifica dentro do grupo
 }
 
 // Tipos para a aba "Reunião Pública"
@@ -83,10 +83,10 @@ export interface NVMCParticipantDynamic {
   partName: string;
   partTheme?: string;
   needsAssistant?: boolean;
-  participantSalaAId?: string | null; // Renamed
-  assistantSalaAId?: string | null;   // Renamed
-  participantSalaBId?: string | null; // Added
-  assistantSalaBId?: string | null;   // Added
+  participantSalaAId?: string | null;
+  assistantSalaAId?: string | null;
+  participantSalaBId?: string | null;
+  assistantSalaBId?: string | null;
 }
 
 export interface NVCVidaCristaDynamicPart {
@@ -99,7 +99,7 @@ export interface NVCVidaCristaDynamicPart {
 export interface NVMCDailyAssignments {
   // Geral
   canticoInicialNumero?: string;
-  comentariosIniciaisDetalhes?: string;
+  comentariosIniciaisDetalhes?: string; // Formato: (X min)
   presidenteId?: string | null;
   oracaoInicialId?: string | null;
   // Tesouros da Palavra de Deus
@@ -107,8 +107,8 @@ export interface NVMCDailyAssignments {
   tesourosDiscursoCustomTitle?: string;
   joiasEspirituaisId?: string | null;
   joiasEspirituaisCustomTitle?: string;
-  leituraBibliaSalaAId?: string | null; // Renamed
-  leituraBibliaSalaBId?: string | null; // Added
+  leituraBibliaSalaAId?: string | null;
+  leituraBibliaSalaBId?: string | null;
   leituraBibliaCustomTitle?: string;
   // Faça Seu Melhor no Ministério (dynamic parts)
   fmmParts: NVMCParticipantDynamic[];
@@ -120,7 +120,7 @@ export interface NVMCDailyAssignments {
   ebcLeitorId?: string | null;
   ebcCustomTitle?: string;
   // Encerramento
-  comentariosFinaisDetalhes?: string;
+  comentariosFinaisDetalhes?: string; // Formato: (X min) | Cântico Y e Oração
   oracaoFinalId?: string | null;
 }
 
@@ -140,13 +140,13 @@ export interface ParsedNvmcPart {
 
 export interface ParsedNvmcProgram {
   canticoInicialNumero?: string;
-  comentariosIniciaisDetalhes?: string;
+  comentariosIniciaisDetalhes?: string; // Deve ser apenas o tempo, ex: (1 min)
   fmmParts: ParsedNvmcPart[];
-  vidaCristaParts: NVCVidaCristaDynamicPart[]; // Corrected type
+  vidaCristaParts: NVCVidaCristaDynamicPart[];
   vidaCristaCantico?: string;
   leituraBibliaTema?: string;
   ebcTema?: string;
   tesourosDiscursoTema?: string;
   joiasEspirituaisTema?: string;
-  comentariosFinaisDetalhes?: string;
+  comentariosFinaisDetalhes?: string; // Deve ser o tempo, cântico e oração, ex: (3 min) | Cântico X e oração
 }

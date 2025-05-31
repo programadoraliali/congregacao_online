@@ -23,6 +23,9 @@ export const PERMISSOES_BASE: PermissaoBase[] = [
   { id: 'leitorQui', nome: 'Leitor (Meio Semana)', grupo: 'Leitura/Presidência' },
   { id: 'leitorDom', nome: 'Leitor (Fim Semana)', grupo: 'Leitura/Presidência' },
   { id: 'presidente', nome: 'Presidente/Instrutor', grupo: 'Leitura/Presidência' },
+  { id: 'avVideo', nome: 'AV Vídeo', grupo: 'Áudio/Vídeo' },
+  { id: 'avZoom', nome: 'AV Indicador Zoom', grupo: 'Áudio/Vídeo' },
+  { id: 'avBackup', nome: 'AV Backup', grupo: 'Áudio/Vídeo' },
 ];
 
 export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
@@ -36,6 +39,13 @@ export const FUNCOES_DESIGNADAS: FuncaoDesignada[] = [
   { id: 'volante2Qui', nome: 'Volante 2', tipoReuniao: ['meioSemana'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteQui' },
   { id: 'volante1Dom', nome: 'Volante 1', tipoReuniao: ['publica'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteDom' },
   { id: 'volante2Dom', nome: 'Volante 2', tipoReuniao: ['publica'], tabela: 'Volantes', permissaoRequeridaBase: 'volanteDom' },
+  // Áudio/Vídeo
+  { id: 'avVideoQui', nome: 'Vídeo (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avVideo' },
+  { id: 'avIndicadorZoomQui', nome: 'Indicador Zoom (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avZoom' },
+  { id: 'avBackupQui', nome: 'Backup (Qui)', tipoReuniao: ['meioSemana'], tabela: 'AV', permissaoRequeridaBase: 'avBackup' },
+  { id: 'avVideoDom', nome: 'Vídeo (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avVideo' },
+  { id: 'avIndicadorZoomDom', nome: 'Indicador Zoom (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avZoom' },
+  { id: 'avBackupDom', nome: 'Backup (Dom)', tipoReuniao: ['publica'], tabela: 'AV', permissaoRequeridaBase: 'avBackup' },
 ];
 
 export const LOCAL_STORAGE_KEY_MEMBROS = 'congregacao_membros';
@@ -48,6 +58,7 @@ export const BADGE_COLORS: Record<string, string> = {
   Indicadores: "bg-blue-100 text-blue-700 border-blue-300",
   Volantes: "bg-green-100 text-green-700 border-green-300",
   "Leitura/Presidência": "bg-purple-100 text-purple-700 border-purple-300",
+  "Áudio/Vídeo": "bg-teal-100 text-teal-700 border-teal-300",
   "Partes Meio de Semana": "bg-yellow-100 text-yellow-700 border-yellow-300",
   "Demonstrações": "bg-indigo-100 text-indigo-700 border-indigo-300",
   "Outras Funções": "bg-pink-100 text-pink-700 border-pink-300",
@@ -65,21 +76,21 @@ export const NVMC_PART_SECTIONS = {
   TESOUROS: "TESOUROS DA PALAVRA DE DEUS",
   FMM: "FAÇA SEU MELHOR NO MINISTÉRIO",
   VIDA_CRISTA: "NOSSA VIDA CRISTÃ",
-  COMENTARIOS_FINAIS: "COMENTÁRIOS FINAIS" // Added for consistency
+  COMENTARIOS_FINAIS: "COMENTÁRIOS FINAIS"
 };
 
 // Configuration for fixed NVMC parts
-type FixedPartKeys = Exclude<keyof NVMCDailyAssignments, 
-  'fmmParts' | 
-  'vidaCristaParts' | 
-  'comentariosIniciaisDetalhes' | 
-  'comentariosFinaisDetalhes' | 
-  'tesourosDiscursoCustomTitle' | 
-  'joiasEspirituaisCustomTitle' | 
-  'leituraBibliaCustomTitle' | 
+type FixedPartKeys = Exclude<keyof NVMCDailyAssignments,
+  'fmmParts' |
+  'vidaCristaParts' |
+  'comentariosIniciaisDetalhes' |
+  'tesourosDiscursoCustomTitle' |
+  'joiasEspirituaisCustomTitle' |
+  'leituraBibliaCustomTitle' |
   'ebcCustomTitle' |
   'canticoInicialNumero' |
-  'vidaCristaCantico'
+  'vidaCristaCantico' |
+  'comentariosFinaisDetalhes'
 >;
 
 
@@ -94,4 +105,3 @@ export const NVMC_FIXED_PARTS_CONFIG: Record<FixedPartKeys | string, { label: st
   ebcLeitorId: { label: "Leitor do EBC", section: NVMC_PART_SECTIONS.VIDA_CRISTA, requiredPermissionId: 'leitorQui' },
   oracaoFinalId: { label: "Oração Final", section: NVMC_PART_SECTIONS.COMENTARIOS_FINAIS, requiredPermissionId: 'presidente' },
 };
-
