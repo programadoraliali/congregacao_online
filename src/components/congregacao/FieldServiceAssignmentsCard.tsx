@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { ClipboardList, PlusCircle, Trash2, Settings2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { ManageFieldServiceListsDialog } from './ManageFieldServiceListsDialog'; // Importar o novo diálogo
+import { ManageFieldServiceListsDialog } from './ManageFieldServiceListsDialog';
 import { carregarModalidades, carregarLocaisBase } from '@/lib/congregacao/storage';
 
 
@@ -107,7 +107,7 @@ export function FieldServiceAssignmentsCard({
     const dayOfWeekStr = dayOfWeek.toString();
     const newSlot: FieldServiceMeetingSlot = {
       id: generateSlotId(),
-      time: FIELD_SERVICE_TIME_OPTIONS[0].value, // Default time
+      time: FIELD_SERVICE_TIME_OPTIONS[0].value,
       modalityId: null,
       baseLocationId: null,
       additionalDetails: '',
@@ -142,7 +142,7 @@ export function FieldServiceAssignmentsCard({
       ...prev,
       [dayOfWeekStr]: {
         slots: prev[dayOfWeekStr]?.slots.map(slot =>
-          slot.id === slotId ? { ...slot, [field]: value } : slot
+          slot.id === slotId ? { ...slot, [field]: value === "" && (field === 'modalityId' || field === 'baseLocationId') ? null : value } : slot
         ) || [],
       },
     }));
@@ -177,7 +177,6 @@ export function FieldServiceAssignmentsCard({
 
   const handleSaveChanges = () => {
     onSaveFieldServiceAssignments(currentMonthData, displayMonth, displayYear);
-    // Toast is handled by parent in page.tsx
   };
 
   return (
@@ -252,7 +251,7 @@ export function FieldServiceAssignmentsCard({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-0 pb-4 px-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
                       <Label htmlFor={`slot-time-${slot.id}`}>Horário</Label>
                       <Select
@@ -260,7 +259,7 @@ export function FieldServiceAssignmentsCard({
                         onValueChange={(value) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'time', value)}
                       >
                         <SelectTrigger id={`slot-time-${slot.id}`} className="h-9">
-                          <SelectValue placeholder="Selecione o horário" />
+                          <SelectValue placeholder="Horário" />
                         </SelectTrigger>
                         <SelectContent>
                           {FIELD_SERVICE_TIME_OPTIONS.map(opt => (
@@ -270,16 +269,51 @@ export function FieldServiceAssignmentsCard({
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor={`slot-location-${slot.id}`}>Local / Detalhes (será atualizado)</Label>
-                      <Input
-                        id={`slot-location-${slot.id}`}
-                        value={slot.additionalDetails || ''} 
-                        onChange={(e) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'additionalDetails', e.target.value)}
-                        placeholder="Ex: TPL - Metrô Paraíso (Grupos 1,2)"
-                        className="h-9"
-                      />
+                      <Label htmlFor={`slot-modality-${slot.id}`}>Modalidade</Label>
+                      <Select
+                        value={slot.modalityId || ""}
+                        onValueChange={(value) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'modalityId', value)}
+                      >
+                        <SelectTrigger id={`slot-modality-${slot.id}`} className="h-9">
+                          <SelectValue placeholder="Modalidade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Nenhuma</SelectItem>
+                          {modalidadesList.map(mod => (
+                            <SelectItem key={mod.id} value={mod.id}>{mod.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`slot-baseLocation-${slot.id}`}>Local Base</Label>
+                      <Select
+                        value={slot.baseLocationId || ""}
+                        onValueChange={(value) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'baseLocationId', value)}
+                      >
+                        <SelectTrigger id={`slot-baseLocation-${slot.id}`} className="h-9">
+                          <SelectValue placeholder="Local Base" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Nenhum</SelectItem>
+                          {locaisBaseList.map(loc => (
+                            <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
+                  <div>
+                    <Label htmlFor={`slot-details-${slot.id}`}>Grupos / Detalhes Adicionais</Label>
+                    <Input
+                      id={`slot-details-${slot.id}`}
+                      value={slot.additionalDetails || ''} 
+                      onChange={(e) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'additionalDetails', e.target.value)}
+                      placeholder="Ex: Grupos 1,2 ou 1º Sábado"
+                      className="h-9"
+                    />
+                  </div>
+
                   {slot.assignedDates.length > 0 && <Separator className="my-3" />}
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {slot.assignedDates.map((dateEntry) => {
@@ -313,9 +347,10 @@ export function FieldServiceAssignmentsCard({
       <ManageFieldServiceListsDialog 
         isOpen={isManageListsDialogOpen}
         onOpenChange={setIsManageListsDialogOpen}
-        onListsUpdated={loadManagedLists} // Recarrega as listas no card pai quando elas são atualizadas
+        onListsUpdated={loadManagedLists}
       />
     </Card>
   );
 }
 
+    
