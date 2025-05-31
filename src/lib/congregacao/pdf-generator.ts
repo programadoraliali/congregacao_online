@@ -53,6 +53,8 @@ export function generateSchedulePdf(
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const pageMargin = 20;
+
 
   const tituloPrincipal = `Designações - ${NOMES_MESES[mes]} de ${ano}`;
   doc.setFontSize(18);
@@ -69,10 +71,11 @@ export function generateSchedulePdf(
       font: "helvetica",
     },
     headStyles: {
-      fillColor: [34, 63, 49], // --jw-ochre HSL to RGB approx
-      textColor: [245, 241, 232], // --jw-light-ochre (background) for text
+      fillColor: [34, 63, 49], 
+      textColor: [245, 241, 232], 
       fontStyle: 'bold',
       halign: 'center',
+      fontSize: 8,
     },
     bodyStyles: {
         valign: 'middle',
@@ -81,7 +84,7 @@ export function generateSchedulePdf(
     columnStyles: {
         0: { halign: 'left', cellWidth: 'auto'},
     },
-    margin: { top: 60, right: 20, bottom: 30, left: 20 },
+    margin: { top: 60, right: pageMargin, bottom: 30, left: pageMargin },
     pageBreak: 'auto',
   };
   
@@ -108,13 +111,17 @@ export function generateSchedulePdf(
   };
 
   const addTableToDoc = (title: string, head: any[][], body: any[][], addTopMargin = true) => {
-    const estimatedTableHeight = (body.length + 1) * 15 + 30; // Estimativa grosseira
+    const tableTitleHeight = 20; // Espaço para o título da seção
+    const estimatedCellHeight = 15; // Estimativa por linha
+    const headerHeight = 20; // Estimativa altura do cabeçalho da tabela
+    const estimatedTableHeight = headerHeight + (body.length * estimatedCellHeight) + tableTitleHeight;
+
     if (addTopMargin && startY + estimatedTableHeight > pageHeight - commonTableOptions.margin.bottom) {
         doc.addPage();
         startY = commonTableOptions.margin.top;
     }
     doc.setFontSize(12);
-    doc.setTextColor(52, 73, 94); // Um cinza escuro para os títulos das seções
+    doc.setTextColor(52, 73, 94); 
     doc.text(title, commonTableOptions.margin.left, startY - 8);
     autoTable(doc, {
       ...commonTableOptions,
@@ -122,7 +129,7 @@ export function generateSchedulePdf(
       body: body,
       startY: startY,
     });
-    startY = (doc as any).lastAutoTable.finalY + 15;
+    startY = (doc as any).lastAutoTable.finalY + 20; // Aumentar um pouco o espaço entre tabelas
   };
 
   const { head: headIndicadores, body: bodyIndicadores, hasData: temIndicadores } = prepararDadosParaPdfTabela('Indicadores');
@@ -137,7 +144,7 @@ export function generateSchedulePdf(
 
   const { head: headAV, body: bodyAV } = prepararDadosParaPdfTabela('AV');
   const allMeetingDatesForMonth = getMeetingDatesForMonth(mes, ano);
-  if (allMeetingDatesForMonth.length > 0) {
+  if (allMeetingDatesForMonth.length > 0) { // Mostrar tabela AV se houver dias de reunião, mesmo sem designações
     addTableToDoc("Áudio/Vídeo (AV)", headAV, bodyAV);
   }
 
@@ -145,7 +152,6 @@ export function generateSchedulePdf(
   const limpezaAposReuniaoData: string[][] = [];
   const limpezaSemanalData: string[][] = [];
 
-  // Usar todas as datas de reunião do mês para verificar "Limpeza Após Reunião"
   allMeetingDatesForMonth.forEach(dateObj => {
     const dateStr = formatarDataCompleta(dateObj);
     const dia = dateObj.getUTCDate();
@@ -158,17 +164,16 @@ export function generateSchedulePdf(
     }
   });
 
-  // Gerar semanas para "Limpeza Semanal"
   const weeksForCleaningPdf: { weekLabel: string, dateKey: string }[] = [];
   const processedWeeksPdf = new Set<string>();
 
-  allMeetingDatesForMonth.forEach(date => { // Usar todas as datas de reunião para derivar as semanas
+  allMeetingDatesForMonth.forEach(date => { 
     const sunday = new Date(date);
-    sunday.setUTCDate(date.getUTCDate() - date.getUTCDay()); // Encontra o domingo da semana
+    sunday.setUTCDate(date.getUTCDate() - date.getUTCDay()); 
     const year = sunday.getUTCFullYear();
     const monthAbr = NOMES_MESES[sunday.getUTCMonth()]?.substring(0, 3).toLowerCase() || '';
     const day = sunday.getUTCDate();
-    const dateKey = formatarDataCompleta(sunday); // Chave é o domingo da semana
+    const dateKey = formatarDataCompleta(sunday); 
     const weekIdForSet = `${year}-${getISOWeekPdf(sunday)}`;
 
     if (!processedWeeksPdf.has(weekIdForSet)) {
@@ -180,7 +185,6 @@ export function generateSchedulePdf(
   weeksForCleaningPdf.sort((a,b) => a.dateKey.localeCompare(b.dateKey));
 
   weeksForCleaningPdf.forEach(week => {
-    // Acessar o scheduleData usando a dateKey da semana (domingo)
     const responsavel = scheduleData[week.dateKey]?.limpezaSemanalResponsavel;
     if (responsavel && responsavel.trim() !== '') {
       limpezaSemanalData.push([week.weekLabel, responsavel]);
@@ -188,7 +192,10 @@ export function generateSchedulePdf(
   });
 
   if (limpezaAposReuniaoData.length > 0 || limpezaSemanalData.length > 0) {
-     if (startY + 60 > pageHeight - commonTableOptions.margin.bottom) { // Estimativa generosa para título e subtítulos
+     const cleaningSectionTitleHeight = 30; // Espaço para título "Limpeza"
+     const estimatedCleaningTableHeight = Math.max(limpezaAposReuniaoData.length, limpezaSemanalData.length) * 15 + 50; // Estimativa
+     
+     if (startY + estimatedCleaningTableHeight + cleaningSectionTitleHeight > pageHeight - commonTableOptions.margin.bottom) { 
         doc.addPage();
         startY = commonTableOptions.margin.top;
     }
@@ -196,53 +203,40 @@ export function generateSchedulePdf(
     doc.setTextColor(52, 73, 94);
     doc.text("Limpeza", commonTableOptions.margin.left, startY - 8);
   
+    const cleaningTableOptions = {
+      ...commonTableOptions,
+      styles: { ...commonTableOptions.styles, fontSize: 7, cellPadding: 1.5 },
+      headStyles: { ...commonTableOptions.headStyles, fontSize: 7.5 },
+      columnStyles: { // Alinhamento específico para tabelas de limpeza
+          0: { halign: 'left', cellWidth: 'auto'},
+          1: { halign: 'left', cellWidth: 'auto'},
+      },
+    };
+
     if (limpezaAposReuniaoData.length > 0) {
-        if (startY + 30 > pageHeight - commonTableOptions.margin.bottom) {
-            doc.addPage();
-            startY = commonTableOptions.margin.top;
-            doc.setFontSize(12); doc.setTextColor(52, 73, 94); doc.text("Limpeza (Continuação)", commonTableOptions.margin.left, startY - 8);
-        }
-        doc.setFontSize(10);
-        doc.setTextColor(0,0,0);
-        doc.text("Após a Reunião:", commonTableOptions.margin.left + 5, startY + 12);
         autoTable(doc, {
-            ...commonTableOptions,
-            head: [['Data', 'Grupo Responsável']],
+            ...cleaningTableOptions,
+            head: [['Data', 'Grupo Responsável (Após Reunião)']],
             body: limpezaAposReuniaoData,
-            startY: startY + 20,
-            theme: 'plain',
-            styles: { ...commonTableOptions.styles, fontSize: 7, cellPadding: 1 },
-            headStyles: { ...commonTableOptions.headStyles, fontSize: 7.5, fillColor: undefined, textColor: [0,0,0] },
-            tableWidth: 'wrap',
-            columnStyles: { 0: { halign: 'left'}, 1: {halign: 'left'}},
+            startY: startY,
         });
-        startY = (doc as any).lastAutoTable.finalY + 10;
+        startY = (doc as any).lastAutoTable.finalY + 15;
     }
 
     if (limpezaSemanalData.length > 0) {
-        if (startY + 40 > pageHeight - commonTableOptions.margin.bottom) {
-            doc.addPage();
-            startY = commonTableOptions.margin.top;
-            doc.setFontSize(12); doc.setTextColor(52, 73, 94); doc.text("Limpeza (Continuação)", commonTableOptions.margin.left, startY -8);
-        }
-        doc.setFontSize(10);
-        doc.setTextColor(0,0,0);
-        doc.text("Semanal:", commonTableOptions.margin.left + 5, startY + 12);
+       if (startY + (limpezaSemanalData.length * 15) + 50 > pageHeight - commonTableOptions.margin.bottom && limpezaAposReuniaoData.length > 0) {
+          doc.addPage();
+          startY = commonTableOptions.margin.top;
+       }
         autoTable(doc, {
-            ...commonTableOptions,
-            head: [['Semana', 'Responsáveis']],
+            ...cleaningTableOptions,
+            head: [['Semana', 'Responsáveis (Limpeza Semanal)']],
             body: limpezaSemanalData,
-            startY: startY + 20,
-            theme: 'plain',
-            styles: { ...commonTableOptions.styles, fontSize: 7, cellPadding: 1 },
-            headStyles: { ...commonTableOptions.headStyles, fontSize: 7.5, fillColor: undefined, textColor: [0,0,0] },
-            tableWidth: 'wrap',
-            columnStyles: { 0: { halign: 'left'}, 1: {halign: 'left'}},
+            startY: startY,
         });
+         startY = (doc as any).lastAutoTable.finalY + 15;
     }
   }
 
   doc.save(`designacoes_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
-
-    
