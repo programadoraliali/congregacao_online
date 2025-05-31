@@ -1,9 +1,9 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Membro, DesignacoesFeitas, Designacao as DesignacaoTypeFromScheduleDisplay } from './types'; // Renomeado para evitar conflito local
-import { NOMES_MESES, GRUPOS_LIMPEZA_APOS_REUNIAO, NONE_GROUP_ID, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, DIAS_SEMANA_REUNIAO_CORES } from './constants';
-import { formatarDataCompleta, getRealFunctionId } from './utils';
+import type { Membro, DesignacoesFeitas } from './types';
+import { NOMES_MESES, GRUPOS_LIMPEZA_APOS_REUNIAO, NONE_GROUP_ID, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV } from './constants';
+import { formatarDataCompleta } from './utils';
 import { prepararDadosTabela as prepararDadosTabelaOriginal } from '@/components/congregacao/ScheduleDisplay';
 
 
@@ -14,14 +14,30 @@ const getMemberName = (memberId: string | null | undefined, membros: Membro[]): 
   return member ? member.nome : 'Desconhecido';
 };
 
-// Helper function to get ISO week number
+// Helper function to get ISO week number (consistent with ScheduleDisplay)
 function getISOWeekPdf(date: Date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
+  const dayNum = d.getUTCDay() || 7; // sunday = 0, make it 7
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
   return Math.ceil((((d.valueOf() - yearStart.valueOf()) / 86400000) + 1)/7);
 }
+
+// Helper para obter todas as datas de reunião no mês (consistente com ScheduleDisplay)
+const getMeetingDatesForMonth = (currentMes: number, currentAno: number): Date[] => {
+  const dates: Date[] = [];
+  const firstDay = new Date(Date.UTC(currentAno, currentMes, 1));
+  const lastDayOfMonth = new Date(Date.UTC(currentAno, currentMes + 1, 0)).getUTCDate();
+  for (let day = 1; day <= lastDayOfMonth; day++) {
+      const currentDate = new Date(Date.UTC(currentAno, currentMes, day));
+      const dayOfWeek = currentDate.getUTCDay();
+      if (dayOfWeek === DIAS_REUNIAO.meioSemana || dayOfWeek === DIAS_REUNIAO.publica) {
+          dates.push(currentDate);
+      }
+  }
+  return dates.sort((a,b) => a.getTime() - b.getTime());
+};
+
 
 export function generateSchedulePdf(
   scheduleData: DesignacoesFeitas,
@@ -38,24 +54,23 @@ export function generateSchedulePdf(
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Título Principal
   const tituloPrincipal = `Designações - ${NOMES_MESES[mes]} de ${ano}`;
-  doc.setFontSize(18); // Aumentado para melhor destaque
+  doc.setFontSize(18);
   doc.text(tituloPrincipal, pageWidth / 2, 45, { align: 'center' });
 
   let startY = 70;
 
-  const commonTableOptions: any = { // Usar 'any' para jspdf-autotable se as tipagens forem complexas
+  const commonTableOptions: any = {
     theme: 'grid',
     styles: {
-      fontSize: 7.5, // Reduzido para tentar caber mais
-      cellPadding: 1.5, // Reduzido
+      fontSize: 7.5,
+      cellPadding: 1.5,
       overflow: 'linebreak',
-      font: "helvetica", // Usar uma fonte padrão
+      font: "helvetica",
     },
     headStyles: {
-      fillColor: [41, 128, 185], // Azul mais escuro
-      textColor: [255, 255, 255],
+      fillColor: [34, 63, 49], // --jw-ochre HSL to RGB approx
+      textColor: [245, 241, 232], // --jw-light-ochre (background) for text
       fontStyle: 'bold',
       halign: 'center',
     },
@@ -64,13 +79,10 @@ export function generateSchedulePdf(
         halign: 'center',
     },
     columnStyles: {
-        0: { halign: 'left', cellWidth: 'auto'}, // Coluna da Data
+        0: { halign: 'left', cellWidth: 'auto'},
     },
-    margin: { top: 60, right: 20, bottom: 30, left: 20 }, // Margens reduzidas
-    pageBreak: 'auto', // Deixa o autoTable gerenciar quebras de página
-    // didDrawPage: (data: any) => {
-    //   // Adicionar header/footer se necessário
-    // }
+    margin: { top: 60, right: 20, bottom: 30, left: 20 },
+    pageBreak: 'auto',
   };
   
   const prepararDadosParaPdfTabela = (
@@ -83,7 +95,7 @@ export function generateSchedulePdf(
         return columns.map(col => {
             if (col.key === 'data') {
                  const [dia, diaAbrev] = (row.data as string).split(' ');
-                 return `${dia}\n${diaAbrev}`; // Quebra de linha para economizar espaço horizontal
+                 return `${dia}\n${diaAbrev}`;
             }
             const memberId = row[col.key] as string | null;
             return getMemberName(memberId, membros);
@@ -95,13 +107,14 @@ export function generateSchedulePdf(
     return { head, body, title: tipoTabela, hasData };
   };
 
-  const addTableToDoc = (title: string, head: any[][], body: any[][]) => {
-    if (startY + 40 > pageHeight - commonTableOptions.margin.bottom) { // Estimativa de altura da tabela + título
+  const addTableToDoc = (title: string, head: any[][], body: any[][], addTopMargin = true) => {
+    const estimatedTableHeight = (body.length + 1) * 15 + 30; // Estimativa grosseira
+    if (addTopMargin && startY + estimatedTableHeight > pageHeight - commonTableOptions.margin.bottom) {
         doc.addPage();
         startY = commonTableOptions.margin.top;
     }
     doc.setFontSize(12);
-    doc.setTextColor(0,0,0);
+    doc.setTextColor(52, 73, 94); // Um cinza escuro para os títulos das seções
     doc.text(title, commonTableOptions.margin.left, startY - 8);
     autoTable(doc, {
       ...commonTableOptions,
@@ -109,76 +122,53 @@ export function generateSchedulePdf(
       body: body,
       startY: startY,
     });
-    startY = (doc as any).lastAutoTable.finalY + 15; // Espaço entre tabelas
+    startY = (doc as any).lastAutoTable.finalY + 15;
   };
 
-  // 1. Tabela de Indicadores
   const { head: headIndicadores, body: bodyIndicadores, hasData: temIndicadores } = prepararDadosParaPdfTabela('Indicadores');
   if (temIndicadores) {
     addTableToDoc("Indicadores", headIndicadores, bodyIndicadores);
   }
 
-  // 2. Tabela de Volantes
   const { head: headVolantes, body: bodyVolantes, hasData: temVolantes } = prepararDadosParaPdfTabela('Volantes');
    if (temVolantes) {
     addTableToDoc("Volantes", headVolantes, bodyVolantes);
   }
 
-  // 3. Tabela de Áudio/Vídeo (AV)
-  const { head: headAV, body: bodyAV, hasData: temAV } = prepararDadosParaPdfTabela('AV');
-  const datasDeReuniaoNoMesPdf: Date[] = [];
-  const primeiroDiaDoMesPdf = new Date(Date.UTC(ano, mes, 1));
-  const ultimoDiaDoMesPdf = new Date(Date.UTC(ano, mes + 1, 0));
-   for (let dia = new Date(primeiroDiaDoMesPdf); dia <= ultimoDiaDoMesPdf; dia.setUTCDate(dia.getUTCDate() + 1)) {
-    const diaDaSemana = dia.getUTCDay();
-    if (diaDaSemana === DIAS_REUNIAO.meioSemana || diaDaSemana === DIAS_REUNIAO.publica) {
-      datasDeReuniaoNoMesPdf.push(new Date(dia));
-    }
-  }
-  if (datasDeReuniaoNoMesPdf.length > 0) { // Sempre mostrar AV se houver dias de reunião
+  const { head: headAV, body: bodyAV } = prepararDadosParaPdfTabela('AV');
+  const allMeetingDatesForMonth = getMeetingDatesForMonth(mes, ano);
+  if (allMeetingDatesForMonth.length > 0) {
     addTableToDoc("Áudio/Vídeo (AV)", headAV, bodyAV);
   }
 
-
-  // 4. Seção de Limpeza
+  // Seção de Limpeza
   const limpezaAposReuniaoData: string[][] = [];
   const limpezaSemanalData: string[][] = [];
 
-  const meetingDatesForCleaningPdf: Date[] = [];
-    Object.keys(scheduleData).forEach(dataStr => {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) return;
-        const dataObj = new Date(dataStr + 'T00:00:00');
-        if (isNaN(dataObj.getTime())) return;
-        if (dataObj.getFullYear() === ano && dataObj.getMonth() === mes) {
-            const diaSemana = dataObj.getUTCDay();
-            if (diaSemana === DIAS_REUNIAO.meioSemana || diaSemana === DIAS_REUNIAO.publica) {
-                meetingDatesForCleaningPdf.push(dataObj);
-            }
-        }
-    });
-  meetingDatesForCleaningPdf.sort((a, b) => a.getTime() - b.getTime());
-
-  meetingDatesForCleaningPdf.forEach(dateObj => {
+  // Usar todas as datas de reunião do mês para verificar "Limpeza Após Reunião"
+  allMeetingDatesForMonth.forEach(dateObj => {
     const dateStr = formatarDataCompleta(dateObj);
     const dia = dateObj.getUTCDate();
     const diaAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
     const designacaoDia = scheduleData[dateStr];
+    
     if (designacaoDia?.limpezaAposReuniaoGrupoId && designacaoDia.limpezaAposReuniaoGrupoId !== NONE_GROUP_ID) {
       const grupo = GRUPOS_LIMPEZA_APOS_REUNIAO.find(g => g.id === designacaoDia.limpezaAposReuniaoGrupoId);
       limpezaAposReuniaoData.push([`${dia} ${diaAbrev}`, grupo ? grupo.nome : 'N/D']);
     }
   });
 
+  // Gerar semanas para "Limpeza Semanal"
   const weeksForCleaningPdf: { weekLabel: string, dateKey: string }[] = [];
   const processedWeeksPdf = new Set<string>();
 
-  meetingDatesForCleaningPdf.forEach(date => {
+  allMeetingDatesForMonth.forEach(date => { // Usar todas as datas de reunião para derivar as semanas
     const sunday = new Date(date);
-    sunday.setUTCDate(date.getUTCDate() - date.getUTCDay());
+    sunday.setUTCDate(date.getUTCDate() - date.getUTCDay()); // Encontra o domingo da semana
     const year = sunday.getUTCFullYear();
     const monthAbr = NOMES_MESES[sunday.getUTCMonth()]?.substring(0, 3).toLowerCase() || '';
     const day = sunday.getUTCDate();
-    const dateKey = formatarDataCompleta(sunday); // Usar a data do domingo como chave da semana
+    const dateKey = formatarDataCompleta(sunday); // Chave é o domingo da semana
     const weekIdForSet = `${year}-${getISOWeekPdf(sunday)}`;
 
     if (!processedWeeksPdf.has(weekIdForSet)) {
@@ -189,33 +179,32 @@ export function generateSchedulePdf(
   });
   weeksForCleaningPdf.sort((a,b) => a.dateKey.localeCompare(b.dateKey));
 
-
   weeksForCleaningPdf.forEach(week => {
+    // Acessar o scheduleData usando a dateKey da semana (domingo)
     const responsavel = scheduleData[week.dateKey]?.limpezaSemanalResponsavel;
-    if (responsavel) {
+    if (responsavel && responsavel.trim() !== '') {
       limpezaSemanalData.push([week.weekLabel, responsavel]);
     }
   });
 
   if (limpezaAposReuniaoData.length > 0 || limpezaSemanalData.length > 0) {
-     if (startY + 60 > pageHeight - commonTableOptions.margin.bottom) {
+     if (startY + 60 > pageHeight - commonTableOptions.margin.bottom) { // Estimativa generosa para título e subtítulos
         doc.addPage();
         startY = commonTableOptions.margin.top;
     }
     doc.setFontSize(12);
-    doc.setTextColor(0,0,0);
+    doc.setTextColor(52, 73, 94);
     doc.text("Limpeza", commonTableOptions.margin.left, startY - 8);
-    // startY += 5; // Espaço após o título da seção
   
     if (limpezaAposReuniaoData.length > 0) {
         if (startY + 30 > pageHeight - commonTableOptions.margin.bottom) {
             doc.addPage();
             startY = commonTableOptions.margin.top;
-            doc.setFontSize(12); doc.setTextColor(0,0,0); doc.text("Limpeza (Continuação)", commonTableOptions.margin.left, startY - 8);
+            doc.setFontSize(12); doc.setTextColor(52, 73, 94); doc.text("Limpeza (Continuação)", commonTableOptions.margin.left, startY - 8);
         }
         doc.setFontSize(10);
         doc.setTextColor(0,0,0);
-        doc.text("Após a Reunião:", commonTableOptions.margin.left + 5, startY + 12); // Pequeno indent
+        doc.text("Após a Reunião:", commonTableOptions.margin.left + 5, startY + 12);
         autoTable(doc, {
             ...commonTableOptions,
             head: [['Data', 'Grupo Responsável']],
@@ -234,11 +223,11 @@ export function generateSchedulePdf(
         if (startY + 40 > pageHeight - commonTableOptions.margin.bottom) {
             doc.addPage();
             startY = commonTableOptions.margin.top;
-            doc.setFontSize(12); doc.setTextColor(0,0,0); doc.text("Limpeza (Continuação)", commonTableOptions.margin.left, startY -8);
+            doc.setFontSize(12); doc.setTextColor(52, 73, 94); doc.text("Limpeza (Continuação)", commonTableOptions.margin.left, startY -8);
         }
         doc.setFontSize(10);
         doc.setTextColor(0,0,0);
-        doc.text("Semanal:", commonTableOptions.margin.left + 5, startY + 12); // Pequeno indent
+        doc.text("Semanal:", commonTableOptions.margin.left + 5, startY + 12);
         autoTable(doc, {
             ...commonTableOptions,
             head: [['Semana', 'Responsáveis']],
@@ -250,9 +239,10 @@ export function generateSchedulePdf(
             tableWidth: 'wrap',
             columnStyles: { 0: { halign: 'left'}, 1: {halign: 'left'}},
         });
-        // startY = (doc as any).lastAutoTable.finalY + 15; // Não precisa se for o último
     }
   }
 
   doc.save(`designacoes_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
+
+    
