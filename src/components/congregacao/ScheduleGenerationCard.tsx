@@ -24,6 +24,7 @@ interface ScheduleGenerationCardProps {
   currentMes: number | null;
   currentAno: number | null;
   onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
+  onDirectAssignAV: (date: string, functionId: string, newMemberId: string | null, originalMemberId: string | null) => void;
   onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
 }
 
@@ -42,6 +43,7 @@ export function ScheduleGenerationCard({
   currentMes,        // Agora é scheduleMes do hook
   currentAno,         // Agora é scheduleAno do hook
   onOpenSubstitutionModal,
+  onDirectAssignAV,
   onLimpezaChange // Nova prop
 }: ScheduleGenerationCardProps) {
   const [selectedMes, setSelectedMes] = useState<string>(currentMes !== null ? currentMes.toString() : new Date().getMonth().toString());
@@ -81,17 +83,23 @@ export function ScheduleGenerationCard({
       toast({ title: "Erro", description: "Adicione membros primeiro.", variant: "destructive" });
       return;
     }
-
-    // Chama a função passada por prop, que agora é do hook useScheduleManagement
-    const result = await onScheduleGenerated(mes, ano); 
     
-    if (result.error) {
-        setError(result.error);
-        // O toast de erro já é tratado dentro do page.tsx ao chamar a função do hook
+    try {
+        // Chama a função passada por prop, que agora é do hook useScheduleManagement
+        const result = await onScheduleGenerated(mes, ano); 
+        
+        if (result.error) {
+            setError(result.error);
+            // O toast de erro já é tratado dentro do page.tsx ao chamar a função do hook
+        }
+        // O toast de sucesso também é tratado em page.tsx
+    } catch (e: any) {
+        console.error("Falha crítica ao gerar cronograma:", e);
+        setError("Ocorreu uma falha inesperada ao gerar o cronograma. Verifique o console para mais detalhes.");
+        toast({ title: "Erro Inesperado", description: "Falha ao gerar cronograma.", variant: "destructive"});
+    } finally {
+        setIsLoading(false);
     }
-    // O toast de sucesso também é tratado em page.tsx
-    
-    setIsLoading(false);
   };
 
   const handleExportPDF = () => {
@@ -135,36 +143,16 @@ export function ScheduleGenerationCard({
   };
 
   const handleConfirmAVSelection = (newMemberId: string | null) => {
-    if (!avSelectionContext || !currentSchedule || currentMes === null || currentAno === null) return;
+    if (!avSelectionContext || currentMes === null || currentAno === null) return;
 
     const { dateStr, functionId } = avSelectionContext;
-    // A lógica de atualização agora está no hook `useScheduleManagement`, 
-    // chamada através de `confirmManualAssignmentOrSubstitution` em `page.tsx`
-    // Este card precisa de uma forma de comunicar essa alteração para `page.tsx`
-    // que então chamará o hook. A maneira mais direta é usar o onOpenSubstitutionModal
-    // mas adaptando-o ou criando uma nova prop para designações diretas de AV.
-    // Por simplicidade, vamos reusar a lógica de substituição, tratando como uma "nova designação" se não havia ninguém.
+    const originalMemberId = avSelectionContext.currentMemberId || null; 
     
-    const originalMemberId = avSelectionContext.currentMemberId || ''; // Se null, é uma nova designação
-    const originalMemberName = originalMemberId ? membros.find(m=>m.id === originalMemberId)?.nome || 'Desconhecido' : 'Ninguém Designado';
-
-    onOpenSubstitutionModal({
-        date: dateStr,
-        functionId: functionId,
-        originalMemberId: originalMemberId,
-        originalMemberName: originalMemberName,
-        currentFunctionGroupId: 'AV' // Identificador para o tipo de função
-    });
-    // Ao confirmar no SubstitutionDialog, ele chamará handleConfirmSubstitution em page.tsx
-    // que por sua vez chamará confirmManualAssignmentOrSubstitution do hook useScheduleManagement
-
-    // A linha abaixo que atualizava o schedule localmente é removida, pois o estado vem do hook.
-    // onScheduleGenerated(updatedSchedule, mes, ano); 
+    onDirectAssignAV(dateStr, functionId, newMemberId, originalMemberId);
 
     setIsAVMemberSelectionOpen(false);
     setAVSelectionContext(null);
-    // O toast será mostrado por page.tsx após a confirmação do hook.
-    // toast({ title: "Designação AV Atualizada", description: "A designação de Áudio/Vídeo foi atualizada." });
+    // Toast de sucesso será mostrado por page.tsx
   };
 
 

@@ -53,15 +53,7 @@ export default function Home() {
     persistMembros: hookPersistMembros,
   } = useMemberManagement();
 
-  const {
-    scheduleData,
-    scheduleMes,
-    scheduleAno,
-    generateNewSchedule,
-    confirmManualAssignmentOrSubstitution,
-    updateLimpezaAssignment,
-    clearMainScheduleAndCache,
-  } = useScheduleManagement({ membros, updateMemberHistory });
+  const scheduleManagement = useScheduleManagement({ membros, updateMemberHistory });
 
   const {
     publicAssignmentsData,
@@ -91,8 +83,8 @@ export default function Home() {
 
 
   const handleLimparCachePrincipal = useCallback(() => {
-    clearMainScheduleAndCache();
-  }, [clearMainScheduleAndCache]);
+    scheduleManagement.clearMainScheduleAndCache();
+  }, [scheduleManagement]);
 
 
   const limparCacheDesignacoesPublicMeetingCallback = useCallback(() => {
@@ -120,7 +112,7 @@ export default function Home() {
   };
 
   const handleScheduleGeneratedCallback = async (mes: number, ano: number) => {
-    const { success, error, generatedSchedule } = await generateNewSchedule(mes, ano);
+    const { success, error, generatedSchedule } = await scheduleManagement.generateNewSchedule(mes, ano);
     if (success && generatedSchedule) {
       toast({ title: "Designações Geradas", description: `Cronograma para ${NOMES_MESES[mes]} de ${ano} gerado com sucesso.` });
     } else if (error) {
@@ -202,7 +194,7 @@ export default function Home() {
   };
 
   const handleConfirmSubstitution = (newMemberId: string) => {
-    if (!substitutionDetails || scheduleData === null || scheduleMes === null || scheduleAno === null) {
+    if (!substitutionDetails || scheduleManagement.scheduleData === null || scheduleManagement.scheduleMes === null || scheduleManagement.scheduleAno === null) {
       toast({ title: "Erro", description: "Não foi possível processar a substituição. Dados do cronograma ausentes.", variant: "destructive" });
       return;
     }
@@ -210,14 +202,14 @@ export default function Home() {
     const { date, functionId, originalMemberId } = substitutionDetails;
     const isNewDesignation = !originalMemberId || originalMemberId === '';
 
-    confirmManualAssignmentOrSubstitution(
+    scheduleManagement.confirmManualAssignmentOrSubstitution(
       date,
       functionId,
       newMemberId,
       originalMemberId,
-      scheduleData,
-      scheduleMes,
-      scheduleAno
+      scheduleManagement.scheduleData,
+      scheduleManagement.scheduleMes,
+      scheduleManagement.scheduleAno
     );
   
     toast({ 
@@ -226,6 +218,33 @@ export default function Home() {
     });
     setIsSubstitutionModalOpen(false);
     setSubstitutionDetails(null);
+  };
+
+  const handleDirectAssignAV = (
+    date: string,
+    functionId: string,
+    newMemberId: string | null,
+    originalMemberId: string | null
+  ) => {
+    if (scheduleManagement.scheduleData === null || scheduleManagement.scheduleMes === null || scheduleManagement.scheduleAno === null) {
+      toast({ title: "Erro", description: "Não foi possível processar a designação AV. Dados do cronograma ausentes.", variant: "destructive" });
+      return;
+    }
+  
+    scheduleManagement.confirmManualAssignmentOrSubstitution(
+      date,
+      functionId,
+      newMemberId,
+      originalMemberId,
+      scheduleManagement.scheduleData,
+      scheduleManagement.scheduleMes,
+      scheduleManagement.scheduleAno
+    );
+  
+    toast({ 
+      title: "Designação AV Atualizada", 
+      description: "A designação de Áudio/Vídeo foi atualizada com sucesso." 
+    });
   };
 
   return (
@@ -274,11 +293,12 @@ export default function Home() {
                   <ScheduleGenerationCard
                     membros={membros}
                     onScheduleGenerated={handleScheduleGeneratedCallback}
-                    currentSchedule={scheduleData}
-                    currentMes={scheduleMes}
-                    currentAno={scheduleAno}
+                    currentSchedule={scheduleManagement.scheduleData}
+                    currentMes={scheduleManagement.scheduleMes}
+                    currentAno={scheduleManagement.scheduleAno}
                     onOpenSubstitutionModal={handleOpenSubstitutionModal}
-                    onLimpezaChange={updateLimpezaAssignment}
+                    onDirectAssignAV={handleDirectAssignAV}
+                    onLimpezaChange={scheduleManagement.updateLimpezaAssignment}
                   />
                 </TabsContent>
                 <TabsContent value="reuniao-publica" className="pt-0">
@@ -286,9 +306,9 @@ export default function Home() {
                     key={`public-meeting-card-${publicMeetingCardKey}`}
                     allMembers={membros}
                     allPublicAssignments={publicAssignmentsData} 
-                    currentScheduleForMonth={scheduleData} 
-                    initialMonth={scheduleMes ?? new Date().getMonth()}
-                    initialYear={scheduleAno ?? new Date().getFullYear()}
+                    currentScheduleForMonth={scheduleManagement.scheduleData} 
+                    initialMonth={scheduleManagement.scheduleMes ?? new Date().getMonth()}
+                    initialYear={scheduleManagement.scheduleAno ?? new Date().getFullYear()}
                     onSaveAssignments={savePublicAssignments} 
                     onOpenSubstitutionModal={handleOpenSubstitutionModal}
                   />
@@ -297,16 +317,16 @@ export default function Home() {
                   <NvmcAssignmentsCard
                     allMembers={membros}
                     allNvmcAssignments={allNvmcAssignmentsData}
-                    initialMonth={scheduleMes ?? new Date().getMonth()}
-                    initialYear={scheduleAno ?? new Date().getFullYear()}
+                    initialMonth={scheduleManagement.scheduleMes ?? new Date().getMonth()}
+                    initialYear={scheduleManagement.scheduleAno ?? new Date().getFullYear()}
                     onSaveNvmcAssignments={handleSaveNvmcAssignments}
                   />
                 </TabsContent>
                 <TabsContent value="servico-de-campo" className="pt-0">
                   <FieldServiceAssignmentsCard
                     allFieldServiceAssignments={allFieldServiceAssignmentsData}
-                    initialMonth={scheduleMes ?? new Date().getMonth()}
-                    initialYear={scheduleAno ?? new Date().getFullYear()}
+                    initialMonth={scheduleManagement.scheduleMes ?? new Date().getMonth()}
+                    initialYear={scheduleManagement.scheduleAno ?? new Date().getFullYear()}
                     onSaveFieldServiceAssignments={handleSaveFieldServiceAssignments}
                   />
                 </TabsContent>
@@ -387,13 +407,13 @@ export default function Home() {
         clearType={clearType}
         targetMemberName={memberIdForAdvancedOptions ? membros.find(m=>m.id === memberIdForAdvancedOptions)?.nome : null}
       />
-       {isSubstitutionModalOpen && substitutionDetails && scheduleData && (
+       {isSubstitutionModalOpen && substitutionDetails && scheduleManagement.scheduleData && (
         <SubstitutionDialog
           isOpen={isSubstitutionModalOpen}
           onOpenChange={setIsSubstitutionModalOpen}
           substitutionDetails={substitutionDetails}
           allMembers={membros}
-          currentAssignmentsForMonth={scheduleData}
+          currentAssignmentsForMonth={scheduleManagement.scheduleData}
           onConfirmSubstitution={handleConfirmSubstitution}
         />
       )}
