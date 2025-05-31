@@ -106,7 +106,10 @@ export const NVMC_FIXED_PARTS_CONFIG: Record<FixedPartKeys | string, { label: st
   oracaoFinalId: { label: "Oração Final", section: NVMC_PART_SECTIONS.COMENTARIOS_FINAIS, requiredPermissionId: 'presidente' },
 };
 
+export const NONE_GROUP_ID = "__NONE_CLEANING_GROUP__";
+
 export const GRUPOS_LIMPEZA_APOS_REUNIAO = [
+  { id: NONE_GROUP_ID, nome: 'Nenhum' },
   { id: 'grupo1', nome: 'Grupo 1 - Luiz Aguinaldo' },
   { id: 'grupo2', nome: 'Grupo 2 - Marcos Camillo' },
   { id: 'grupo3', nome: 'Grupo 3 - Ângelo Berben' },

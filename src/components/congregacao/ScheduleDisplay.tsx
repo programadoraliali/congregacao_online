@@ -3,7 +3,7 @@
 
 import React from 'react';
 import type { Membro, DesignacoesFeitas, Designacao, SubstitutionDetails } from '@/lib/congregacao/types';
-import { FUNCOES_DESIGNADAS, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO, DIAS_SEMANA_REUNIAO_CORES, GRUPOS_LIMPEZA_APOS_REUNIAO } from '@/lib/congregacao/constants';
+import { FUNCOES_DESIGNADAS, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV, DIAS_REUNIAO, DIAS_SEMANA_REUNIAO_CORES, GRUPOS_LIMPEZA_APOS_REUNIAO, NONE_GROUP_ID } from '@/lib/congregacao/constants';
 import { ScheduleTable } from './ScheduleTable';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -275,17 +275,21 @@ export function ScheduleDisplay({
 
   const hasIndicadoresData = dadosIndicadores.data.length > 0 && dadosIndicadores.data.some(row => Object.keys(row).some(key => key !== 'data' && key !== 'diaSemanaBadgeColor' && row[key]));
   const hasVolantesData = dadosVolantes.data.length > 0 && dadosVolantes.data.some(row => Object.keys(row).some(key => key !== 'data' && key !== 'diaSemanaBadgeColor' && row[key]));
-  const hasAVDataStructure = dadosAV.data.length > 0;
+  
+  const hasAnyMeetingDates = dadosIndicadores.fullDateStrings.length > 0 || dadosVolantes.fullDateStrings.length > 0 || dadosAV.fullDateStrings.length > 0;
+  const hasAVDataStructure = hasAnyMeetingDates; // Show AV table if there are meeting dates, even if no assignments yet
 
   const hasAnyDataForMonth = Object.values(designacoesFeitas).some(dayAssignments => 
-    Object.keys(dayAssignments).length > 0 && Object.values(dayAssignments).some(val => val !== null && val !== '')
+    Object.keys(dayAssignments).length > 0 && Object.values(dayAssignments).some(val => val !== null && val !== '' && val !== NONE_GROUP_ID)
   );
+  
+  const hasLimpezaData = Object.values(designacoesFeitas).some(d => d.limpezaAposReuniaoGrupoId || d.limpezaSemanalResponsavel);
 
-  if (!hasAnyDataForMonth && !hasAVDataStructure && !Object.values(designacoesFeitas).some(d => d.limpezaAposReuniaoGrupoId || d.limpezaSemanalResponsavel)) {
+  if (!hasAnyDataForMonth && !hasAVDataStructure && !hasLimpezaData) {
      return <p className="text-muted-foreground text-center py-4">Nenhuma designação para {NOMES_MESES[mes]} de {ano}. Gere o cronograma ou adicione manualmente.</p>;
   }
 
-  const getMeetingDatesForMonth = (currentMes: number, currentAno: number): Date[] => {
+  const getMeetingDatesForCleaning = (currentMes: number, currentAno: number): Date[] => {
     const dates: Date[] = [];
     const firstDay = new Date(Date.UTC(currentAno, currentMes, 1));
     const lastDayOfMonth = new Date(Date.UTC(currentAno, currentMes + 1, 0)).getUTCDate();
@@ -299,7 +303,7 @@ export function ScheduleDisplay({
     return dates.sort((a,b) => a.getTime() - b.getTime());
   };
 
-  const meetingDatesForCleaning = getMeetingDatesForMonth(mes, ano);
+  const meetingDatesForCleaning = getMeetingDatesForCleaning(mes, ano);
 
   const weeksForCleaning = React.useMemo(() => {
     if (!meetingDatesForCleaning || meetingDatesForCleaning.length === 0) return [];
@@ -388,14 +392,13 @@ export function ScheduleDisplay({
                          <Badge variant="outline" className={badgeColorClass}>{diaAbrev}</Badge>
                       </div>
                       <Select
-                        value={currentGroupId || ''}
-                        onValueChange={(value) => onLimpezaChange(dateStr, 'aposReuniao', value)}
+                        value={currentGroupId ?? NONE_GROUP_ID}
+                        onValueChange={(value) => onLimpezaChange(dateStr, 'aposReuniao', value === NONE_GROUP_ID ? null : value)}
                       >
                         <SelectTrigger className="flex-1 h-9 text-sm">
                           <SelectValue placeholder="Selecione o grupo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem>
                           {GRUPOS_LIMPEZA_APOS_REUNIAO.map(grupo => (
                             <SelectItem key={grupo.id} value={grupo.id}>{grupo.nome}</SelectItem>
                           ))}
