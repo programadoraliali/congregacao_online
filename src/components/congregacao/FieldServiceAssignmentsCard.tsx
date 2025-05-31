@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { AllFieldServiceAssignments, FieldServiceMeetingSlot, FieldServiceMonthlyData } from '@/lib/congregacao/types';
+import type { AllFieldServiceAssignments, FieldServiceMeetingSlot, FieldServiceMonthlyData, ManagedListItem } from '@/lib/congregacao/types';
 import { NOMES_MESES, NOMES_DIAS_SEMANA_COMPLETOS, FIELD_SERVICE_TIME_OPTIONS } from '@/lib/congregacao/constants';
 import { formatarDataParaChave, formatarDataCompleta } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { ClipboardList, PlusCircle, Trash2 } from 'lucide-react';
+import { ClipboardList, PlusCircle, Trash2, Settings2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { ManageFieldServiceListsDialog } from './ManageFieldServiceListsDialog'; // Importar o novo diálogo
+import { carregarModalidades, carregarLocaisBase } from '@/lib/congregacao/storage';
+
 
 interface FieldServiceAssignmentsCardProps {
   allFieldServiceAssignments: AllFieldServiceAssignments | null;
@@ -38,8 +41,22 @@ export function FieldServiceAssignmentsCard({
   const [currentMonthData, setCurrentMonthData] = useState<FieldServiceMonthlyData>({});
   const { toast } = useToast();
 
+  const [isManageListsDialogOpen, setIsManageListsDialogOpen] = useState(false);
+  const [modalidadesList, setModalidadesList] = useState<ManagedListItem[]>([]);
+  const [locaisBaseList, setLocaisBaseList] = useState<ManagedListItem[]>([]);
+
   const currentYearValue = new Date().getFullYear();
   const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYearValue - 2 + i);
+
+  const loadManagedLists = useCallback(() => {
+    setModalidadesList(carregarModalidades());
+    setLocaisBaseList(carregarLocaisBase());
+  }, []);
+
+  useEffect(() => {
+    loadManagedLists();
+  }, [loadManagedLists]);
+
 
   const generateMeetingDatesForSlot = useCallback((dayOfWeek: number, year: number, month: number) => {
     const dates = [];
@@ -72,7 +89,7 @@ export function FieldServiceAssignmentsCard({
             slots: existingDaySlots.map(slot => ({
                 ...slot,
                 id: slot.id || generateSlotId(),
-                time: slot.time || FIELD_SERVICE_TIME_OPTIONS[0].value, // Default to first time option
+                time: slot.time || FIELD_SERVICE_TIME_OPTIONS[0].value, 
                 modalityId: slot.modalityId || null,
                 baseLocationId: slot.baseLocationId || null,
                 additionalDetails: slot.additionalDetails || '',
@@ -201,8 +218,15 @@ export function FieldServiceAssignmentsCard({
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleSaveChanges} className="w-full sm:w-auto">
-            Salvar Alterações do Serviço de Campo
+          <Button onClick={handleSaveChanges} className="w-full sm:w-auto whitespace-nowrap">
+            Salvar Designações de Campo
+          </Button>
+           <Button 
+            variant="outline" 
+            onClick={() => setIsManageListsDialogOpen(true)} 
+            className="w-full sm:w-auto whitespace-nowrap"
+          >
+            <Settings2 className="mr-2 h-4 w-4" /> Gerenciar Listas
           </Button>
         </div>
 
@@ -249,7 +273,7 @@ export function FieldServiceAssignmentsCard({
                       <Label htmlFor={`slot-location-${slot.id}`}>Local / Detalhes (será atualizado)</Label>
                       <Input
                         id={`slot-location-${slot.id}`}
-                        value={slot.additionalDetails || ''} // Temporariamente usando additionalDetails aqui
+                        value={slot.additionalDetails || ''} 
                         onChange={(e) => handleSlotInputChange(dayOfWeekIndex, slot.id, 'additionalDetails', e.target.value)}
                         placeholder="Ex: TPL - Metrô Paraíso (Grupos 1,2)"
                         className="h-9"
@@ -286,6 +310,12 @@ export function FieldServiceAssignmentsCard({
           </div>
         ))}
       </CardContent>
+      <ManageFieldServiceListsDialog 
+        isOpen={isManageListsDialogOpen}
+        onOpenChange={setIsManageListsDialogOpen}
+        onListsUpdated={loadManagedLists} // Recarrega as listas no card pai quando elas são atualizadas
+      />
     </Card>
   );
 }
+
