@@ -348,6 +348,7 @@ export default function Home() {
   
     const { date, functionId, originalMemberId } = substitutionDetails;
     const { mes, ano } = cachedScheduleInfo;
+    const isNewDesignation = !originalMemberId || originalMemberId === '';
   
     // Crie uma cópia profunda do cache para modificação
     const novasDesignacoes = JSON.parse(JSON.stringify(designacoesMensaisCache)) as DesignacoesFeitas;
@@ -365,8 +366,8 @@ export default function Home() {
     const membrosAtualizados = membros.map(m => {
       const membroModificado = { ...m, historicoDesignacoes: { ...m.historicoDesignacoes } };
       
-      // Remove a designação antiga do histórico do membro original, SE ele existia
-      if (originalMemberId && m.id === originalMemberId) {
+      // Remove a designação antiga do histórico do membro original, SE ele existia e não é uma nova designação
+      if (originalMemberId && originalMemberId !== '' && m.id === originalMemberId) {
         if (membroModificado.historicoDesignacoes[date] === functionId) {
              delete membroModificado.historicoDesignacoes[date];
         }
@@ -389,7 +390,10 @@ export default function Home() {
        handleScheduleGenerated(novasDesignacoes, mes, ano); // Isso também salva o cache e atualiza membros novamente, mas é bom para consistência de estado.
     }
   
-    toast({ title: "Substituição Realizada", description: "A designação foi atualizada com sucesso." });
+    toast({ 
+      title: isNewDesignation ? "Designação Realizada" : "Substituição Realizada", 
+      description: isNewDesignation ? "A designação foi atribuída com sucesso." : "A designação foi atualizada com sucesso." 
+    });
     setIsSubstitutionModalOpen(false);
     setSubstitutionDetails(null);
   };
@@ -450,7 +454,7 @@ export default function Home() {
                   <PublicMeetingAssignmentsCard
                     allMembers={membros}
                     allPublicAssignments={allPublicMeetingAssignmentsData}
-                    currentScheduleForMonth={designacoesMensaisCache}
+                    currentScheduleForMonth={designacoesMensaisCache} 
                     initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
                     initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
                     onSaveAssignments={handleSavePublicMeetingAssignments}
