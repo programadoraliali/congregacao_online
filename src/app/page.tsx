@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useMemberManagement } from '@/hooks/congregacao/useMemberManagement';
-import { useScheduleManagement } from '@/hooks/congregacao/useScheduleManagement'; // Novo Hook
+import { useScheduleManagement } from '@/hooks/congregacao/useScheduleManagement';
+import { usePublicMeetingAssignments } from '@/hooks/congregacao/usePublicMeetingAssignments'; // Novo Hook
 import { MemberManagementCard } from '@/components/congregacao/MemberManagementCard';
 import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerationCard';
 import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard';
@@ -14,13 +15,9 @@ import { BulkAddDialog } from '@/components/congregacao/BulkAddDialog';
 import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog';
 import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog';
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
-import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAssignments, PublicMeetingAssignment, AllNVMCAssignments, NVMCDailyAssignments, AllFieldServiceAssignments, FieldServiceMonthlyData } from '@/lib/congregacao/types';
-import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants'; // NOMES_MESES ADICIONADO AQUI
-import { formatarDataParaChave } from '@/lib/congregacao/utils';
+import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllNVMCAssignments, NVMCDailyAssignments, AllFieldServiceAssignments, FieldServiceMonthlyData } from '@/lib/congregacao/types';
+import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants';
 import { 
-  carregarPublicMeetingAssignments,
-  salvarPublicMeetingAssignments,
-  limparPublicMeetingAssignments as limparStoragePublicMeetingAssignments,
   carregarNVMCAssignments,
   salvarNVMCAssignments,
   limparNVMCAssignments as limparStorageNVMCAssignments,
@@ -28,6 +25,7 @@ import {
   salvarFieldServiceAssignments,
   limparFieldServiceAssignments as limparStorageFieldServiceAssignments
 } from '@/lib/congregacao/storage';
+import { formatarDataParaChave } from '@/lib/congregacao/utils';
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
@@ -65,7 +63,12 @@ export default function Home() {
     clearMainScheduleAndCache,
   } = useScheduleManagement({ membros, updateMemberHistory });
 
-  const [allPublicMeetingAssignmentsData, setAllPublicMeetingAssignmentsData] = useState<AllPublicMeetingAssignments | null>(null);
+  const {
+    publicAssignmentsData,
+    savePublicAssignments,
+    clearPublicAssignments,
+  } = usePublicMeetingAssignments();
+  
   const [allNvmcAssignmentsData, setAllNvmcAssignmentsData] = useState<AllNVMCAssignments | null>(null);
   const [allFieldServiceAssignmentsData, setAllFieldServiceAssignmentsData] = useState<AllFieldServiceAssignments | null>(null);
   
@@ -81,7 +84,7 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setAllPublicMeetingAssignmentsData(carregarPublicMeetingAssignments());
+    // Carregamento de NVMC e Serviço de Campo permanece aqui por enquanto
     setAllNvmcAssignmentsData(carregarNVMCAssignments());
     setAllFieldServiceAssignmentsData(carregarFieldServiceAssignments());
   }, []);
@@ -89,19 +92,13 @@ export default function Home() {
 
   const handleLimparCachePrincipal = useCallback(() => {
     clearMainScheduleAndCache();
-    // Se a limpeza do cache principal implicar limpeza de histórico de membros,
-    // uma chamada a hookPersistMembros com o histórico zerado para o mês seria necessária aqui.
-    // Por ora, o hook `useScheduleManagement` não faz isso automaticamente.
-    // A lógica de `internalUpdateMemberHistoryForMonth` no hook é para *popular* o histórico.
-    // Limpar o histórico relacionado a esta aba pode ser uma ação separada se necessário.
   }, [clearMainScheduleAndCache]);
 
 
-  const limparCacheDesignacoesPublicMeeting = useCallback(() => {
-    setAllPublicMeetingAssignmentsData(null);
-    limparStoragePublicMeetingAssignments();
-    setPublicMeetingCardKey(prev => prev + 1);
-  }, []);
+  const limparCacheDesignacoesPublicMeetingCallback = useCallback(() => {
+    clearPublicAssignments();
+    setPublicMeetingCardKey(prev => prev + 1); // Força re-render do card
+  }, [clearPublicAssignments]);
 
   const limparCacheNVMCAssignments = useCallback(() => {
     setAllNvmcAssignmentsData(null);
@@ -116,7 +113,7 @@ export default function Home() {
   const handleImportMembersWithUICallback = (file: File) => {
     hookHandleImportMembers(file, () => {
         handleLimparCachePrincipal(); 
-        limparCacheDesignacoesPublicMeeting(); 
+        limparCacheDesignacoesPublicMeetingCallback(); 
         limparCacheNVMCAssignments(); 
         limparCacheFieldService();
     });
@@ -132,38 +129,7 @@ export default function Home() {
     return { success, error };
   };
   
-  const handleSavePublicMeetingAssignments = (
-    monthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> },
-    mes: number,
-    ano: number
-  ) => {
-    const yearMonthKey = formatarDataParaChave(new Date(ano, mes, 1));
-    
-    const existingDataForMonth = (allPublicMeetingAssignmentsData || {})[yearMonthKey] || {};
-    const updatedMonthAssignmentsWithExistingLeitor: { [dateStr: string]: PublicMeetingAssignment } = {};
-
-    Object.keys(monthAssignments).forEach(dateStr => {
-      updatedMonthAssignmentsWithExistingLeitor[dateStr] = {
-        ...(existingDataForMonth[dateStr] || {}), 
-        ...monthAssignments[dateStr], 
-      };
-    });
-    Object.keys(existingDataForMonth).forEach(dateStr => {
-        if (!updatedMonthAssignmentsWithExistingLeitor[dateStr]) {
-            updatedMonthAssignmentsWithExistingLeitor[dateStr] = existingDataForMonth[dateStr];
-        }
-    });
-
-    const updatedAllAssignments = {
-      ...(allPublicMeetingAssignmentsData || {}),
-      [yearMonthKey]: updatedMonthAssignmentsWithExistingLeitor,
-    };
-
-    setAllPublicMeetingAssignmentsData(updatedAllAssignments);
-    salvarPublicMeetingAssignments(updatedAllAssignments);
-    toast({ title: "Sucesso", description: "Designações da Reunião Pública salvas." });
-  };
-
+  // handleSavePublicMeetingAssignments agora é savePublicAssignments do hook usePublicMeetingAssignments
 
   const handleSaveNvmcAssignments = (
     monthAssignments: { [dateStr: string]: NVMCDailyAssignments },
@@ -210,10 +176,10 @@ export default function Home() {
             const membrosAtualizados = membros.map(m =>
                 m.id === memberIdForAdvancedOptions ? { ...m, historicoDesignacoes: {} } : m
             );
-            hookPersistMembros(membrosAtualizados); // Persiste todos os membros (hook atualiza o estado e localStorage)
+            hookPersistMembros(membrosAtualizados); 
             toast({ title: "Histórico Limpo", description: `Histórico de ${membro.nome} foi limpo.` });
         }
-    } else { // Limpar histórico de todos
+    } else { 
         const membrosAtualizados = membros.map(m => ({ ...m, historicoDesignacoes: {} }));
         hookPersistMembros(membrosAtualizados);
         toast({ title: "Histórico Limpo", description: "Histórico de designações de TODOS os membros foi limpo." });
@@ -224,7 +190,7 @@ export default function Home() {
   const handleClearAllData = () => {
     hookPersistMembros([]); 
     handleLimparCachePrincipal();
-    limparCacheDesignacoesPublicMeeting();
+    limparCacheDesignacoesPublicMeetingCallback();
     limparCacheNVMCAssignments();
     limparCacheFieldService();
     toast({ title: "Todos os Dados Limpos", description: "Todos os dados da aplicação foram removidos.", variant: "destructive" });
@@ -319,11 +285,11 @@ export default function Home() {
                   <PublicMeetingAssignmentsCard
                     key={`public-meeting-card-${publicMeetingCardKey}`}
                     allMembers={membros}
-                    allPublicAssignments={allPublicMeetingAssignmentsData}
+                    allPublicAssignments={publicAssignmentsData} 
                     currentScheduleForMonth={scheduleData} 
                     initialMonth={scheduleMes ?? new Date().getMonth()}
                     initialYear={scheduleAno ?? new Date().getFullYear()}
-                    onSaveAssignments={handleSavePublicMeetingAssignments}
+                    onSaveAssignments={savePublicAssignments} 
                     onOpenSubstitutionModal={handleOpenSubstitutionModal}
                   />
                 </TabsContent>
@@ -407,7 +373,7 @@ export default function Home() {
           toast({ title: "Dados Limpos", description: "Designações de Indicadores/Volantes/AV/Limpeza foram limpas." });
         }}
         onClearPublicMeetingData={() => {
-          limparCacheDesignacoesPublicMeeting();
+          limparCacheDesignacoesPublicMeetingCallback(); // Usa o callback que chama o hook
           toast({ title: "Dados Limpos", description: "Dados da Reunião Pública foram limpos." });
         }}
         onClearNvmcData={() => { 
@@ -434,3 +400,4 @@ export default function Home() {
     </div>
   );
 }
+
