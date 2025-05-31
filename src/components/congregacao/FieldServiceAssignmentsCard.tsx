@@ -86,28 +86,33 @@ export function FieldServiceAssignmentsCard({
         const existingDaySlots = loadedMonthData[dayOfWeekStr]?.slots || [];
         
         initializedMonthData[dayOfWeekStr] = {
-            slots: existingDaySlots.map(slot => ({
-                ...slot,
-                id: slot.id || generateSlotId(),
-                time: slot.time || FIELD_SERVICE_TIME_OPTIONS[0].value, 
-                modalityId: slot.modalityId || null,
-                baseLocationId: slot.baseLocationId || null,
-                additionalDetails: slot.additionalDetails || '',
-                assignedDates: slot.assignedDates && slot.assignedDates.length > 0 
-                                ? slot.assignedDates 
-                                : generateMeetingDatesForSlot(i, displayYear, displayMonth)
-            }))
+            slots: existingDaySlots.map(slot => {
+                const validModalityId = modalidadesList.some(m => m.id === slot.modalityId) ? slot.modalityId : null;
+                const validBaseLocationId = locaisBaseList.some(l => l.id === slot.baseLocationId) ? slot.baseLocationId : null;
+
+                return {
+                    ...slot,
+                    id: slot.id || generateSlotId(),
+                    time: slot.time || (FIELD_SERVICE_TIME_OPTIONS.length > 0 ? FIELD_SERVICE_TIME_OPTIONS[0].value : '00:00'), 
+                    modalityId: validModalityId,
+                    baseLocationId: validBaseLocationId,
+                    additionalDetails: slot.additionalDetails || '',
+                    assignedDates: slot.assignedDates && slot.assignedDates.length > 0 
+                                    ? slot.assignedDates 
+                                    : generateMeetingDatesForSlot(i, displayYear, displayMonth)
+                };
+            })
         };
     }
     setCurrentMonthData(initializedMonthData);
-  }, [displayMonth, displayYear, allFieldServiceAssignments, generateMeetingDatesForSlot]);
+  }, [displayMonth, displayYear, allFieldServiceAssignments, generateMeetingDatesForSlot, modalidadesList, locaisBaseList]);
 
 
   const handleAddSlot = (dayOfWeek: number) => {
     const dayOfWeekStr = dayOfWeek.toString();
     const newSlot: FieldServiceMeetingSlot = {
       id: generateSlotId(),
-      time: FIELD_SERVICE_TIME_OPTIONS[0].value,
+      time: FIELD_SERVICE_TIME_OPTIONS.length > 0 ? FIELD_SERVICE_TIME_OPTIONS[0].value : '00:00',
       modalityId: null,
       baseLocationId: null,
       additionalDetails: '',
@@ -352,5 +357,6 @@ export function FieldServiceAssignmentsCard({
     </Card>
   );
 }
+    
 
     
