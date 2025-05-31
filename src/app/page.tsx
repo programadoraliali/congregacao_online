@@ -5,13 +5,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MemberManagementCard } from '@/components/congregacao/MemberManagementCard';
 import { ScheduleGenerationCard } from '@/components/congregacao/ScheduleGenerationCard';
 import { PublicMeetingAssignmentsCard } from '@/components/congregacao/PublicMeetingAssignmentsCard';
-import { NvmcAssignmentsCard } from '@/components/congregacao/NvmcAssignmentsCard'; // Novo
+import { NvmcAssignmentsCard } from '@/components/congregacao/NvmcAssignmentsCard';
+import { FieldServiceAssignmentsCard } from '@/components/congregacao/FieldServiceAssignmentsCard';
 import { MemberFormDialog } from '@/components/congregacao/MemberFormDialog';
 import { BulkAddDialog } from '@/components/congregacao/BulkAddDialog';
 import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog';
 import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog';
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
-import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAssignments, PublicMeetingAssignment, AllNVMCAssignments, NVMCDailyAssignments } from '@/lib/congregacao/types'; // Novo
+import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAssignments, PublicMeetingAssignment, AllNVMCAssignments, NVMCDailyAssignments, AllFieldServiceAssignments, FieldServiceMonthlyData } from '@/lib/congregacao/types';
 import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants';
 import { validarEstruturaMembro, gerarIdMembro, formatarDataParaChave } from '@/lib/congregacao/utils';
 import { 
@@ -23,34 +24,35 @@ import {
   carregarPublicMeetingAssignments,
   salvarPublicMeetingAssignments,
   limparPublicMeetingAssignments,
-  carregarNVMCAssignments, // Novo
-  salvarNVMCAssignments,   // Novo
-  limparNVMCAssignments    // Novo
+  carregarNVMCAssignments,
+  salvarNVMCAssignments,
+  limparNVMCAssignments,
+  carregarFieldServiceAssignments,
+  salvarFieldServiceAssignments,
+  limparFieldServiceAssignments
 } from '@/lib/congregacao/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2, History, Users, Settings2, ListChecks, BookUser, BookOpen } from 'lucide-react'; // Corrigido
+import { Trash2, History, Users, Settings2, ListChecks, BookUser, BookOpen, ClipboardList } from 'lucide-react';
 
 
 export default function Home() {
   const [membros, setMembros] = useState<Membro[]>([]);
-  // Cache para a primeira aba (Indicadores/Volantes)
   const [designacoesMensaisCache, setDesignacoesMensaisCache] = useState<DesignacoesFeitas | null>(null);
   const [cachedScheduleInfo, setCachedScheduleInfo] = useState<{mes: number, ano: number} | null>(null);
-  // Cache para a segunda aba (Reunião Pública)
   const [allPublicMeetingAssignmentsData, setAllPublicMeetingAssignmentsData] = useState<AllPublicMeetingAssignments | null>(null);
-  // Cache para a terceira aba (NVMC)
   const [allNvmcAssignmentsData, setAllNvmcAssignmentsData] = useState<AllNVMCAssignments | null>(null);
+  const [allFieldServiceAssignmentsData, setAllFieldServiceAssignmentsData] = useState<AllFieldServiceAssignments | null>(null);
 
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<Membro | null>(null);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
-  const [clearType, setClearType] = useState<'history' | 'all' | 'public_meeting' | 'nvmc' | null>(null); // Novo
+  const [clearType, setClearType] = useState<'history' | 'all' | 'public_meeting' | 'nvmc' | 'field_service' | null>(null);
   const [memberIdForAdvancedOptions, setMemberIdForAdvancedOptions] = useState<string | null>(null);
 
   const [isSubstitutionModalOpen, setIsSubstitutionModalOpen] = useState(false);
@@ -66,7 +68,8 @@ export default function Home() {
         setCachedScheduleInfo({ mes: cachedScheduleObject.mes, ano: cachedScheduleObject.ano });
     }
     setAllPublicMeetingAssignmentsData(carregarPublicMeetingAssignments());
-    setAllNvmcAssignmentsData(carregarNVMCAssignments()); // Novo
+    setAllNvmcAssignmentsData(carregarNVMCAssignments());
+    setAllFieldServiceAssignmentsData(carregarFieldServiceAssignments());
   }, []);
 
   const persistMembros = (novosMembros: Membro[]) => {
@@ -177,7 +180,8 @@ export default function Home() {
         persistMembros(membrosValidosImportados);
         limparCacheDesignacoesPrimeiraAba(); 
         limparCacheDesignacoesPublicMeeting(); 
-        limparCacheNVMCAssignments(); // Novo
+        limparCacheNVMCAssignments(); 
+        limparCacheFieldService();
         toast({ title: "Importado", description: `${membrosValidosImportados.length} membros importados com sucesso.` });
       } catch (err: any) {
         console.error("Erro ao importar membros:", err);
@@ -187,7 +191,6 @@ export default function Home() {
     reader.readAsText(file);
   };
 
-  // Para a primeira aba (Indicadores/Volantes)
   const handleScheduleGenerated = (designacoes: DesignacoesFeitas, mes: number, ano: number) => {
     setDesignacoesMensaisCache(designacoes);
     setCachedScheduleInfo({mes, ano});
@@ -220,7 +223,6 @@ export default function Home() {
     limparCacheDesignacoes();
   };
 
-  // Para a segunda aba (Reunião Pública)
   const handleSavePublicMeetingAssignments = (
     monthAssignments: { [dateStr: string]: PublicMeetingAssignment },
     mes: number,
@@ -241,7 +243,6 @@ export default function Home() {
     limparPublicMeetingAssignments();
   };
 
-  // Para a terceira aba (NVMC) - Novo
   const handleSaveNvmcAssignments = (
     monthAssignments: { [dateStr: string]: NVMCDailyAssignments },
     mes: number,
@@ -260,6 +261,26 @@ export default function Home() {
   const limparCacheNVMCAssignments = () => {
     setAllNvmcAssignmentsData(null);
     limparNVMCAssignments();
+  };
+
+  const handleSaveFieldServiceAssignments = (
+    monthAssignments: FieldServiceMonthlyData,
+    mes: number,
+    ano: number
+  ) => {
+    const yearMonthKey = formatarDataParaChave(new Date(ano, mes, 1));
+    const updatedAllAssignments = {
+      ...(allFieldServiceAssignmentsData || {}),
+      [yearMonthKey]: monthAssignments,
+    };
+    setAllFieldServiceAssignmentsData(updatedAllAssignments);
+    salvarFieldServiceAssignments(updatedAllAssignments);
+    toast({ title: "Sucesso", description: "Designações do Serviço de Campo salvas." });
+  };
+
+  const limparCacheFieldService = () => {
+    setAllFieldServiceAssignmentsData(null);
+    limparFieldServiceAssignments();
   };
 
 
@@ -291,7 +312,8 @@ export default function Home() {
     persistMembros([]);
     limparCacheDesignacoesPrimeiraAba();
     limparCacheDesignacoesPublicMeeting();
-    limparCacheNVMCAssignments(); // Novo
+    limparCacheNVMCAssignments();
+    limparCacheFieldService();
     toast({ title: "Todos os Dados Limpos", description: "Todos os dados da aplicação foram removidos.", variant: "destructive" });
   };
 
@@ -339,15 +361,6 @@ export default function Home() {
     setSubstitutionDetails(null);
   };
 
-  const currentPublicAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null && allPublicMeetingAssignmentsData
-    ? allPublicMeetingAssignmentsData[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
-    : null;
-
-  const currentNvmcAssignmentsForSelectedMonth = cachedScheduleInfo?.mes !== null && cachedScheduleInfo?.ano !== null && allNvmcAssignmentsData
-    ? allNvmcAssignmentsData[formatarDataParaChave(new Date(cachedScheduleInfo.ano, cachedScheduleInfo.mes, 1))]
-    : null;
-
-
   return (
     <div className="container mx-auto p-4 min-h-screen flex flex-col">
       <header className="mb-8 text-center">
@@ -384,10 +397,11 @@ export default function Home() {
             </AccordionTrigger>
             <AccordionContent className="bg-card p-0 rounded-b-lg">
               <Tabs defaultValue="indicadores-volantes-av-limpeza" className="w-full pt-2">
-                <TabsList className="mx-4 mb-2">
+                <TabsList className="mx-4 mb-2 overflow-x-auto">
                   <TabsTrigger value="indicadores-volantes-av-limpeza">Indicadores/Volantes/AV/Limpeza</TabsTrigger>
                   <TabsTrigger value="reuniao-publica">Reunião Pública</TabsTrigger>
                   <TabsTrigger value="nvmc">NVMC</TabsTrigger>
+                  <TabsTrigger value="servico-de-campo">Serviço de Campo</TabsTrigger>
                 </TabsList>
                 <TabsContent value="indicadores-volantes-av-limpeza" className="pt-0">
                   <ScheduleGenerationCard
@@ -417,6 +431,14 @@ export default function Home() {
                     onSaveNvmcAssignments={handleSaveNvmcAssignments}
                   />
                 </TabsContent>
+                <TabsContent value="servico-de-campo" className="pt-0">
+                  <FieldServiceAssignmentsCard
+                    allFieldServiceAssignments={allFieldServiceAssignmentsData}
+                    initialMonth={cachedScheduleInfo?.mes ?? new Date().getMonth()}
+                    initialYear={cachedScheduleInfo?.ano ?? new Date().getFullYear()}
+                    onSaveFieldServiceAssignments={handleSaveFieldServiceAssignments}
+                  />
+                </TabsContent>
               </Tabs>
             </AccordionContent>
           </AccordionItem>
@@ -439,6 +461,9 @@ export default function Home() {
                 </Button>
                 <Button variant="outline" onClick={() => { setClearType('nvmc'); handleOpenAdvancedOptions(null);}}>
                     <BookUser className="mr-2 h-4 w-4" /> Limpar Dados NVMC
+                </Button>
+                <Button variant="outline" onClick={() => { setClearType('field_service'); handleOpenAdvancedOptions(null);}}>
+                    <ClipboardList className="mr-2 h-4 w-4" /> Limpar Dados do Serviço de Campo
                 </Button>
                 <Button variant="destructive" onClick={() => { setClearType('all'); handleOpenAdvancedOptions(null);}}>
                     <Trash2 className="mr-2 h-4 w-4" /> Limpar TODOS os Dados
@@ -473,9 +498,13 @@ export default function Home() {
           limparCacheDesignacoesPublicMeeting();
           toast({ title: "Dados Limpos", description: "Dados da Reunião Pública foram limpos." });
         }}
-        onClearNvmcData={() => { // Novo
+        onClearNvmcData={() => { 
           limparCacheNVMCAssignments();
           toast({ title: "Dados Limpos", description: "Dados NVMC foram limpos." });
+        }}
+        onClearFieldServiceData={() => {
+          limparCacheFieldService();
+          toast({ title: "Dados Limpos", description: "Dados do Serviço de Campo foram limpos." });
         }}
         clearType={clearType}
         targetMemberName={memberIdForAdvancedOptions ? membros.find(m=>m.id === memberIdForAdvancedOptions)?.nome : null}

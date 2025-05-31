@@ -9,6 +9,10 @@ export const NOMES_MESES: string[] = [
 ];
 
 export const NOMES_DIAS_SEMANA_ABREV: string[] = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+export const NOMES_DIAS_SEMANA_COMPLETOS: string[] = [
+  "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"
+];
+
 
 export const DIAS_REUNIAO: DiasReuniao = {
   meioSemana: 4, // Quinta-feira
@@ -52,6 +56,7 @@ export const LOCAL_STORAGE_KEY_MEMBROS = 'congregacao_membros';
 export const LOCAL_STORAGE_KEY_SCHEDULE_CACHE = 'congregacao_schedule_cache';
 export const LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS = 'congregacao_public_meeting_assignments';
 export const LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS = 'congregacao_nvmc_assignments';
+export const LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS = 'congregacao_field_service_assignments';
 
 
 export const BADGE_COLORS: Record<string, string> = {

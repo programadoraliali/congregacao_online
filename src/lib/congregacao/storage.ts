@@ -1,12 +1,13 @@
 
 'use client';
 
-import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments } from './types';
+import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments, AllFieldServiceAssignments } from './types';
 import { 
   LOCAL_STORAGE_KEY_MEMBROS, 
   LOCAL_STORAGE_KEY_SCHEDULE_CACHE,
   LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS,
-  LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS
+  LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS,
+  LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS
 } from './constants';
 import { validarEstruturaMembro } from './utils';
 
@@ -152,5 +153,44 @@ export function limparNVMCAssignments(): void {
     localStorage.removeItem(LOCAL_STORAGE_KEY_NVMC_ASSIGNMENTS);
   } catch (error) {
     console.error("Erro ao limpar designações NVMC:", error);
+  }
+}
+
+// Funções para a aba "Serviço de Campo"
+export function carregarFieldServiceAssignments(): AllFieldServiceAssignments | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS);
+    if (dadosSalvos) {
+      const parsedData = JSON.parse(dadosSalvos) as AllFieldServiceAssignments;
+      if (parsedData && typeof parsedData === 'object') {
+        return parsedData;
+      } else {
+         console.warn("Cache de Serviço de Campo encontrado, mas com estrutura inválida. Limpando.");
+         localStorage.removeItem(LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS);
+         return null;
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao carregar designações do Serviço de Campo:", error);
+  }
+  return null;
+}
+
+export function salvarFieldServiceAssignments(data: AllFieldServiceAssignments): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS, JSON.stringify(data));
+  } catch (error) {
+    console.error("Erro ao salvar designações do Serviço de Campo:", error);
+  }
+}
+
+export function limparFieldServiceAssignments(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY_FIELD_SERVICE_ASSIGNMENTS);
+  } catch (error) {
+    console.error("Erro ao limpar designações do Serviço de Campo:", error);
   }
 }
