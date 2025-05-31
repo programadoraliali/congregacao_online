@@ -18,8 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 interface PublicMeetingAssignmentsCardProps {
   allMembers: Membro[];
   allPublicAssignments: AllPublicMeetingAssignments | null;
-  currentScheduleForMonth: DesignacoesFeitas | null; // Para ler o leitorDom
-  initialMonth: number; // 0-11
+  currentScheduleForMonth: DesignacoesFeitas | null; 
+  initialMonth: number; 
   initialYear: number;
   onSaveAssignments: (
     updatedMonthAssignments: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> },
@@ -56,22 +56,6 @@ export function PublicMeetingAssignmentsCard({
   const currentYear = new Date().getFullYear();
   const yearsForSelect = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  useEffect(() => {
-    if (allPublicAssignments) {
-      const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
-      const monthDataFromStorage = allPublicAssignments[yearMonthKey] || {};
-      const newAssignmentsState: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> } = {};
-      
-      Object.keys(monthDataFromStorage).forEach(dateStr => {
-        const { leitorId, ...rest } = monthDataFromStorage[dateStr];
-        newAssignmentsState[dateStr] = rest;
-      });
-      setAssignments(newAssignmentsState);
-    } else {
-      setAssignments({});
-    }
-  }, [displayMonth, displayYear, allPublicAssignments]);
-
   const sundaysInMonth = useMemo(() => {
     const dates: Date[] = [];
     const firstDay = new Date(Date.UTC(displayYear, displayMonth, 1));
@@ -86,11 +70,38 @@ export function PublicMeetingAssignmentsCard({
     return dates;
   }, [displayMonth, displayYear]);
 
+  useEffect(() => {
+    const newAssignmentsState: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> } = {};
+    const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
+
+    // Se allPublicAssignments for null ou não contiver o yearMonthKey, monthDataFromProp será {}
+    const monthDataFromProp = (allPublicAssignments && allPublicAssignments[yearMonthKey])
+      ? allPublicAssignments[yearMonthKey]
+      : {};
+
+    sundaysInMonth.forEach(dateObj => {
+        const dateStr = formatarDataCompleta(dateObj);
+        // Se monthDataFromProp não tiver dados para dateStr, dataForThisSunday será {}
+        const dataForThisSunday = monthDataFromProp[dateStr] || {}; 
+        const { leitorId, ...rest } = dataForThisSunday; // leitorId é ignorado, rest pode ser {}
+
+        newAssignmentsState[dateStr] = {
+            tema: rest.tema || '',
+            orador: rest.orador || '',
+            congregacaoOrador: rest.congregacaoOrador || '',
+            dirigenteId: rest.dirigenteId || null,
+        };
+    });
+    setAssignments(newAssignmentsState);
+
+  }, [displayMonth, displayYear, allPublicAssignments, sundaysInMonth]);
+
+
   const handleInputChange = (dateStr: string, field: EditableField, value: string) => {
     setAssignments(prev => ({
       ...prev,
       [dateStr]: {
-        ...(prev[dateStr] || {}),
+        ...(prev[dateStr] || { tema: '', orador: '', congregacaoOrador: '', dirigenteId: null }), // Garante que prev[dateStr] exista
         [field]: value,
       },
     }));
@@ -109,7 +120,7 @@ export function PublicMeetingAssignmentsCard({
       setAssignments(prev => ({
         ...prev,
         [dateStr]: {
-          ...(prev[dateStr] || {}),
+          ...(prev[dateStr] || { tema: '', orador: '', congregacaoOrador: '', dirigenteId: null }),
           dirigenteId: selectedMemberId,
         },
       }));
@@ -144,7 +155,7 @@ export function PublicMeetingAssignmentsCard({
      onOpenSubstitutionModal({
          date: dateStr,
          functionId: 'leitorDom', 
-         originalMemberId: leitorId || '', // Passa string vazia se null, diálogo trata
+         originalMemberId: leitorId || '', 
          originalMemberName: leitorNome,
          currentFunctionGroupId: grupoFuncao 
      });
@@ -288,9 +299,10 @@ export function PublicMeetingAssignmentsCard({
           currentDate={memberSelectionContext.dateStr}
           onSelectMember={handleSelectMember}
           currentlyAssignedMemberId={memberSelectionContext.currentMemberId}
-          excludedMemberId={null}
+          excludedMemberId={null} // Leitor e Dirigente são independentes aqui
         />
       )}
     </Card>
   );
 }
+
