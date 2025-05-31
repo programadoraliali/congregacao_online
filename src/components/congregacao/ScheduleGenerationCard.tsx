@@ -14,6 +14,8 @@ import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic';
 import { useToast } from "@/hooks/use-toast";
 import { FileText, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
 import { getPermissaoRequerida, formatarDataCompleta } from '@/lib/congregacao/utils';
+import { generateSchedulePdf } from '@/lib/congregacao/pdf-generator';
+
 
 interface ScheduleGenerationCardProps {
   membros: Membro[];
@@ -103,10 +105,26 @@ export function ScheduleGenerationCard({
   };
 
   const handleExportPDF = () => {
-    toast({
-      title: "Funcionalidade Indisponível",
-      description: "A exportação para PDF ainda não foi implementada.",
-    });
+    if (displayedScheduleData && displayedScheduleData.schedule && membros.length > 0) {
+      try {
+        generateSchedulePdf(
+          displayedScheduleData.schedule,
+          membros,
+          displayedScheduleData.mes,
+          displayedScheduleData.ano
+        );
+        toast({ title: "PDF Gerado", description: "O download do PDF deve iniciar em breve." });
+      } catch (e: any) {
+        console.error("Erro ao gerar PDF:", e);
+        toast({ title: "Erro ao Gerar PDF", description: e.message || "Não foi possível gerar o PDF.", variant: "destructive" });
+      }
+    } else {
+      toast({
+        title: "Dados Insuficientes",
+        description: "Gere o cronograma ou adicione membros antes de exportar.",
+        variant: "default",
+      });
+    }
   };
 
   const handleOpenAVMemberSelection = (
@@ -264,8 +282,8 @@ export function ScheduleGenerationCard({
                 onLimpezaChange={handleLimpezaChange}
               />
               <div className="mt-6 text-center">
-                <Button variant="outline" onClick={handleExportPDF}>
-                  <FileText className="mr-2 h-4 w-4" /> Exportar como PDF (em breve)
+                <Button variant="outline" onClick={handleExportPDF} disabled={!displayedScheduleData || isLoading}>
+                  <FileText className="mr-2 h-4 w-4" /> Exportar como PDF
                 </Button>
               </div>
             </>

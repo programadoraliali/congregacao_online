@@ -1,6 +1,6 @@
 
 import { type Membro, type PermissaoBase, type Impedimento, type ParsedNvmcProgram, type ParsedNvmcPart } from './types';
-import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV, FUNCOES_DESIGNADAS } from './constants';
+import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV, FUNCOES_DESIGNADAS, DIAS_REUNIAO } from './constants';
 
 export function gerarIdMembro(): string {
   return `membro_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -96,8 +96,6 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
         return funcaoDef.permissaoRequeridaBase;
     }
 
-    // Fallback para manter alguma compatibilidade ou lógica específica, se necessário,
-    // mas o ideal é que FUNCOES_DESIGNADAS seja a fonte da verdade.
     switch (funcaoId) {
         case 'indicadorExternoQui':
         case 'indicadorPalcoQui':
@@ -111,16 +109,14 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
         case 'volante1Dom':
         case 'volante2Dom':
             return 'volanteDom';
-        case 'leitorDom': // Adicionado para clareza, embora FUNCOES_DESIGNADAS deva cobrir
-            return 'leitorDom';
-        case 'leitorQui': // Adicionado para clareza
+        case 'leitorDom':
+             return 'leitorDom';
+        case 'leitorQui':
              return 'leitorQui';
         case 'presidenteReuniaoPublicaDom':
-        case 'presidenteMeioSemana': // Nome genérico, mas o específico deve vir de FUNCOES_DESIGNADAS
+        case 'presidenteMeioSemana':
             return 'presidente';
         default:
-            // Lógica de fallback mais genérica se não encontrar uma definição exata.
-            // Isso pode ser útil se os IDs de função nem sempre estiverem em FUNCOES_DESIGNADAS.
             if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'meioSemana') return 'leitorQui';
             if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'publica') return 'leitorDom';
             if (funcaoId.toLowerCase().includes('presidente') || funcaoId.toLowerCase().includes('instrutor')) return 'presidente';
@@ -134,6 +130,26 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
             
             return undefined;
     }
+}
+
+
+export function getRealFunctionId(columnKey: string, dateStr: string, tipoTabela: string): string {
+    const dataObj = new Date(dateStr + "T00:00:00");
+    const diaSemanaIndex = dataObj.getUTCDay();
+    const isMeioSemana = diaSemanaIndex === DIAS_REUNIAO.meioSemana;
+
+    if (tipoTabela === 'Indicadores') {
+        if (columnKey === 'indicador1') return isMeioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom';
+        if (columnKey === 'indicador2') return isMeioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom';
+    } else if (tipoTabela === 'Volantes') {
+        if (columnKey === 'volante1') return isMeioSemana ? 'volante1Qui' : 'volante1Dom';
+        if (columnKey === 'volante2') return isMeioSemana ? 'volante2Qui' : 'volante2Dom';
+    } else if (tipoTabela === 'Áudio/Vídeo (AV)') { 
+        if (columnKey === 'video') return isMeioSemana ? 'avVideoQui' : 'avVideoDom';
+        if (columnKey === 'indicadorZoom') return isMeioSemana ? 'avIndicadorZoomQui' : 'avIndicadorZoomDom';
+        if (columnKey === 'backupAV') return isMeioSemana ? 'avBackupQui' : 'avBackupDom';
+    }
+    return columnKey; 
 }
 
 export function parseNvmcProgramText(text: string): ParsedNvmcProgram {

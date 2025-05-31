@@ -10,11 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { formatarDataCompleta } from '@/lib/congregacao/utils';
+import { formatarDataCompleta, getRealFunctionId } from '@/lib/congregacao/utils';
 import { Badge } from '@/components/ui/badge';
 
 
-function prepararDadosTabela(
+export function prepararDadosTabela(
   designacoesFeitas: DesignacoesFeitas,
   mes: number,
   ano: number,
@@ -190,24 +190,6 @@ function prepararDadosTabela(
   return { data: dataTabela, columns, fullDateStrings };
 }
 
-export const getRealFunctionId = (columnKey: string, dateStr: string, tipoTabela: string): string => {
-    const dataObj = new Date(dateStr + "T00:00:00");
-    const diaSemanaIndex = dataObj.getUTCDay();
-    const isMeioSemana = diaSemanaIndex === DIAS_REUNIAO.meioSemana;
-
-    if (tipoTabela === 'Indicadores') {
-        if (columnKey === 'indicador1') return isMeioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom';
-        if (columnKey === 'indicador2') return isMeioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom';
-    } else if (tipoTabela === 'Volantes') {
-        if (columnKey === 'volante1') return isMeioSemana ? 'volante1Qui' : 'volante1Dom';
-        if (columnKey === 'volante2') return isMeioSemana ? 'volante2Qui' : 'volante2Dom';
-    } else if (tipoTabela === 'Áudio/Vídeo (AV)') { 
-        if (columnKey === 'video') return isMeioSemana ? 'avVideoQui' : 'avVideoDom';
-        if (columnKey === 'indicadorZoom') return isMeioSemana ? 'avIndicadorZoomQui' : 'avIndicadorZoomDom';
-        if (columnKey === 'backupAV') return isMeioSemana ? 'avBackupQui' : 'avBackupDom';
-    }
-    return columnKey; 
-};
 
 interface ScheduleDisplayProps {
     designacoesFeitas: DesignacoesFeitas;
@@ -264,11 +246,8 @@ export function ScheduleDisplay({
       if (originalMemberId && originalMemberName) { 
         onOpenSubstitutionModal({ date, functionId: realFunctionId, originalMemberId, originalMemberName, currentFunctionGroupId: tableTitle });
       } else {
-        toast({
-            title: "Célula Vazia",
-            description: "Não há ninguém designado para esta função para substituir.",
-            variant: "default"
-        });
+        // Para células vazias (não AV), permitir designar novo (usando o mesmo modal de substituição)
+        onOpenSubstitutionModal({ date, functionId: realFunctionId, originalMemberId: '', originalMemberName: "Ninguém Designado", currentFunctionGroupId: tableTitle });
       }
     }
   };
