@@ -283,7 +283,6 @@ export function FieldServiceAssignmentsCard({
                           <SelectValue placeholder="Modalidade" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhuma</SelectItem>
                           {modalidadesList.map(mod => (
                             <SelectItem key={mod.id} value={mod.id}>{mod.name}</SelectItem>
                           ))}
@@ -300,7 +299,6 @@ export function FieldServiceAssignmentsCard({
                           <SelectValue placeholder="Local Base" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem>
                           {locaisBaseList.map(loc => (
                             <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                           ))}
@@ -357,6 +355,8 @@ export function FieldServiceAssignmentsCard({
     </Card>
   );
 }
+    
+
     
 
     
