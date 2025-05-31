@@ -1,6 +1,6 @@
 
 import { type Membro, type PermissaoBase, type Impedimento, type ParsedNvmcProgram, type ParsedNvmcPart } from './types';
-import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV } from './constants';
+import { PERMISSOES_BASE, NOMES_MESES, NOMES_DIAS_SEMANA_ABREV, FUNCOES_DESIGNADAS } from './constants';
 
 export function gerarIdMembro(): string {
   return `membro_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -91,6 +91,13 @@ export function agruparPermissoes(permissoes: PermissaoBase[]): Record<string, P
 }
 
 export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana' | 'publica'): string | undefined {
+    const funcaoDef = FUNCOES_DESIGNADAS.find(f => f.id === funcaoId);
+    if (funcaoDef && funcaoDef.permissaoRequeridaBase) {
+        return funcaoDef.permissaoRequeridaBase;
+    }
+
+    // Fallback para manter alguma compatibilidade ou lógica específica, se necessário,
+    // mas o ideal é que FUNCOES_DESIGNADAS seja a fonte da verdade.
     switch (funcaoId) {
         case 'indicadorExternoQui':
         case 'indicadorPalcoQui':
@@ -104,18 +111,27 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
         case 'volante1Dom':
         case 'volante2Dom':
             return 'volanteDom';
-        case 'leitorASentinelaDom':
+        case 'leitorDom': // Adicionado para clareza, embora FUNCOES_DESIGNADAS deva cobrir
             return 'leitorDom';
-        // Adicionar case para leitorQui se existir função correspondente
-        // case 'leitorBibliaQui': // Exemplo, supondo uma função que use 'leitorQui'
-        //     return 'leitorQui';
+        case 'leitorQui': // Adicionado para clareza
+             return 'leitorQui';
         case 'presidenteReuniaoPublicaDom':
-        case 'presidenteMeioSemana':
+        case 'presidenteMeioSemana': // Nome genérico, mas o específico deve vir de FUNCOES_DESIGNADAS
             return 'presidente';
         default:
-            // Tentativa de mapeamento genérico para funções não listadas explicitamente
+            // Lógica de fallback mais genérica se não encontrar uma definição exata.
+            // Isso pode ser útil se os IDs de função nem sempre estiverem em FUNCOES_DESIGNADAS.
             if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'meioSemana') return 'leitorQui';
             if (funcaoId.toLowerCase().includes('leitor') && tipoReuniao === 'publica') return 'leitorDom';
+            if (funcaoId.toLowerCase().includes('presidente') || funcaoId.toLowerCase().includes('instrutor')) return 'presidente';
+            if (funcaoId.toLowerCase().includes('indicador') && tipoReuniao === 'meioSemana') return 'indicadorQui';
+            if (funcaoId.toLowerCase().includes('indicador') && tipoReuniao === 'publica') return 'indicadorDom';
+            if (funcaoId.toLowerCase().includes('volante') && tipoReuniao === 'meioSemana') return 'volanteQui';
+            if (funcaoId.toLowerCase().includes('volante') && tipoReuniao === 'publica') return 'volanteDom';
+            if (funcaoId.startsWith('avVideo')) return 'avVideo';
+            if (funcaoId.startsWith('avZoom') || funcaoId.startsWith('avIndicadorZoom')) return 'avZoom';
+            if (funcaoId.startsWith('avBackup')) return 'avBackup';
+            
             return undefined;
     }
 }
