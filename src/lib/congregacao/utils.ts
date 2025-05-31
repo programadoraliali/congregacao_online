@@ -106,8 +106,8 @@ export function getRealFunctionId(columnKey: string, dateStr: string, tipoTabela
     const isMeioSemana = diaSemanaIndex === DIAS_REUNIAO.meioSemana;
 
     if (tipoTabela === 'Indicadores') {
-        if (columnKey === 'indicador1') return isMeioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom';
-        if (columnKey === 'indicador2') return isMeioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom';
+        if (columnKey === 'indicadorExterno') return isMeioSemana ? 'indicadorExternoQui' : 'indicadorExternoDom';
+        if (columnKey === 'indicadorPalco') return isMeioSemana ? 'indicadorPalcoQui' : 'indicadorPalcoDom';
     } else if (tipoTabela === 'Volantes') {
         if (columnKey === 'volante1') return isMeioSemana ? 'volante1Qui' : 'volante1Dom';
         if (columnKey === 'volante2') return isMeioSemana ? 'volante2Qui' : 'volante2Dom';
@@ -116,6 +116,7 @@ export function getRealFunctionId(columnKey: string, dateStr: string, tipoTabela
         if (columnKey === 'indicadorZoom') return isMeioSemana ? 'avIndicadorZoomQui' : 'avIndicadorZoomDom';
         if (columnKey === 'backupAV') return isMeioSemana ? 'avBackupQui' : 'avBackupDom';
     }
+    // If columnKey is already specific (e.g., 'indicadorExternoDom' or 'leitorDom'), or not matched above, return it.
     return columnKey; 
 }
 
@@ -292,4 +293,3 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   }
   return result;
 }
-
