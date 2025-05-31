@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Membro, PublicMeetingAssignment, AllPublicMeetingAssignments } from '@/lib/congregacao/types';
-import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV } from '@/lib/congregacao/constants';
+import type { Membro, PublicMeetingAssignment, AllPublicMeetingAssignments, DesignacoesFeitas, SubstitutionDetails } from '@/lib/congregacao/types';
+import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, FUNCOES_DESIGNADAS } from '@/lib/congregacao/constants';
 import { formatarDataCompleta, formatarDataParaChave, obterNomeMes } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,13 +11,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, BookOpenText, FileText } from 'lucide-react'; // Adicionado FileText
+import { UserPlus, BookOpenText, FileText, Edit3 } from 'lucide-react';
 import { MemberSelectionDialog } from './MemberSelectionDialog';
 import { useToast } from "@/hooks/use-toast";
 
 interface PublicMeetingAssignmentsCardProps {
   allMembers: Membro[];
   allPublicAssignments: AllPublicMeetingAssignments | null;
+  currentScheduleForMonth: DesignacoesFeitas | null; // Para ler o leitorDom
   initialMonth: number; // 0-11
   initialYear: number;
   onSaveAssignments: (
@@ -25,25 +26,30 @@ interface PublicMeetingAssignmentsCardProps {
     month: number,
     year: number
   ) => void;
+  onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
 }
 
 type EditableField = 'tema' | 'orador' | 'congregacaoOrador';
-type MemberRole = 'dirigente' | 'leitor';
+type MemberRole = 'dirigente'; // 'leitor' removido pois será automático
 
 export function PublicMeetingAssignmentsCard({
   allMembers,
   allPublicAssignments,
+  currentScheduleForMonth,
   initialMonth,
   initialYear,
   onSaveAssignments,
+  onOpenSubstitutionModal,
 }: PublicMeetingAssignmentsCardProps) {
   const [displayMonth, setDisplayMonth] = useState<number>(initialMonth ?? new Date().getMonth());
   const [displayYear, setDisplayYear] = useState<number>(initialYear ?? new Date().getFullYear());
-  const [assignments, setAssignments] = useState<{ [dateStr: string]: PublicMeetingAssignment }>({});
+  // Este estado 'assignments' agora só cuida das partes manuais (tema, orador, congregacao, dirigenteId)
+  const [assignments, setAssignments] = useState<{ [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> }>({});
+  
   const [isMemberSelectionOpen, setIsMemberSelectionOpen] = useState(false);
   const [memberSelectionContext, setMemberSelectionContext] = useState<{
     dateStr: string;
-    role: MemberRole;
+    role: MemberRole; // Apenas 'dirigente'
     currentMemberId?: string | null;
   } | null>(null);
   const { toast } = useToast();
@@ -54,7 +60,14 @@ export function PublicMeetingAssignmentsCard({
   useEffect(() => {
     if (allPublicAssignments) {
       const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
-      setAssignments(allPublicAssignments[yearMonthKey] || {});
+      const monthDataFromStorage = allPublicAssignments[yearMonthKey] || {};
+      const newAssignmentsState: { [dateStr: string]: Omit<PublicMeetingAssignment, 'leitorId'> } = {};
+      
+      Object.keys(monthDataFromStorage).forEach(dateStr => {
+        const { leitorId, ...rest } = monthDataFromStorage[dateStr]; // Exclui leitorId
+        newAssignmentsState[dateStr] = rest;
+      });
+      setAssignments(newAssignmentsState);
     } else {
       setAssignments({});
     }
@@ -62,13 +75,12 @@ export function PublicMeetingAssignmentsCard({
 
   const sundaysInMonth = useMemo(() => {
     const dates: Date[] = [];
-    // Ensure UTC to avoid timezone issues when determining day of week and month boundaries
     const firstDay = new Date(Date.UTC(displayYear, displayMonth, 1));
-    const lastDayMonth = new Date(Date.UTC(displayYear, displayMonth + 1, 0)).getUTCDate(); // Get the last day number of the month
+    const lastDayMonth = new Date(Date.UTC(displayYear, displayMonth + 1, 0)).getUTCDate();
 
     for (let dayNum = 1; dayNum <= lastDayMonth; dayNum++) {
         const currentDate = new Date(Date.UTC(displayYear, displayMonth, dayNum));
-        if (currentDate.getUTCDay() === DIAS_REUNIAO.publica) { // Domingo is 0
+        if (currentDate.getUTCDay() === DIAS_REUNIAO.publica) {
             dates.push(currentDate);
         }
     }
@@ -86,20 +98,22 @@ export function PublicMeetingAssignmentsCard({
   };
 
   const handleOpenMemberSelection = (dateStr: string, role: MemberRole) => {
+    // Apenas para dirigente
     const currentAssignment = assignments[dateStr];
-    const currentMemberId = role === 'dirigente' ? currentAssignment?.dirigenteId : currentAssignment?.leitorId;
+    const currentMemberId = currentAssignment?.dirigenteId;
     setMemberSelectionContext({ dateStr, role, currentMemberId });
     setIsMemberSelectionOpen(true);
   };
 
   const handleSelectMember = (selectedMemberId: string) => {
-    if (memberSelectionContext) {
-      const { dateStr, role } = memberSelectionContext;
+    // Apenas para dirigente
+    if (memberSelectionContext && memberSelectionContext.role === 'dirigente') {
+      const { dateStr } = memberSelectionContext;
       setAssignments(prev => ({
         ...prev,
         [dateStr]: {
           ...(prev[dateStr] || {}),
-          [role === 'dirigente' ? 'dirigenteId' : 'leitorId']: selectedMemberId,
+          dirigenteId: selectedMemberId,
         },
       }));
     }
@@ -114,8 +128,8 @@ export function PublicMeetingAssignmentsCard({
   };
   
   const handleSaveChanges = () => {
+    // O leitorId não é mais salvo aqui. Ele vem do cache central.
     onSaveAssignments(assignments, displayMonth, displayYear);
-    // O toast de sucesso já é dado em page.tsx
   };
 
   const handleExportPublicMeetingPDF = () => {
@@ -123,6 +137,29 @@ export function PublicMeetingAssignmentsCard({
       title: "Funcionalidade Indisponível",
       description: "A exportação para PDF ainda não foi implementada.",
     });
+  };
+
+  const handleOpenLeitorSubstitution = (dateStr: string, leitorId: string | null) => {
+     const leitor = allMembers.find(m => m.id === leitorId);
+     const leitorNome = leitor ? leitor.nome : "Não Designado";
+     const funcaoLeitorDom = FUNCOES_DESIGNADAS.find(f => f.id === 'leitorDom');
+     const grupoFuncao = funcaoLeitorDom?.grupo || "Leitura/Presidência";
+
+     if (leitorId) {
+        onOpenSubstitutionModal({
+            date: dateStr,
+            functionId: 'leitorDom', // ID da função do leitor de domingo
+            originalMemberId: leitorId,
+            originalMemberName: leitorNome,
+            currentFunctionGroupId: grupoFuncao 
+        });
+     } else {
+        toast({
+            title: "Leitor Não Designado",
+            description: "Não há leitor designado para substituir. Gere o cronograma na primeira aba.",
+            variant: "default"
+        });
+     }
   };
 
   return (
@@ -133,6 +170,7 @@ export function PublicMeetingAssignmentsCard({
         </CardTitle>
         <CardDescription>
           Configure os temas, oradores e participantes para as reuniões públicas de {obterNomeMes(displayMonth)} de {displayYear}.
+          O Leitor de A Sentinela é designado automaticamente; use "Substituir" se necessário.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -163,7 +201,6 @@ export function PublicMeetingAssignmentsCard({
               </SelectContent>
             </Select>
           </div>
-           {/* Botão Salvar movido para perto dos seletores, para salvar o mês/ano ativo */}
            <Button onClick={handleSaveChanges} className="w-full sm:w-auto">
             Salvar Alterações de {obterNomeMes(displayMonth)}
           </Button>
@@ -177,9 +214,11 @@ export function PublicMeetingAssignmentsCard({
 
         {sundaysInMonth.map((dateObj, index) => {
           const dateStr = formatarDataCompleta(dateObj);
-          const dayAssignment = assignments[dateStr] || {};
+          const dayAssignment = assignments[dateStr] || {}; // Contém tema, orador, congregacao, dirigenteId
+          const leitorDesignadoId = currentScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
+          const nomeLeitorDesignado = getMemberName(leitorDesignadoId);
+
           const dayAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
-          // Use getUTCDate() for day and getUTCMonth() for month to be consistent with how dates were generated
           const formattedDateDisplay = `${dayAbrev} ${dateObj.getUTCDate().toString().padStart(2, '0')}/${(dateObj.getUTCMonth() + 1).toString().padStart(2, '0')}`;
           
           return (
@@ -230,10 +269,10 @@ export function PublicMeetingAssignmentsCard({
                   <Label>Leitor de A Sentinela</Label>
                    <div className="flex items-center gap-2 mt-1">
                     <span className="flex-grow p-2 border rounded-md bg-muted/50 min-h-[38px] text-sm flex items-center">
-                       {getMemberName(dayAssignment.leitorId)}
+                       {nomeLeitorDesignado === 'Nenhum selecionado' ? 'A ser designado' : nomeLeitorDesignado}
                     </span>
-                    <Button variant="outline" size="sm" onClick={() => handleOpenMemberSelection(dateStr, 'leitor')}>
-                      <UserPlus className="mr-1.5 h-4 w-4" /> {dayAssignment.leitorId ? 'Alterar' : 'Selecionar'}
+                    <Button variant="outline" size="sm" onClick={() => handleOpenLeitorSubstitution(dateStr, leitorDesignadoId)}>
+                      <Edit3 className="mr-1.5 h-4 w-4" /> Substituir
                     </Button>
                   </div>
                 </div>
@@ -257,19 +296,13 @@ export function PublicMeetingAssignmentsCard({
           isOpen={isMemberSelectionOpen}
           onOpenChange={setIsMemberSelectionOpen}
           allMembers={allMembers}
-          targetRole={memberSelectionContext.role}
+          targetRole={memberSelectionContext.role} // Apenas 'dirigente'
           currentDate={memberSelectionContext.dateStr}
           onSelectMember={handleSelectMember}
           currentlyAssignedMemberId={memberSelectionContext.currentMemberId}
-          excludedMemberId={
-            memberSelectionContext.role === 'dirigente' 
-            ? assignments[memberSelectionContext.dateStr]?.leitorId 
-            : assignments[memberSelectionContext.dateStr]?.dirigenteId
-          }
+          excludedMemberId={null} // Não há leitor para excluir da lista de dirigentes
         />
       )}
     </Card>
   );
 }
-
-
