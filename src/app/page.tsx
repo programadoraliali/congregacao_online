@@ -15,7 +15,7 @@ import { ConfirmClearDialog } from '@/components/congregacao/ConfirmClearDialog'
 import { SubstitutionDialog } from '@/components/congregacao/SubstitutionDialog';
 import { CongregationIcon } from '@/components/icons/CongregationIcon';
 import type { Membro, DesignacoesFeitas, SubstitutionDetails, AllPublicMeetingAssignments, PublicMeetingAssignment, AllNVMCAssignments, NVMCDailyAssignments, AllFieldServiceAssignments, FieldServiceMonthlyData } from '@/lib/congregacao/types';
-import { APP_NAME } from '@/lib/congregacao/constants';
+import { APP_NAME, NOMES_MESES } from '@/lib/congregacao/constants'; // NOMES_MESES ADICIONADO AQUI
 import { formatarDataParaChave } from '@/lib/congregacao/utils';
 import { 
   carregarPublicMeetingAssignments,
