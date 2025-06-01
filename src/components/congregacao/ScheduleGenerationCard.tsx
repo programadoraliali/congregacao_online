@@ -1,12 +1,12 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { NOMES_MESES, FUNCOES_DESIGNADAS, DIAS_REUNIAO } from '@/lib/congregacao/constants';
+import { NOMES_MESES, FUNCOES_DESIGNADAS, DIAS_REUNIAO, NONE_GROUP_ID } from '@/lib/congregacao/constants';
 import type { DesignacoesFeitas, FuncaoDesignada, Membro, SubstitutionDetails } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { MemberSelectionDialog } from './MemberSelectionDialog';
@@ -15,6 +15,13 @@ import { FileText, AlertTriangle, Loader2, UserPlus, Info } from 'lucide-react';
 import { getPermissaoRequerida, formatarDataCompleta } from '@/lib/congregacao/utils';
 import { generateSchedulePdf } from '@/lib/congregacao/pdf-generator';
 
+interface AVSelectionContext {
+  dateStr: string;
+  functionId: string;
+  columnKey: string;
+  currentMemberId: string | null;
+  requiredPermissionId: string | null;
+}
 
 interface ScheduleGenerationCardProps {
   membros: Membro[];
@@ -29,14 +36,6 @@ interface ScheduleGenerationCardProps {
   onDirectAssignAV: (date: string, functionId: string, newMemberId: string | null, originalMemberId: string | null) => void;
   onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
   onMonthYearChangeRequest: (mes: number, ano: number) => void;
-}
-
-interface AVSelectionContext {
-  dateStr: string;
-  functionId: string;
-  columnKey: string;
-  currentMemberId: string | null;
-  requiredPermissionId: string | null;
 }
 
 export function ScheduleGenerationCard({
@@ -70,6 +69,67 @@ export function ScheduleGenerationCard({
     }
     setError(null);
   }, [currentMes, currentAno]);
+
+  const allRequiredFieldsFilled = useMemo(() => {
+    if (!currentSchedule || status !== 'rascunho' || currentMes === null || currentAno === null) {
+      return false;
+    }
+  
+    const localDIAS_REUNIAO = {
+      meioSemana: DIAS_REUNIAO.meioSemana,
+      publica: DIAS_REUNIAO.publica,
+    };
+  
+    const datasDeReuniaoNoMes: string[] = [];
+    const primeiroDiaDoMes = new Date(Date.UTC(currentAno, currentMes, 1));
+    const ultimoDiaDoMes = new Date(Date.UTC(currentAno, currentMes + 1, 0));
+  
+    for (let d = new Date(primeiroDiaDoMes); d <= ultimoDiaDoMes; d.setUTCDate(d.getUTCDate() + 1)) {
+      const diaSemana = d.getUTCDay();
+      if (diaSemana === localDIAS_REUNIAO.meioSemana || diaSemana === localDIAS_REUNIAO.publica) {
+        datasDeReuniaoNoMes.push(formatarDataCompleta(d));
+      }
+    }
+  
+    // 1. Checar todas as funções (Indicadores, Volantes, AV) para cada dia de reunião
+    for (const dateStr of datasDeReuniaoNoMes) {
+      const assignmentsForDay = currentSchedule[dateStr];
+      if (!assignmentsForDay) return false; 
+  
+      const dataObj = new Date(dateStr + "T00:00:00Z");
+      const tipoReuniao = dataObj.getUTCDay() === localDIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
+  
+      const funcoesDoDia = FUNCOES_DESIGNADAS.filter(f => f.tipoReuniao.includes(tipoReuniao));
+      for (const funcao of funcoesDoDia) {
+        if (!assignmentsForDay[funcao.id]) { 
+          return false;
+        }
+      }
+  
+      // 2. Checar limpeza após reunião para cada dia de reunião
+      if (!assignmentsForDay.limpezaAposReuniaoGrupoId || assignmentsForDay.limpezaAposReuniaoGrupoId === NONE_GROUP_ID) {
+        return false;
+      }
+    }
+  
+    // 3. Checar limpeza semanal para cada semana que tem reunião
+    const weeksComReuniao = new Set<string>();
+    datasDeReuniaoNoMes.forEach(dateStr => {
+      const dataObj = new Date(dateStr + "T00:00:00Z");
+      const domingoDaSemana = new Date(dataObj);
+      domingoDaSemana.setUTCDate(dataObj.getUTCDate() - dataObj.getUTCDay());
+      weeksComReuniao.add(formatarDataCompleta(domingoDaSemana));
+    });
+  
+    for (const weekKey of Array.from(weeksComReuniao)) {
+      const weeklyData = currentSchedule[weekKey];
+      if (!weeklyData || !weeklyData.limpezaSemanalResponsavel || weeklyData.limpezaSemanalResponsavel.trim() === '') {
+          return false;
+      }
+    }
+  
+    return true;
+  }, [currentSchedule, status, currentMes, currentAno]);
 
 
   const handleGenerateSchedule = async () => {
@@ -268,7 +328,7 @@ export function ScheduleGenerationCard({
                   <Button onClick={onSaveProgress} disabled={!currentSchedule || isLoading}>
                     Salvar Progresso
                   </Button>
-                  <Button onClick={onFinalizeSchedule} disabled={!currentSchedule || isLoading}>
+                  <Button onClick={onFinalizeSchedule} disabled={!currentSchedule || isLoading || !allRequiredFieldsFilled}>
                     Finalizar e Salvar Mês
                   </Button>
                 </div>
@@ -305,3 +365,4 @@ export function ScheduleGenerationCard({
     </Card>
   );
 }
+
