@@ -11,17 +11,17 @@ const RP_MARGIN_LEFT = 40;
 const RP_MARGIN_RIGHT = 40;
 
 const RP_MAIN_TITLE_FONT_SIZE = 18;
-const RP_DATE_FONT_SIZE = 11;
-const RP_THEME_FONT_SIZE = 11;
+// MODIFICADO: Ajuste nos tamanhos de fonte para hierarquia visual
+const RP_DATE_FONT_SIZE = 10;
+const RP_THEME_FONT_SIZE = 12; 
 const RP_DETAIL_FONT_SIZE = 10;
 const RP_LINE_HEIGHT_FACTOR = 1.3;
 
 const RP_SPACE_AFTER_MAIN_TITLE = 30;
 const RP_SPACE_AFTER_DATE_AND_THEME = 25;
 const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 1.5;
-const RP_SECTION_VERTICAL_SPACING = 20; // Espaço entre os boxes
+const RP_SECTION_VERTICAL_SPACING = 20;
 
-// NOVO: Constantes para o layout em Box
 const RP_BOX_PADDING = 15;
 const RP_BOX_CORNER_RADIUS = 5;
 const RP_BOX_BORDER_COLOR_R = 220;
@@ -29,7 +29,6 @@ const RP_BOX_BORDER_COLOR_G = 220;
 const RP_BOX_BORDER_COLOR_B = 220;
 
 const RP_COLOR_TEXT_DEFAULT_R = 30;
-// ... (outras constantes podem ser mantidas)
 
 const getMemberNamePdf = (memberId: string | null | undefined, membros: Membro[]): string => {
   if (!memberId) return 'A Ser Designado';
@@ -63,7 +62,6 @@ export function generatePublicMeetingPdf(
 
   let currentY = RP_MARGIN_TOP;
 
-  // Título Principal
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
   doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R);
@@ -80,16 +78,13 @@ export function generatePublicMeetingPdf(
         currentY += RP_SECTION_VERTICAL_SPACING;
     }
 
-    // --- NOVO: Lógica de Box ---
-    // Guarda a posição Y inicial do conteúdo do box
     const boxContentStartY = currentY;
-    let contentY = boxContentStartY; // Usaremos uma variável local para desenhar dentro do box
+    let contentY = boxContentStartY;
 
     const dateStr = formatarDataParaChaveOriginal(sundayDate);
     const assignment = assignmentsForMonth[dateStr];
     if (!assignment) return;
     
-    // ... (lógica para pegar valores permanece a mesma)
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     let oradorBaseName: string = "A Ser Designado";
     const oradorInput = assignment.orador;
@@ -104,67 +99,66 @@ export function generatePublicMeetingPdf(
 
     // --- LÓGICA DE DESENHO MODIFICADA ---
     
-    // 1. Data (peso normal, como na imagem)
+    // 1. Data (fonte normal e menor)
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(RP_DATE_FONT_SIZE);
     doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R);
     doc.text(formatDisplayDateForPublicMeetingPdf(sundayDate), RP_MARGIN_LEFT, contentY);
-    contentY += RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR;
+    contentY += RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR * 1.5; // Mais espaço após a data
 
-    // 2. Tema (rótulo e valor em negrito, como na imagem)
-    const temaLabel = "Tema:";
+    // 2. Tema (sem rótulo, fonte maior e em negrito)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_THEME_FONT_SIZE);
-    doc.text(temaLabel, RP_MARGIN_LEFT, contentY);
-    const temaLabelWidth = doc.getTextWidth(temaLabel);
-    
-    doc.setFont('helvetica', 'bold'); // Valor também em negrito para destaque
-    doc.text(temaValue, RP_MARGIN_LEFT + temaLabelWidth + 4, contentY, { maxWidth: contentWidth - temaLabelWidth - 4 });
-    const temaLines = doc.splitTextToSize(temaValue, contentWidth - temaLabelWidth - 4);
+    const temaLines = doc.splitTextToSize(temaValue, contentWidth);
+    doc.text(temaLines, RP_MARGIN_LEFT, contentY);
     contentY += (temaLines.length * RP_THEME_FONT_SIZE * RP_LINE_HEIGHT_FACTOR) + RP_SPACE_AFTER_DATE_AND_THEME;
 
-    // 3. Bloco de Participantes com Título e Barras
-    // ... (lógica interna deste bloco permanece a mesma)
+    // 3. Bloco de Participantes
     const col1_X = RP_MARGIN_LEFT;
     const col2_X = RP_MARGIN_LEFT + (contentWidth / 2);
     const barSpacing = 8;
     const textX_Col1 = col1_X + barSpacing;
     const textX_Col2 = col2_X + barSpacing;
+    
+    // MODIFICADO: Título "Participantes" desenhado acima da coluna da esquerda
     const participantsTitleY = contentY;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_DETAIL_FONT_SIZE);
-    doc.text("Participantes", textX_Col2, participantsTitleY);
+    doc.text("Participantes", textX_Col1, participantsTitleY);
+
     const contentStartY = participantsTitleY + RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR;
+    
     let line1_Y = contentStartY;
     let line2_Y = line1_Y + RP_DETAIL_ITEM_VERTICAL_SPACING;
+
     doc.setFont('helvetica', 'normal');
     doc.text(`Orador: ${oradorBaseName}`, textX_Col1, line1_Y);
     doc.text(`Dirigente: ${dirigenteValue}`, textX_Col2, line1_Y);
     doc.text(`Congregação: ${congregacaoValue}`, textX_Col1, line2_Y);
     doc.text(`Leitor: ${leitorValue}`, textX_Col2, line2_Y);
+
     const participantsBlockStartY = participantsTitleY - (RP_DETAIL_FONT_SIZE * 0.4);
     const participantsBlockEndY = line2_Y + (RP_DETAIL_FONT_SIZE * 0.4);
+    
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.75);
     doc.line(col1_X, participantsBlockStartY, col1_X, participantsBlockEndY);
     doc.line(col2_X, participantsBlockStartY, col2_X, participantsBlockEndY);
     
-    // --- NOVO: Desenha o Box ao redor de todo o conteúdo ---
     const boxContentEndY = participantsBlockEndY;
     const boxHeight = (boxContentEndY - boxContentStartY) + (RP_BOX_PADDING * 2);
 
     doc.setDrawColor(RP_BOX_BORDER_COLOR_R, RP_BOX_BORDER_COLOR_G, RP_BOX_BORDER_COLOR_B);
     doc.setLineWidth(1);
     doc.roundedRect(
-      RP_MARGIN_LEFT - RP_BOX_PADDING,       // X
-      boxContentStartY - RP_BOX_PADDING,    // Y
-      contentWidth + (RP_BOX_PADDING * 2),  // Largura
-      boxHeight,                            // Altura
-      RP_BOX_CORNER_RADIUS,                 // Raio do canto X
-      RP_BOX_CORNER_RADIUS                  // Raio do canto Y
+      RP_MARGIN_LEFT - RP_BOX_PADDING,
+      boxContentStartY - RP_BOX_PADDING,
+      contentWidth + (RP_BOX_PADDING * 2),
+      boxHeight,
+      RP_BOX_CORNER_RADIUS,
+      RP_BOX_CORNER_RADIUS
     );
 
-    // Atualiza a posição Y principal para a próxima seção
     currentY = boxContentStartY - RP_BOX_PADDING + boxHeight;
   });
 
