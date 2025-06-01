@@ -97,7 +97,6 @@ export function generateSchedulePdf(
         if (data.pageNumber > 1) {
             drawMainScheduleTitle(); 
         }
-         // Adicionar número da página no rodapé
         const pageCount = doc.internal.getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
@@ -147,8 +146,7 @@ export function generateSchedulePdf(
 
     if (yPos + SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE > pageHeight - options.margin.bottom) {
       doc.addPage();
-      // drawMainScheduleTitle(); // o didDrawPage já faz isso
-      yPos = options.margin.top + 25; // Ajuste para não sobrepor o título redesenhado
+      yPos = options.margin.top + 25; 
     }
 
     doc.setFontSize(SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE);
@@ -233,9 +231,8 @@ export function generateSchedulePdf(
 
     if (cleaningTitleY + SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE > pageHeight - commonTableOptions.margin.bottom) {
         doc.addPage();
-        // drawMainScheduleTitle(); // o didDrawPage já faz isso
         currentPdfY = commonTableOptions.margin.top + 25;
-        cleaningTitleY = currentPdfY; // Reatribuir cleaningTitleY após addPage
+        cleaningTitleY = currentPdfY; 
     }
     doc.setFontSize(SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE);
     doc.setTextColor(52, 73, 94);
@@ -263,7 +260,7 @@ export function generateSchedulePdf(
             startY: currentPdfY,
             margin: { ...cleaningTableOptions.margin, left: pageMarginMain, right: pageWidth - pageMarginMain - tableWidth },
             columnStyles: { 0: { halign: 'left', cellWidth: 60 }, 1: { halign: 'left', cellWidth: 'auto' } },
-             didDrawPage: function (data: any) { // Copiado de commonTableOptions e adaptado
+             didDrawPage: function (data: any) { 
                 if (data.pageNumber > 1) {
                     drawMainScheduleTitle();
                 }
@@ -284,18 +281,18 @@ export function generateSchedulePdf(
         let marginParaSemanal = { ...cleaningTableOptions.margin };
         let tableWidthSemanal = contentWidth;
 
-        if (limpezaAposReuniaoData.length > 0) { // Se a tabela de limpeza pós reunião foi desenhada
-             if (lastTableOnPage < doc.internal.getNumberOfPages()) { // Se a tabela anterior causou quebra de página
-                startYParaSemanal = commonTableOptions.margin.top + 25; // Começa abaixo do título
+        if (limpezaAposReuniaoData.length > 0) { 
+             if (lastTableOnPage < doc.internal.getNumberOfPages()) { 
+                startYParaSemanal = commonTableOptions.margin.top + 25; 
                 marginParaSemanal.left = pageMarginMain;
                 marginParaSemanal.right = pageMarginMain;
                 tableWidthSemanal = contentWidth; 
-            } else { // Ambas cabem na mesma página (lado a lado)
+            } else { 
                 marginParaSemanal.left = pageMarginMain + tableWidth + 10;
                 marginParaSemanal.right = pageMarginMain;
                 tableWidthSemanal = tableWidth;
             }
-        } else { // Se a tabela de limpeza semanal é a primeira (ou única) tabela de limpeza
+        } else { 
             marginParaSemanal.left = pageMarginMain;
             marginParaSemanal.right = pageMarginMain;
             tableWidthSemanal = contentWidth;
@@ -310,7 +307,7 @@ export function generateSchedulePdf(
             startY: startYParaSemanal,
             margin: marginParaSemanal,
             columnStyles: { 0: { halign: 'left', cellWidth: 60 }, 1: { halign: 'left', cellWidth: 'auto' } },
-             didDrawPage: function (data: any) { // Copiado de commonTableOptions e adaptado
+             didDrawPage: function (data: any) { 
                 if (data.pageNumber > 1) {
                     drawMainScheduleTitle();
                 }
@@ -331,27 +328,30 @@ export function generateSchedulePdf(
 
 // --- PDF para Reunião Pública ---
 
-// Constantes de Estilo para Reunião Pública
 const RP_MARGIN = 40;
 const RP_CONTENT_WIDTH_OFFSET = 2 * RP_MARGIN;
-const RP_TEXT_COLOR_DARK_GRAY = [40, 40, 40];
-const RP_LINE_COLOR_MEDIUM_GRAY = [150, 150, 150];
 
+// Fontes e Cores
+const RP_FONT_FAMILY_NORMAL = 'helvetica';
+const RP_FONT_FAMILY_BOLD = 'helvetica';
+const RP_TEXT_COLOR_DARK_GRAY = [40, 40, 40]; // #282828
+const RP_LINE_COLOR_MEDIUM_GRAY = [100, 100, 100]; // #646464
+
+// Tamanhos de Fonte
 const RP_MAIN_TITLE_FONT_SIZE = 18;
-const RP_APP_NAME_FONT_SIZE = 9;
-const RP_MAIN_TITLE_Y_OFFSET = 20;
-const RP_APP_NAME_Y_OFFSET = 5;
-
-const RP_DATE_FONT_SIZE = 11; // Um pouco menor que o título, mas maior que detalhes
+const RP_DATE_FONT_SIZE = 12;
 const RP_DETAIL_FONT_SIZE = 10;
-const RP_LINE_SPACING_FACTOR = 1.4; // Para multilinhas nos detalhes
+const RP_LINE_HEIGHT_FACTOR = 1.4; // Multiplicador para espaçamento entre linhas de texto multilinhas
 const RP_BULLET = "\u2022"; // •
 
-const RP_SPACE_AFTER_MAIN_TITLE_BLOCK = 25;
-const RP_SPACE_AFTER_DATE = RP_DATE_FONT_SIZE * 0.4;
-const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2; 
-const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.5;
-const RP_SECTION_VERTICAL_SPACING = 35; // Aumentado para ocupar mais a página
+// Espaçamentos Verticais
+const RP_MAIN_TITLE_Y_OFFSET = 20;
+const RP_SPACE_AFTER_MAIN_TITLE = 25;
+const RP_SPACE_AFTER_DATE_TEXT = RP_DATE_FONT_SIZE * 0.2; // Pequeno espaço entre o texto da data e a linha
+const RP_HORIZONTAL_LINE_Y_OFFSET_AFTER_DATE = 2; // Adiciona este offset à posição Y da linha após o texto da data
+const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2; // Espaço entre a linha e o primeiro item de detalhe
+const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.6; // Espaço entre cada item de detalhe (Tema, Orador etc.)
+const RP_SECTION_VERTICAL_SPACING = 45; // Espaço ENTRE blocos de domingo completos
 
 function formatDisplayDateForPublicMeetingPdf(date: Date): string {
     const dayName = NOMES_DIAS_SEMANA_COMPLETOS[date.getUTCDay()];
@@ -378,36 +378,18 @@ export function generatePublicMeetingPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - RP_CONTENT_WIDTH_OFFSET;
 
-  const regularFont = 'helvetica'; // ou 'times'
-  const boldFont = 'helvetica';    // ou 'times'
-  
   let currentY = RP_MARGIN;
 
-  const drawHeader = (isFirstPage: boolean) => {
-    if (isFirstPage) {
-        // Nome da Congregação (APP_NAME)
-        doc.setFont(regularFont, 'normal');
-        doc.setFontSize(RP_APP_NAME_FONT_SIZE);
-        doc.setTextColor(128, 128, 128); // Cinza
-        doc.text(APP_NAME, RP_MARGIN, currentY + RP_APP_NAME_Y_OFFSET);
-    }
-
-    // Título Principal
-    doc.setFont(boldFont, 'bold'); // Em negrito
-    doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
-    doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
-    const mainTitleText = `REUNIÃO PÚBLICA - ${NOMES_MESES[mes].toUpperCase()} DE ${ano}`;
-    const mainTitleWidth = doc.getTextWidth(mainTitleText);
-    doc.text(mainTitleText, (pageWidth - mainTitleWidth) / 2, currentY + RP_MAIN_TITLE_Y_OFFSET);
-    
-    currentY += RP_MAIN_TITLE_Y_OFFSET + RP_MAIN_TITLE_FONT_SIZE - (isFirstPage ? 0 : RP_APP_NAME_FONT_SIZE + RP_APP_NAME_Y_OFFSET); // Ajusta se não for a primeira página
-    currentY += RP_SPACE_AFTER_MAIN_TITLE_BLOCK;
-  };
-
-  drawHeader(true);
+  // Título Principal
+  doc.setFont(RP_FONT_FAMILY_NORMAL, 'normal');
+  doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
+  doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
+  const mainTitleText = `REUNIÃO PÚBLICA - ${NOMES_MESES[mes].toUpperCase()} DE ${ano}`;
+  doc.text(mainTitleText, RP_MARGIN, currentY + RP_MAIN_TITLE_Y_OFFSET);
+  currentY += RP_MAIN_TITLE_Y_OFFSET + RP_SPACE_AFTER_MAIN_TITLE;
 
   const sundays = Object.keys(assignmentsForMonth)
-    .map(dateStr => new Date(dateStr + "T00:00:00Z"))
+    .map(dateStr => new Date(dateStr + "T00:00:00Z")) // Use Z para UTC
     .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica)
     .sort((a, b) => a.getTime() - b.getTime());
 
@@ -418,12 +400,12 @@ export function generatePublicMeetingPdf(
 
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     
-    let oradorText = getMemberNamePdf(assignment.orador, allMembers);
+    let oradorValue = getMemberNamePdf(assignment.orador, allMembers);
     if (typeof assignment.orador === 'string' && assignment.orador && !allMembers.find(m => m.id === assignment.orador)) {
-        oradorText = assignment.orador; // Usa o nome digitado se não for um ID de membro
+        oradorValue = assignment.orador;
     }
-    const congregacaoOradorText = assignment.congregacaoOrador ? `(${assignment.congregacaoOrador})` : (oradorText !== 'A Ser Designado' && oradorText !== 'Desconhecido' ? '(Local)' : '');
-    const oradorDisplay = `${congregacaoOradorText} ${oradorText}`.trim();
+    const congregacaoOradorText = assignment.congregacaoOrador ? `(${assignment.congregacaoOrador})` : (oradorValue !== 'A Ser Designado' && oradorValue !== 'Desconhecido' ? '(Local)' : '');
+    const oradorDisplay = `${congregacaoOradorText} ${oradorValue}`.trim();
 
     const detailItems = [
       { label: "Tema:", value: assignment.tema || 'A Ser Anunciado' },
@@ -433,73 +415,81 @@ export function generatePublicMeetingPdf(
     ];
     
     // Estimar altura da seção
-    let estimatedSectionHeight = RP_DATE_FONT_SIZE * RP_LINE_SPACING_FACTOR + RP_SPACE_AFTER_DATE + 1 + RP_SPACE_AFTER_LINE_BEFORE_DETAILS; // +1 for line
+    let estimatedSectionHeight = RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE_TEXT + RP_HORIZONTAL_LINE_Y_OFFSET_AFTER_DATE + 1 + RP_SPACE_AFTER_LINE_BEFORE_DETAILS; // +1 for line height approx
+    
+    doc.setFont(RP_FONT_FAMILY_BOLD, 'bold');
     let maxLabelWidth = 0;
-    doc.setFont(boldFont, 'bold');
-    doc.setFontSize(RP_DETAIL_FONT_SIZE);
     detailItems.forEach(item => {
         const currentLabelWidth = doc.getTextWidth(`${RP_BULLET} ${item.label} `);
         if (currentLabelWidth > maxLabelWidth) {
             maxLabelWidth = currentLabelWidth;
         }
     });
-    const valueStartX = RP_MARGIN + maxLabelWidth;
-    const availableWidthForValue = contentWidth - maxLabelWidth;
+    const valueStartX = RP_MARGIN + maxLabelWidth + 5; // 5pt de espaço entre label e value
+    const availableWidthForValue = contentWidth - (maxLabelWidth + 5);
 
-    doc.setFont(regularFont, 'normal');
+    doc.setFont(RP_FONT_FAMILY_NORMAL, 'normal');
     doc.setFontSize(RP_DETAIL_FONT_SIZE);
     detailItems.forEach(item => {
       const valueLines = doc.splitTextToSize(item.value, availableWidthForValue > 0 ? availableWidthForValue : 1);
-      estimatedSectionHeight += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_SPACING_FACTOR);
+      estimatedSectionHeight += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR);
       estimatedSectionHeight += RP_DETAIL_ITEM_VERTICAL_SPACING;
     });
-    estimatedSectionHeight -= RP_DETAIL_ITEM_VERTICAL_SPACING; // Remove o último espaçamento extra
+    estimatedSectionHeight -= RP_DETAIL_ITEM_VERTICAL_SPACING; 
     
-    if (index > 0) { // Adicionar espaçamento ANTES de verificar quebra de página para o próximo bloco
+    if (index > 0) { 
         currentY += RP_SECTION_VERTICAL_SPACING;
     }
 
     if (currentY + estimatedSectionHeight > pageHeight - RP_MARGIN) {
       doc.addPage();
       currentY = RP_MARGIN;
-      drawHeader(false); // Não é a primeira página, não desenha APP_NAME
+      // Não redesenha o título principal em novas páginas
     }
     
     // Data
-    doc.setFont(boldFont, 'bold');
+    doc.setFont(RP_FONT_FAMILY_BOLD, 'bold');
     doc.setFontSize(RP_DATE_FONT_SIZE);
     doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
     const formattedDateDisplay = formatDisplayDateForPublicMeetingPdf(sundayDate);
     doc.text(formattedDateDisplay, RP_MARGIN, currentY);
-    currentY += RP_DATE_FONT_SIZE * RP_LINE_SPACING_FACTOR * 0.8; // Ajuste para a linha não sobrepor
-    currentY += RP_SPACE_AFTER_DATE;
+    currentY += RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE_TEXT;
 
     // Linha Horizontal
     doc.setDrawColor(RP_LINE_COLOR_MEDIUM_GRAY[0], RP_LINE_COLOR_MEDIUM_GRAY[1], RP_LINE_COLOR_MEDIUM_GRAY[2]);
     doc.setLineWidth(0.5);
-    doc.line(RP_MARGIN, currentY, RP_MARGIN + contentWidth, currentY);
-    currentY += RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
+    const lineYPos = currentY + RP_HORIZONTAL_LINE_Y_OFFSET_AFTER_DATE;
+    doc.line(RP_MARGIN, lineYPos, RP_MARGIN + contentWidth, lineYPos);
+    currentY = lineYPos + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
     // Detalhes
     detailItems.forEach((item, itemIndex) => {
       const labelTextWithBullet = `${RP_BULLET} ${item.label} `;
-      doc.setFont(boldFont, 'bold');
+      doc.setFont(RP_FONT_FAMILY_BOLD, 'bold');
       doc.setFontSize(RP_DETAIL_FONT_SIZE);
       doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
       doc.text(labelTextWithBullet, RP_MARGIN, currentY);
       
-      doc.setFont(regularFont, 'normal'); // Valor em fonte normal
+      doc.setFont(RP_FONT_FAMILY_NORMAL, 'normal'); 
       const valueLines = doc.splitTextToSize(item.value, availableWidthForValue > 0 ? availableWidthForValue : 1);
       doc.text(valueLines, valueStartX, currentY);
       
-      currentY += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_SPACING_FACTOR);
+      currentY += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR);
       if (itemIndex < detailItems.length - 1) {
           currentY += RP_DETAIL_ITEM_VERTICAL_SPACING;
       }
     });
   });
+  
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    if(pageCount > 1) {
+        doc.text(`Página ${i} de ${pageCount}`, pageWidth - RP_MARGIN, pageHeight - 15, { align: 'right' });
+    }
+  }
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
-
-
