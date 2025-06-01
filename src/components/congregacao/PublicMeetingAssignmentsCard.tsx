@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Membro, PublicMeetingAssignment, AllPublicMeetingAssignments, DesignacoesFeitas, SubstitutionDetails } from '@/lib/congregacao/types';
-import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, FUNCOES_DESIGNADAS } from '@/lib/congregacao/constants';
+import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, FUNCOES_DESIGNADAS, APP_NAME } from '@/lib/congregacao/constants';
 import { formatarDataCompleta, formatarDataParaChave, obterNomeMes } from '@/lib/congregacao/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserPlus, BookOpenText, FileText, Edit3 } from 'lucide-react';
 import { MemberSelectionDialog } from './MemberSelectionDialog';
 import { useToast } from "@/hooks/use-toast";
+import { generatePublicMeetingPdf } from '@/lib/congregacao/pdf-generator';
 
 interface PublicMeetingAssignmentsCardProps {
   allMembers: Membro[];
@@ -75,7 +76,6 @@ export function PublicMeetingAssignmentsCard({
     const yearMonthKey = formatarDataParaChave(new Date(displayYear, displayMonth, 1));
 
     if (allPublicAssignments === null) {
-      // Se allPublicAssignments for null (ex: após limpar dados), inicialize todos os domingos como vazios.
       sundaysInMonth.forEach(dateObj => {
         const dateStr = formatarDataCompleta(dateObj);
         newAssignmentsState[dateStr] = {
@@ -86,7 +86,6 @@ export function PublicMeetingAssignmentsCard({
         };
       });
     } else {
-      // Caso contrário, processe normalmente.
       const monthDataFromProp = allPublicAssignments[yearMonthKey] || {};
       sundaysInMonth.forEach(dateObj => {
         const dateStr = formatarDataCompleta(dateObj);
@@ -149,10 +148,27 @@ export function PublicMeetingAssignmentsCard({
   };
 
   const handleExportPublicMeetingPDF = () => {
-    toast({
-      title: "Funcionalidade Indisponível",
-      description: "A exportação para PDF ainda não foi implementada.",
-    });
+    if (sundaysInMonth.length === 0 || Object.keys(assignments).length === 0) {
+        toast({
+            title: "Sem Dados",
+            description: "Não há dados de reunião pública para exportar para este mês.",
+            variant: "default",
+        });
+        return;
+    }
+    try {
+        generatePublicMeetingPdf(
+            assignments,
+            currentScheduleForMonth, // Pass main schedule for leitor info
+            allMembers,
+            displayMonth,
+            displayYear
+        );
+        toast({ title: "PDF Gerado", description: "O download do PDF da Reunião Pública deve iniciar em breve." });
+    } catch (e: any) {
+        console.error("Erro ao gerar PDF da Reunião Pública:", e);
+        toast({ title: "Erro ao Gerar PDF", description: e.message || "Não foi possível gerar o PDF.", variant: "destructive" });
+    }
   };
 
   const handleOpenLeitorSubstitution = (dateStr: string, leitorId: string | null) => {
@@ -222,7 +238,7 @@ export function PublicMeetingAssignmentsCard({
 
         {sundaysInMonth.map((dateObj, index) => {
           const dateStr = formatarDataCompleta(dateObj);
-          const dayAssignment = assignments[dateStr] || {}; // Garante que dayAssignment seja um objeto
+          const dayAssignment = assignments[dateStr] || {}; 
           const leitorDesignadoId = currentScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
           const nomeLeitorDesignado = getMemberName(leitorDesignadoId);
 
@@ -291,9 +307,13 @@ export function PublicMeetingAssignmentsCard({
         })}
         {sundaysInMonth.length > 0 && (
             <div className="mt-8 flex justify-end">
-            <Button variant="outline" onClick={handleExportPublicMeetingPDF}>
+            <Button 
+                variant="outline" 
+                onClick={handleExportPublicMeetingPDF}
+                disabled={sundaysInMonth.length === 0 || Object.keys(assignments).length === 0}
+            >
                 <FileText className="mr-2 h-4 w-4" />
-                Exportar como PDF (em breve)
+                Exportar como PDF
             </Button>
             </div>
         )}
