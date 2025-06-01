@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments, AllFieldServiceAssignments, ManagedListItem } from './types';
+import type { Membro, DesignacoesFeitas, AllPublicMeetingAssignments, AllNVMCAssignments, AllFieldServiceAssignments, ManagedListItem, DesignacaoSalva, TodosCronogramasSalvos } from './types';
 import { 
   LOCAL_STORAGE_KEY_MEMBROS, 
   LOCAL_STORAGE_KEY_SCHEDULE_CACHE,
@@ -38,36 +38,34 @@ export function salvarMembrosLocalmente(membros: Membro[]): void {
   }
 }
 
-
-export function carregarCacheDesignacoes(): { schedule: DesignacoesFeitas, mes: number, ano: number } | null {
+export function carregarCacheDesignacoes(): DesignacaoSalva | null {
   if (typeof window === 'undefined') return null;
   try {
     const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE);
     if (dadosSalvos) {
-      const parsedData = JSON.parse(dadosSalvos);
+      const parsedData = JSON.parse(dadosSalvos) as DesignacaoSalva;
+      // Adicionar validação básica da estrutura se necessário
       if (parsedData && typeof parsedData === 'object' && 
-          'schedule' in parsedData && 'mes' in parsedData && 'ano' in parsedData &&
-          typeof parsedData.schedule === 'object' && 
-          typeof parsedData.mes === 'number' && typeof parsedData.ano === 'number') {
-        return parsedData as { schedule: DesignacoesFeitas, mes: number, ano: number };
+          'schedule' in parsedData && 'mes' in parsedData && 'ano' in parsedData && 'status' in parsedData) {
+        return parsedData;
       } else {
-        console.warn("Cache de designações (aba 1) encontrado, mas com estrutura inválida. Limpando.");
-        localStorage.removeItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE);
-        return null;
+         console.warn("Cache de designações encontrado, mas com estrutura inválida. Limpando.");
+         localStorage.removeItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE);
+         return null;
       }
     }
   } catch (error) {
-    console.error("Erro ao carregar cache de designações (aba 1):", error);
+    console.error("Erro ao carregar cache de designações:", error);
   }
   return null;
 }
 
-export function salvarCacheDesignacoes(data: { schedule: DesignacoesFeitas, mes: number, ano: number }): void {
+export function salvarCacheDesignacoes(data: DesignacaoSalva): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE, JSON.stringify(data));
   } catch (error) {
-    console.error("Erro ao salvar cache de designações (aba 1):", error);
+    console.error("Erro ao salvar cache de designações:", error);
   }
 }
 
@@ -76,50 +74,68 @@ export function limparCacheDesignacoes(): void {
   try {
     localStorage.removeItem(LOCAL_STORAGE_KEY_SCHEDULE_CACHE);
   } catch (error) {
-    console.error("Erro ao limpar cache de designações (aba 1):", error);
+    console.error("Erro ao limpar cache de designações:", error);
   }
 }
 
-export function salvarDesignacoesUsuario(data: { schedule: DesignacoesFeitas, mes: number, ano: number }): void {
+
+export function carregarTodosCronogramas(): TodosCronogramasSalvos | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
+    if (dadosSalvos) {
+      const parsedData = JSON.parse(dadosSalvos) as TodosCronogramasSalvos;
+      // Basic validation: check if it's an object (and not an array)
+      if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+        // Further validation for each entry can be added here if needed
+        return parsedData;
+      } else {
+        console.warn("Dados de cronogramas salvos encontrados, mas com estrutura inválida (esperado objeto, recebido array ou outro). Limpando.");
+        localStorage.removeItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao carregar todos os cronogramas do localStorage:", error);
+  }
+  return null; // Return null if not found or error
+}
+
+export function salvarTodosCronogramas(cronogramas: TodosCronogramasSalvos): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_USER_SCHEDULE, JSON.stringify(data));
+    localStorage.setItem(LOCAL_STORAGE_KEY_USER_SCHEDULE, JSON.stringify(cronogramas));
+  } catch (error) {
+    console.error("Erro ao salvar todos os cronogramas no localStorage:", error);
+  }
+}
+
+export function salvarDesignacoesUsuario(designacaoParaSalvar: DesignacaoSalva): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const todosCronogramas = carregarTodosCronogramas() || {};
+    const yearMonthKey = `${designacaoParaSalvar.ano}-${String(designacaoParaSalvar.mes + 1).padStart(2, '0')}`;
+    todosCronogramas[yearMonthKey] = designacaoParaSalvar; // Salva com status 'rascunho'
+    salvarTodosCronogramas(todosCronogramas);
+    // O cache principal (LOCAL_STORAGE_KEY_SCHEDULE_CACHE) pode ser atualizado aqui também se desejado,
+    // ou deixado para ser carregado a partir de LOCAL_STORAGE_KEY_USER_SCHEDULE na próxima vez.
+    // Por consistência com o botão "Finalizar", que limpa o cache, talvez seja melhor não salvar no cache aqui.
+    // Ou, se salvar, garantir que o status 'rascunho' seja o correto.
+    // Vamos manter o cache atualizado com o que está sendo trabalhado:
+    salvarCacheDesignacoes(designacaoParaSalvar);
   } catch (error) {
     console.error("Erro ao salvar designações do usuário:", error);
   }
 }
 
-export function carregarDesignacoesUsuario(): { schedule: DesignacoesFeitas, mes: number, ano: number } | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
-    if (dadosSalvos) {
-      const parsedData = JSON.parse(dadosSalvos);
-      if (parsedData && typeof parsedData === 'object' &&
-          'schedule' in parsedData && 'mes' in parsedData && 'ano' in parsedData &&
-          typeof parsedData.schedule === 'object' &&
-          typeof parsedData.mes === 'number' && typeof parsedData.ano === 'number') {
-        return parsedData as { schedule: DesignacoesFeitas, mes: number, ano: number };
-      } else {
-        console.warn("Designações de usuário encontradas, mas com estrutura inválida. Limpando.");
-        localStorage.removeItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
-        return null;
-      }
-    }
-  } catch (error) {
-    console.error("Erro ao carregar designações do usuário:", error);
-  }
-  return null;
-}
-
-export function limparDesignacoesUsuario(): void {
+export function limparTodosCronogramasSalvos(): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(LOCAL_STORAGE_KEY_USER_SCHEDULE);
   } catch (error) {
-    console.error("Erro ao limpar designações do usuário:", error);
+    console.error("Erro ao limpar todos os cronogramas salvos:", error);
   }
 }
+
 
 // Funções para a aba "Reunião Pública"
 export function carregarPublicMeetingAssignments(): AllPublicMeetingAssignments | null {
@@ -128,7 +144,6 @@ export function carregarPublicMeetingAssignments(): AllPublicMeetingAssignments 
     const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY_PUBLIC_MEETING_ASSIGNMENTS);
     if (dadosSalvos) {
       const parsedData = JSON.parse(dadosSalvos) as AllPublicMeetingAssignments;
-      // Adicionar validação básica da estrutura se necessário
       if (parsedData && typeof parsedData === 'object') {
         return parsedData;
       } else {
@@ -208,7 +223,6 @@ export function carregarFieldServiceAssignments(): AllFieldServiceAssignments | 
     if (dadosSalvos) {
       const parsedData = JSON.parse(dadosSalvos) as AllFieldServiceAssignments;
       if (parsedData && typeof parsedData === 'object') {
-        // Adicionar aqui uma validação mais profunda da estrutura se necessário
         return parsedData;
       } else {
          console.warn("Cache de Serviço de Campo encontrado, mas com estrutura inválida. Limpando.");

@@ -52,8 +52,14 @@ export default function Home() {
     updateMemberHistory,
     persistMembros: hookPersistMembros,
   } = useMemberManagement();
-
-  const scheduleManagement = useScheduleManagement({ membros, updateMemberHistory });
+  
+  // Initialize scheduleManagement before destructuring its properties
+  const scheduleManagement = useScheduleManagement({ membros, updateMemberHistory }); 
+  const {
+    status, 
+    salvarDesignacoes, 
+    finalizarCronograma, 
+  } = scheduleManagement;
 
   const {
     publicAssignmentsData,
@@ -76,7 +82,6 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Carregamento de NVMC e Serviço de Campo permanece aqui por enquanto
     setAllNvmcAssignmentsData(carregarNVMCAssignments());
     setAllFieldServiceAssignmentsData(carregarFieldServiceAssignments());
   }, []);
@@ -89,7 +94,7 @@ export default function Home() {
 
   const limparCacheDesignacoesPublicMeetingCallback = useCallback(() => {
     clearPublicAssignments();
-    setPublicMeetingCardKey(prev => prev + 1); // Força re-render do card
+    setPublicMeetingCardKey(prev => prev + 1); 
   }, [clearPublicAssignments]);
 
   const limparCacheNVMCAssignments = useCallback(() => {
@@ -121,8 +126,6 @@ export default function Home() {
     return { success, error };
   };
   
-  // handleSavePublicMeetingAssignments agora é savePublicAssignments do hook usePublicMeetingAssignments
-
   const handleSaveNvmcAssignments = (
     monthAssignments: { [dateStr: string]: NVMCDailyAssignments },
     mes: number,
@@ -247,6 +250,26 @@ export default function Home() {
     });
   };
 
+  const handleSaveProgressClick = () => {
+    const { success, error } = salvarDesignacoes(); // Correctly using destructured salvarDesignacoes
+    if (success) {
+      toast({ title: "Sucesso", description: "Progresso salvo com sucesso." });
+    } else if (error) { // Check if error exists before using it
+      toast({ title: "Erro", description: error, variant: "destructive" });
+    } else {
+       toast({ title: "Erro", description: "Erro ao salvar progresso.", variant: "destructive" });
+    }
+  };
+
+  const handleFinalizeScheduleClick = async () => {
+    const result = await finalizarCronograma(); // Correctly using destructured finalizarCronograma
+    if (result.success) {
+      toast({ title: "Sucesso", description: "Cronograma finalizado com sucesso." });
+    } else if (result.error) {
+      toast({ title: "Erro", description: result.error, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 min-h-screen flex flex-col">
       <header className="mb-8 text-center">
@@ -299,6 +322,9 @@ export default function Home() {
                     onOpenSubstitutionModal={handleOpenSubstitutionModal}
                     onDirectAssignAV={handleDirectAssignAV}
                     onLimpezaChange={scheduleManagement.updateLimpezaAssignment}
+                    status={status} 
+                    onSaveProgress={handleSaveProgressClick} 
+                    onFinalizeSchedule={handleFinalizeScheduleClick} 
                   />
                 </TabsContent>
                 <TabsContent value="reuniao-publica" className="pt-0">
@@ -393,7 +419,7 @@ export default function Home() {
           toast({ title: "Dados Limpos", description: "Designações de Indicadores/Volantes/AV/Limpeza foram limpas." });
         }}
         onClearPublicMeetingData={() => {
-          limparCacheDesignacoesPublicMeetingCallback(); // Usa o callback que chama o hook
+          limparCacheDesignacoesPublicMeetingCallback(); 
           toast({ title: "Dados Limpos", description: "Dados da Reunião Pública foram limpos." });
         }}
         onClearNvmcData={() => { 
@@ -420,4 +446,4 @@ export default function Home() {
     </div>
   );
 }
-
+    

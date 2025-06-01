@@ -37,17 +37,22 @@ export interface DesignacoesFeitas {
   [dataStr: string]: {
     // Key: idFuncao
     [funcaoId: string]: string | null; // Value: idMembro or null if unassigned
-    limpezaAposReuniaoGrupoId?: string | null;
-    limpezaSemanalResponsavel?: string;
+    limpezaAposReuniaoGrupoId?: string | null; // This can be null, string or undefined
+    limpezaSemanalResponsavel?: string | null; // This can be null, string or undefined
   };
 }
 
-export interface DesignacoesSalvasHistorico {
-  // Key: "AAAA-MM"
-  [anoMes: string]: {
-    designacoes: DesignacoesFeitas;
-  };
+export interface DesignacaoSalva {
+  schedule: DesignacoesFeitas;
+  mes: number; // 0-11
+  ano: number;
+  status: 'rascunho' | 'finalizado';
 }
+
+export interface TodosCronogramasSalvos {
+  [yearMonthKey: string]: DesignacaoSalva; // Key: "YYYY-MM" (e.g., "2024-07")
+}
+
 
 export interface DiasReuniao {
   meioSemana: number; // 0 (Dom) - 6 (Sab)
@@ -171,7 +176,6 @@ export interface FieldServiceMeetingSlot {
   modalityId?: string | null; // ID da lista de modalidades gerenciadas
   baseLocationId?: string | null; // ID da lista de locais base gerenciados
   additionalDetails?: string; // Campo de texto para "Grupos 1,2" ou "1º Sábado"
-  // locationDetails: string; // <- Campo antigo, será substituído
   assignedDates: FieldServiceMeetingDateEntry[];
 }
 

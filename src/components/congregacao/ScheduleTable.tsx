@@ -17,6 +17,7 @@ interface ScheduleTableProps {
   onCellClick?: (date: string, columnKey: string, originalMemberId: string | null, originalMemberName: string | null, tableTitle: string) => void;
   currentFullDateStrings: string[];
   isAVTable?: boolean;
+ isReadOnly: boolean;
 }
 
 export function ScheduleTable({ title, data, columns, allMembers, onCellClick, currentFullDateStrings, isAVTable = false }: ScheduleTableProps) {
@@ -88,7 +89,7 @@ export function ScheduleTable({ title, data, columns, allMembers, onCellClick, c
                         key={col.key} 
                         className={isAVTable ? 'min-w-[100px]' : ''}
                       >
-                        {onCellClick ? (
+                        {onCellClick && !isReadOnly ? (
                           <Button
                             variant="link"
                             className="p-0 h-auto text-sm font-normal text-primary hover:underline w-full justify-start"

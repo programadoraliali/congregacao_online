@@ -199,6 +199,7 @@ interface ScheduleDisplayProps {
     onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
     onOpenAVMemberSelectionDialog: (dateStr: string, functionId: string, columnKey: string, currentMemberId: string | null) => void;
     onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
+ status: string | null;
 }
 
 // Helper function to get ISO week number
@@ -219,6 +220,7 @@ export function ScheduleDisplay({
     onOpenSubstitutionModal,
     onOpenAVMemberSelectionDialog,
     onLimpezaChange,
+ status,
 }: ScheduleDisplayProps) {
   const { toast } = useToast();
 
@@ -238,6 +240,10 @@ export function ScheduleDisplay({
     originalMemberName: string | null,
     tableTitle: string
   ) => {
+ if (status === 'finalizado') {
+ return; // Do nothing if the schedule is finalized
+ }
+
     const realFunctionId = getRealFunctionId(columnKey, date, tableTitle);
 
     if (tableTitle === 'Áudio/Vídeo (AV)') {
@@ -320,6 +326,7 @@ export function ScheduleDisplay({
             allMembers={membros}
             onCellClick={handleCellClick}
             currentFullDateStrings={dadosIndicadores.fullDateStrings}
+ isReadOnly={status === 'finalizado'}
           />
           <ScheduleTable
             title="Volantes"
@@ -328,6 +335,7 @@ export function ScheduleDisplay({
             allMembers={membros}
             onCellClick={handleCellClick}
             currentFullDateStrings={dadosVolantes.fullDateStrings}
+ isReadOnly={status === 'finalizado'}
           />
           <ScheduleTable
             title="Áudio/Vídeo (AV)"
@@ -337,6 +345,7 @@ export function ScheduleDisplay({
             onCellClick={handleCellClick}
             currentFullDateStrings={dadosAV.fullDateStrings}
             isAVTable={true}
+ isReadOnly={status === 'finalizado'}
           />
       </div>
 
@@ -366,6 +375,7 @@ export function ScheduleDisplay({
                       <Select
                         value={currentGroupId ?? NONE_GROUP_ID}
                         onValueChange={(value) => onLimpezaChange(dateStr, 'aposReuniao', value === NONE_GROUP_ID ? null : value)}
+ disabled={status === 'finalizado'}
                       >
                         <SelectTrigger className="flex-1 h-9 text-sm">
                           <SelectValue placeholder="Selecione o grupo" />
@@ -396,6 +406,7 @@ export function ScheduleDisplay({
                         value={currentResponsavel}
                         onChange={(e) => onLimpezaChange(week.dateKey, 'semanal', e.target.value)}
                         placeholder="Responsáveis"
+ disabled={status === 'finalizado'}
                         className="flex-1 h-9 text-sm"
                       />
                     </div>

@@ -23,6 +23,9 @@ interface ScheduleGenerationCardProps {
   currentSchedule: DesignacoesFeitas | null;
   currentMes: number | null;
   currentAno: number | null;
+  status: string | null; // Added status field
+  onFinalizeSchedule: () => Promise<{ success: boolean; error?: string }>; // Added finalize handler
+  onSaveProgress: () => void; // Added save progress handler
   onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
   onDirectAssignAV: (date: string, functionId: string, newMemberId: string | null, originalMemberId: string | null) => void;
   onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
@@ -42,6 +45,9 @@ export function ScheduleGenerationCard({
   currentSchedule,   // Agora é scheduleData do hook
   currentMes,        // Agora é scheduleMes do hook
   currentAno,         // Agora é scheduleAno do hook
+  status, // Received status prop
+  onFinalizeSchedule, // Received finalize handler
+  onSaveProgress, // Received save progress handler
   onOpenSubstitutionModal,
   onDirectAssignAV,
   onLimpezaChange // Nova prop
@@ -220,6 +226,7 @@ export function ScheduleGenerationCard({
                 Designações para {NOMES_MESES[currentMes]} de {currentAno}
               </h3>
               <ScheduleDisplay
+                status={status} // Pass status to ScheduleDisplay
                 designacoesFeitas={currentSchedule}
                 membros={membros}
                 mes={currentMes}
@@ -228,6 +235,16 @@ export function ScheduleGenerationCard({
                 onOpenAVMemberSelectionDialog={handleOpenAVMemberSelection}
                 onLimpezaChange={onLimpezaChange} // Passa a prop adiante
               />
+               {status === 'rascunho' && (
+                 <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button onClick={onSaveProgress} disabled={!currentSchedule || isLoading}>
+                    Salvar Progresso
+                  </Button>
+                  <Button onClick={onFinalizeSchedule} disabled={!currentSchedule || isLoading}>
+                    Finalizar e Salvar Mês
+                  </Button>
+                </div>
+              )}
               <div className="mt-6 text-center">
                 <Button variant="outline" onClick={handleExportPDF} disabled={!currentSchedule || isLoading}>
                   <FileText className="mr-2 h-4 w-4" /> Exportar como PDF
@@ -237,6 +254,11 @@ export function ScheduleGenerationCard({
           )}
           {!isLoading && !currentSchedule && !error && (
              <p className="text-muted-foreground text-center py-4">
+              {status === 'finalizado' ? (
+                `O cronograma para ${NOMES_MESES[currentMes]} de ${currentAno} foi finalizado.`
+              ) : (
+                 "Nenhum cronograma carregado. "
+              )}
               Selecione o mês e ano e clique em "Gerar Cronograma" para ver as designações de Indicadores/Volantes.
               As designações de AV e Limpeza são preenchidas manualmente.
             </p>
@@ -257,6 +279,7 @@ export function ScheduleGenerationCard({
           dialogDescription={`Escolha um membro para ${FUNCOES_DESIGNADAS.find(f=>f.id === avSelectionContext.functionId)?.nome || 'esta função de AV'} em ${new Date(avSelectionContext.dateStr + "T00:00:00").toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}.`}
         />
       )}
+     {status && <p className="text-sm text-center text-muted-foreground mt-4">Status: {status === 'rascunho' ? 'Rascunho' : 'Finalizado'}</p>}
     </Card>
   );
 }
