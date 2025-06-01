@@ -16,12 +16,13 @@ const RP_DATE_FONT_SIZE = 12;
 const RP_DETAIL_FONT_SIZE = 10;
 const RP_LINE_HEIGHT_FACTOR = 1.3;
 
-const RP_SPACE_AFTER_MAIN_TITLE = 40; // Dobrado de 20
-const RP_SPACE_AFTER_DATE = 2.5;      // Diminuído de 5
+const RP_SPACE_AFTER_MAIN_TITLE = 40;
+const RP_SPACE_AFTER_DATE = 2.5;
 const RP_LINE_THICKNESS = 0.5;
-const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2; // Aumentado
+const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2;
 const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.7;
-const RP_SECTION_VERTICAL_SPACING = 45; // Aumentado para espaçar mais entre os domingos
+// MODIFICADO: Reduzido o espaçamento entre as seções para evitar quebra de página.
+const RP_SECTION_VERTICAL_SPACING = 35; 
 
 const RP_COLOR_TEXT_DEFAULT_R = 50;
 const RP_COLOR_TEXT_DEFAULT_G = 50;
@@ -71,11 +72,13 @@ export function generatePublicMeetingPdf(
   let currentY = RP_MARGIN_TOP;
   let isFirstBlockOnPage = true;
 
-  // Título Principal (sem alterações)
+  // MODIFICADO: A linha abaixo, que adicionava o nome "CONGREGAÇÃO ONLINE", foi removida.
+  /*
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(RP_APP_NAME_FONT_SIZE);
   doc.setTextColor(RP_COLOR_TEXT_MUTED_R, RP_COLOR_TEXT_MUTED_G, RP_COLOR_TEXT_MUTED_B);
   doc.text(APP_NAME.toUpperCase(), RP_MARGIN_LEFT, currentY - RP_APP_NAME_FONT_SIZE - 5);
+  */
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
@@ -83,6 +86,7 @@ export function generatePublicMeetingPdf(
   const mainTitleText = `REUNIÃO PÚBLICA`;
   doc.text(mainTitleText, RP_MARGIN_LEFT, currentY);
   currentY += RP_MAIN_TITLE_FONT_SIZE * 0.7 + RP_SPACE_AFTER_MAIN_TITLE;
+
 
   const sundays = Object.keys(assignmentsForMonth)
     .map(dateStr => new Date(dateStr + "T00:00:00Z"))
@@ -96,6 +100,7 @@ export function generatePublicMeetingPdf(
 
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     
+    // MODIFICADO: Lógica do Orador e Congregação ajustada.
     let oradorBaseName: string = "A Ser Designado";
     const oradorInput = assignment.orador;
     const congregacaoInput = assignment.congregacaoOrador;
@@ -108,18 +113,13 @@ export function generatePublicMeetingPdf(
             oradorBaseName = oradorInput;
         }
     }
-
-    let oradorDisplayValue = oradorBaseName;
-    if (congregacaoInput && congregacaoInput.trim() !== '') {
-        oradorDisplayValue = `${oradorBaseName} (${congregacaoInput})`;
-    }
-
-    // --- LÓGICA MODIFICADA ---
-    // NOVO: Separamos o tema dos outros itens para tratá-lo de forma especial.
+    
     const temaValue = assignment.tema || 'A Ser Anunciado';
 
+    // MODIFICADO: O campo "Congregação" foi adicionado como um item separado.
     const detailItemsConfig: { label: string; value: string }[] = [
-      { label: `Orador:`, value: oradorDisplayValue },
+      { label: `Orador:`, value: oradorBaseName },
+      { label: `Congregação:`, value: congregacaoInput || 'Local' },
       { label: `Dirigente de A Sentinela:`, value: getMemberNamePdf(assignment.dirigenteId, allMembers) },
       { label: `Leitor de A Sentinela:`, value: getMemberNamePdf(leitorId, allMembers) }
     ];
@@ -135,16 +135,12 @@ export function generatePublicMeetingPdf(
     });
     const valueStartX = RP_MARGIN_LEFT + maxLabelWidth;
     const availableWidthForValue = contentWidth - maxLabelWidth > 0 ? contentWidth - maxLabelWidth : 1;
-
-    // MODIFICADO: Cálculo da altura da seção foi ajustado para o novo layout.
-    let estimatedSectionHeight = RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE + RP_LINE_THICKNESS + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
     
-    // NOVO: Adiciona a altura do tema.
-    doc.setFont('helvetica', 'italic'); // Definir a fonte antes de splitTextToSize para cálculo correto
-    doc.setFontSize(RP_DETAIL_FONT_SIZE + 1);
+    // MODIFICADO: A lógica de quebra de página foi removida.
+    /*
+    let estimatedSectionHeight = RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE + RP_LINE_THICKNESS + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
     const temaLines = doc.splitTextToSize(temaValue, contentWidth);
-    estimatedSectionHeight += (temaLines.length * (RP_DETAIL_FONT_SIZE + 1) * RP_LINE_HEIGHT_FACTOR) + RP_SPACE_AFTER_LINE_BEFORE_DETAILS; // Espaço extra após o tema.
-
+    estimatedSectionHeight += (temaLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR) + RP_SPACE_AFTER_LINE_BEFORE_DETAILS; 
     detailItemsConfig.forEach(itemConf => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(RP_DETAIL_FONT_SIZE);
@@ -153,23 +149,20 @@ export function generatePublicMeetingPdf(
       estimatedSectionHeight += RP_DETAIL_ITEM_VERTICAL_SPACING;
     });
     estimatedSectionHeight -= RP_DETAIL_ITEM_VERTICAL_SPACING;
-
     if (!isFirstBlockOnPage) {
       estimatedSectionHeight += RP_SECTION_VERTICAL_SPACING;
     }
-
     if (currentY + estimatedSectionHeight > pageHeight - RP_MARGIN_BOTTOM) {
       doc.addPage();
       currentY = RP_MARGIN_TOP;
       isFirstBlockOnPage = true;
     }
+    */
 
     if (!isFirstBlockOnPage) {
         currentY += RP_SECTION_VERTICAL_SPACING;
     }
     
-    // --- LÓGICA DE DESENHO MODIFICADA ---
-    // 1. Data (sem alteração)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_DATE_FONT_SIZE);
     doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
@@ -177,23 +170,19 @@ export function generatePublicMeetingPdf(
     doc.text(formattedDateDisplay, RP_MARGIN_LEFT, currentY);
     currentY += RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE;
 
-    // 2. Linha Horizontal (sem alteração)
     doc.setDrawColor(RP_COLOR_LINE_R, RP_COLOR_LINE_G, RP_COLOR_LINE_B);
     doc.setLineWidth(RP_LINE_THICKNESS);
     doc.line(RP_MARGIN_LEFT, currentY, RP_MARGIN_LEFT + contentWidth, currentY);
     currentY += RP_LINE_THICKNESS + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
-    // NOVO: 3. Desenha o Tema de forma centralizada e com estilo próprio
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(RP_DETAIL_FONT_SIZE + 1); // Um pouco maior para destaque
+    doc.setFontSize(RP_DETAIL_FONT_SIZE + 1);
     doc.setTextColor(RP_COLOR_TEXT_MUTED_R, RP_COLOR_TEXT_MUTED_G, RP_COLOR_TEXT_MUTED_B);
-    // Recalcula temaLines com a fonte correta para text()
-    const temaLinesForDrawing = doc.splitTextToSize(temaValue, contentWidth); 
-    doc.text(temaLinesForDrawing, pageWidth / 2, currentY, { align: 'center', maxWidth: contentWidth });
-    const temaHeight = (temaLinesForDrawing.length * (RP_DETAIL_FONT_SIZE + 1) * RP_LINE_HEIGHT_FACTOR);
-    currentY += temaHeight + RP_SPACE_AFTER_LINE_BEFORE_DETAILS; // Espaço extra após o tema
+    const temaLines = doc.splitTextToSize(temaValue, contentWidth); // Recalculado para obter altura
+    doc.text(temaValue, pageWidth / 2, currentY, { align: 'center', maxWidth: contentWidth });
+    const temaHeight = (temaLines.length * (RP_DETAIL_FONT_SIZE + 1) * RP_LINE_HEIGHT_FACTOR);
+    currentY += temaHeight + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
-    // 4. Desenha os outros itens (lógica original, agora aplicada apenas aos itens restantes)
     detailItemsConfig.forEach((itemConf, itemIndex) => {
       doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
       
@@ -216,7 +205,8 @@ export function generatePublicMeetingPdf(
     isFirstBlockOnPage = false;
   });
   
-  // Paginação (sem alterações)
+  // MODIFICADO: Lógica de paginação removida, conforme solicitado.
+  /*
   const pageCount = doc.internal.getNumberOfPages();
   if (pageCount > 1) {
     for (let i = 1; i <= pageCount; i++) {
@@ -226,6 +216,7 @@ export function generatePublicMeetingPdf(
       doc.text(`Página ${i} de ${pageCount}`, pageWidth - RP_MARGIN_RIGHT, pageHeight - (RP_MARGIN_BOTTOM / 2), { align: 'right' });
     }
   }
+  */
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
@@ -342,3 +333,5 @@ export function generateSchedulePdf(
 
   doc.save(`cronograma_principal_${monthName.toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
+
+    
