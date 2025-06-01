@@ -10,18 +10,19 @@ const RP_MARGIN_BOTTOM = 40;
 const RP_MARGIN_LEFT = 40;
 const RP_MARGIN_RIGHT = 40;
 
-const RP_APP_NAME_FONT_SIZE = 9;
 const RP_MAIN_TITLE_FONT_SIZE = 18;
 const RP_DATE_FONT_SIZE = 12;
 const RP_DETAIL_FONT_SIZE = 10;
 const RP_LINE_HEIGHT_FACTOR = 1.3;
 
 const RP_SPACE_AFTER_MAIN_TITLE = 40;
-const RP_SPACE_AFTER_DATE = 2.5;
+// const RP_SPACE_AFTER_DATE = 2.5; // Removido, será incorporado na altura do header
 const RP_LINE_THICKNESS = 0.5;
 const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2;
 const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.7;
-const RP_SECTION_VERTICAL_SPACING = 35; 
+
+// MODIFICADO: Aumentado o espaçamento para melhor aproveitamento da página com 4 ou 5 domingos.
+const RP_SECTION_VERTICAL_SPACING = 55; 
 
 const RP_COLOR_TEXT_DEFAULT_R = 50;
 const RP_COLOR_TEXT_DEFAULT_G = 50;
@@ -33,6 +34,15 @@ const RP_COLOR_TEXT_MUTED_B = 120;
 const RP_COLOR_LINE_R = 100;
 const RP_COLOR_LINE_G = 100;
 const RP_COLOR_LINE_B = 100;
+
+// NOVO: Constantes para o cabeçalho da data
+const RP_DATE_HEADER_RECT_HEIGHT = RP_DATE_FONT_SIZE * 2.2; // Altura da faixa colorida
+const RP_DATE_HEADER_BG_R = 220; // Cinza claro azulado
+const RP_DATE_HEADER_BG_G = 225;
+const RP_DATE_HEADER_BG_B = 230;
+const RP_DATE_HEADER_TEXT_R = 255; // Branco
+const RP_DATE_HEADER_TEXT_G = 255;
+const RP_DATE_HEADER_TEXT_B = 255;
 
 const RP_BULLET = "\u2022";
 
@@ -65,6 +75,7 @@ export function generatePublicMeetingPdf(
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
+  // const pageHeight = doc.internal.pageSize.getHeight(); // Não usado se não há quebra de página
   const contentWidth = pageWidth - RP_MARGIN_LEFT - RP_MARGIN_RIGHT;
 
   let currentY = RP_MARGIN_TOP;
@@ -87,7 +98,6 @@ export function generatePublicMeetingPdf(
     const assignment = assignmentsForMonth[dateStr];
     if (!assignment) return;
 
-    // Pega os valores necessários
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     let oradorBaseName: string = "A Ser Designado";
     const oradorInput = assignment.orador;
@@ -100,23 +110,38 @@ export function generatePublicMeetingPdf(
     const leitorValue = getMemberNamePdf(leitorId, allMembers);
     const temaValue = assignment.tema || 'A Ser Anunciado';
     
-    // Espaçamento entre seções
     if (!isFirstBlockOnPage) {
         currentY += RP_SECTION_VERTICAL_SPACING;
     }
     
-    // Desenha a Data
+    // --- NOVO: Desenho do Cabeçalho da Data Colorido ---
+    const dateHeaderY = currentY;
+    doc.setFillColor(RP_DATE_HEADER_BG_R, RP_DATE_HEADER_BG_G, RP_DATE_HEADER_BG_B);
+    doc.rect(RP_MARGIN_LEFT, dateHeaderY, contentWidth, RP_DATE_HEADER_RECT_HEIGHT, 'F'); // 'F' para preenchido
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_DATE_FONT_SIZE);
-    doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
-    doc.text(formatDisplayDateForPublicMeetingPdf(sundayDate), RP_MARGIN_LEFT, currentY);
-    currentY += RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE;
+    doc.setTextColor(RP_DATE_HEADER_TEXT_R, RP_DATE_HEADER_TEXT_G, RP_DATE_HEADER_TEXT_B);
+    const formattedDateDisplay = formatDisplayDateForPublicMeetingPdf(sundayDate);
+    // Calcula Y para centralizar texto da data verticalmente no retângulo
+    const dateTextDimensions = doc.getTextDimensions(formattedDateDisplay, { fontSize: RP_DATE_FONT_SIZE });
+    const dateTextY = dateHeaderY + (RP_DATE_HEADER_RECT_HEIGHT / 2) + (dateTextDimensions.h / 2) - (doc.getLineHeightFactor() * doc.getFontSize() / (2 * doc.getK()) * 0.35); // Ajuste fino para baseline
+    doc.text(formattedDateDisplay, RP_MARGIN_LEFT + 10, dateTextY); // Adiciona um pequeno padding esquerdo
+    
+    currentY += RP_DATE_HEADER_RECT_HEIGHT; 
+    // --- FIM DO CABEÇALHO DA DATA ---
 
-    // Desenha a Linha Horizontal
-    doc.setDrawColor(RP_COLOR_LINE_R, RP_COLOR_LINE_G, RP_COLOR_LINE_B);
+    // Repõe a cor padrão do texto para o restante
+    doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
+    currentY += RP_SPACE_AFTER_LINE_BEFORE_DETAILS / 2; // Espaço menor após header colorido
+
+    // Desenha a Linha Horizontal (OPCIONAL: pode não ser mais necessária com o header colorido)
+    // Se decidir manter, ajuste o Y dela. Por ora, vou remover para um look mais limpo.
+    /* doc.setDrawColor(RP_COLOR_LINE_R, RP_COLOR_LINE_G, RP_COLOR_LINE_B);
     doc.setLineWidth(RP_LINE_THICKNESS);
     doc.line(RP_MARGIN_LEFT, currentY, RP_MARGIN_LEFT + contentWidth, currentY);
     currentY += RP_LINE_THICKNESS + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
+    */
 
     // Desenha o Tema Centralizado
     doc.setFont('helvetica', 'italic');
@@ -127,9 +152,9 @@ export function generatePublicMeetingPdf(
     const temaHeight = (temaLines.length * (RP_DETAIL_FONT_SIZE + 1) * RP_LINE_HEIGHT_FACTOR);
     currentY += temaHeight + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
-    // --- NOVO: Bloco de desenho com Agrupamento Vertical ---
+    // Bloco de desenho com Agrupamento Vertical (sem alterações neste bloco)
     const col1_X = RP_MARGIN_LEFT;
-    const col2_X = RP_MARGIN_LEFT + (contentWidth / 2) + 10; // Segunda coluna com um respiro
+    const col2_X = RP_MARGIN_LEFT + (contentWidth / 2) + 10;
     const labelFont = 'helvetica';
     const labelWeight = 'bold';
     const valueFont = 'helvetica';
@@ -137,49 +162,43 @@ export function generatePublicMeetingPdf(
     doc.setFontSize(RP_DETAIL_FONT_SIZE);
     doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
 
-    // Rótulos
     const labelOrador = `${RP_BULLET} Orador:`;
     const labelCongregacao = `${RP_BULLET} Congregação:`;
     const labelDirigente = `${RP_BULLET} Dirigente:`;
     const labelLeitor = `${RP_BULLET} Leitor:`;
 
-    // NOVO: Calcula a largura máxima do rótulo em cada coluna para alinhar os valores
     const maxLabelWidthCol1 = Math.max(doc.getTextWidth(labelOrador), doc.getTextWidth(labelCongregacao));
     const maxLabelWidthCol2 = Math.max(doc.getTextWidth(labelDirigente), doc.getTextWidth(labelLeitor));
-
-    const valueX_Col1 = col1_X + maxLabelWidthCol1 + 5; // Posição X para os valores da Coluna 1
-    const valueX_Col2 = col2_X + maxLabelWidthCol2 + 5; // Posição X para os valores da Coluna 2
+    const valueX_Col1 = col1_X + maxLabelWidthCol1 + 5;
+    const valueX_Col2 = col2_X + maxLabelWidthCol2 + 5;
     
-    // Linha 1: Orador e Dirigente
     let currentLineY = currentY;
     doc.setFont(labelFont, labelWeight);
     doc.text(labelOrador, col1_X, currentLineY);
     doc.text(labelDirigente, col2_X, currentLineY);
-    
     doc.setFont(valueFont, valueWeight);
     doc.text(oradorBaseName, valueX_Col1, currentLineY);
     doc.text(dirigenteValue, valueX_Col2, currentLineY);
-    
     currentY += RP_DETAIL_FONT_SIZE + RP_DETAIL_ITEM_VERTICAL_SPACING;
 
-    // Linha 2: Congregação e Leitor
     currentLineY = currentY;
     doc.setFont(labelFont, labelWeight);
     doc.text(labelCongregacao, col1_X, currentLineY);
     doc.text(labelLeitor, col2_X, currentLineY);
-
     doc.setFont(valueFont, valueWeight);
     doc.text(congregacaoValue, valueX_Col1, currentLineY);
     doc.text(leitorValue, valueX_Col2, currentLineY);
-    
     currentY += RP_DETAIL_FONT_SIZE;
-    // --- FIM DO NOVO BLOCO ---
 
     isFirstBlockOnPage = false;
   });
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
+
+// A primeira parte do arquivo (constantes, helpers) permanece a mesma...
+// (Esta linha de comentário no final do seu código parece ser um resto de uma instrução anterior,
+// mas todo o conteúdo do arquivo será substituído pelo que está acima.)
 
 // --- Função para Cronograma Principal (Indicadores, Volantes, AV, Limpeza) ---
 // (Esta função permanece como estava antes, pois não foi fornecida uma nova versão para ela)
@@ -292,3 +311,5 @@ export function generateSchedulePdf(
 
   doc.save(`cronograma_principal_${NOMES_MESES[month].toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
+
+    
