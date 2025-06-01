@@ -53,12 +53,12 @@ export default function Home() {
     persistMembros: hookPersistMembros,
   } = useMemberManagement();
   
-  // Initialize scheduleManagement before destructuring its properties
   const scheduleManagement = useScheduleManagement({ membros, updateMemberHistory }); 
   const {
     status, 
     salvarDesignacoes, 
-    finalizarCronograma, 
+    finalizarCronograma,
+    carregarDesignacoes, 
   } = scheduleManagement;
 
   const {
@@ -251,10 +251,10 @@ export default function Home() {
   };
 
   const handleSaveProgressClick = () => {
-    const { success, error } = salvarDesignacoes(); // Correctly using destructured salvarDesignacoes
+    const { success, error } = salvarDesignacoes();
     if (success) {
       toast({ title: "Sucesso", description: "Progresso salvo com sucesso." });
-    } else if (error) { // Check if error exists before using it
+    } else if (error) { 
       toast({ title: "Erro", description: error, variant: "destructive" });
     } else {
        toast({ title: "Erro", description: "Erro ao salvar progresso.", variant: "destructive" });
@@ -262,13 +262,22 @@ export default function Home() {
   };
 
   const handleFinalizeScheduleClick = async () => {
-    const result = await finalizarCronograma(); // Correctly using destructured finalizarCronograma
+    const result = await finalizarCronograma(); 
     if (result.success) {
       toast({ title: "Sucesso", description: "Cronograma finalizado com sucesso." });
     } else if (result.error) {
       toast({ title: "Erro", description: result.error, variant: "destructive" });
     }
   };
+
+  const handleMonthYearChangeRequest = useCallback((newMes: number, newAno: number) => {
+    if (scheduleManagement.scheduleMes !== newMes || scheduleManagement.scheduleAno !== newAno) {
+         carregarDesignacoes(newMes, newAno);
+         // Opcionalmente, adicionar um toast aqui se um rascunho/finalizado for carregado.
+         // Isso pode ser feito verificando o 'status' retornado pelo hook após a carga.
+    }
+  }, [scheduleManagement, carregarDesignacoes]);
+
 
   return (
     <div className="container mx-auto p-4 min-h-screen flex flex-col">
@@ -324,7 +333,8 @@ export default function Home() {
                     onLimpezaChange={scheduleManagement.updateLimpezaAssignment}
                     status={status} 
                     onSaveProgress={handleSaveProgressClick} 
-                    onFinalizeSchedule={handleFinalizeScheduleClick} 
+                    onFinalizeSchedule={handleFinalizeScheduleClick}
+                    onMonthYearChangeRequest={handleMonthYearChangeRequest} 
                   />
                 </TabsContent>
                 <TabsContent value="reuniao-publica" className="pt-0">

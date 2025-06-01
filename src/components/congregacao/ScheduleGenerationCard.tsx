@@ -10,9 +10,8 @@ import { NOMES_MESES, FUNCOES_DESIGNADAS, DIAS_REUNIAO } from '@/lib/congregacao
 import type { DesignacoesFeitas, FuncaoDesignada, Membro, SubstitutionDetails } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
 import { MemberSelectionDialog } from './MemberSelectionDialog'; 
-// import { calcularDesignacoesAction } from '@/lib/congregacao/assignment-logic'; // Agora tratado no hook
 import { useToast } from "@/hooks/use-toast";
-import { FileText, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
+import { FileText, AlertTriangle, Loader2, UserPlus, Info } from 'lucide-react';
 import { getPermissaoRequerida, formatarDataCompleta } from '@/lib/congregacao/utils';
 import { generateSchedulePdf } from '@/lib/congregacao/pdf-generator';
 
@@ -23,12 +22,13 @@ interface ScheduleGenerationCardProps {
   currentSchedule: DesignacoesFeitas | null;
   currentMes: number | null;
   currentAno: number | null;
-  status: string | null; // Added status field
-  onFinalizeSchedule: () => Promise<{ success: boolean; error?: string }>; // Added finalize handler
-  onSaveProgress: () => void; // Added save progress handler
+  status: string | null; 
+  onFinalizeSchedule: () => Promise<{ success: boolean; error?: string }>; 
+  onSaveProgress: () => void; 
   onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
   onDirectAssignAV: (date: string, functionId: string, newMemberId: string | null, originalMemberId: string | null) => void;
   onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
+  onMonthYearChangeRequest: (mes: number, ano: number) => void; // Nova prop
 }
 
 interface AVSelectionContext {
@@ -41,16 +41,17 @@ interface AVSelectionContext {
 
 export function ScheduleGenerationCard({
   membros,
-  onScheduleGenerated, // Agora é generateNewSchedule do hook
-  currentSchedule,   // Agora é scheduleData do hook
-  currentMes,        // Agora é scheduleMes do hook
-  currentAno,         // Agora é scheduleAno do hook
-  status, // Received status prop
-  onFinalizeSchedule, // Received finalize handler
-  onSaveProgress, // Received save progress handler
+  onScheduleGenerated,
+  currentSchedule,  
+  currentMes,       
+  currentAno,        
+  status, 
+  onFinalizeSchedule, 
+  onSaveProgress, 
   onOpenSubstitutionModal,
   onDirectAssignAV,
-  onLimpezaChange // Nova prop
+  onLimpezaChange,
+  onMonthYearChangeRequest, // Nova prop
 }: ScheduleGenerationCardProps) {
   const [selectedMes, setSelectedMes] = useState<string>(currentMes !== null ? currentMes.toString() : new Date().getMonth().toString());
   const [selectedAno, setSelectedAno] = useState<string>(currentAno !== null ? currentAno.toString() : new Date().getFullYear().toString());
@@ -58,21 +59,13 @@ export function ScheduleGenerationCard({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // O schedule exibido agora vem diretamente das props (currentSchedule, currentMes, currentAno)
-  // que são alimentadas pelo hook useScheduleManagement.
-  // Não precisamos mais do estado local `displayedScheduleData` aqui.
-
-  const [isAVMemberSelectionOpen, setIsAVMemberSelectionOpen] = useState(false);
-  const [avSelectionContext, setAVSelectionContext] = useState<AVSelectionContext | null>(null);
-
 
   useEffect(() => {
-    // Sincroniza os seletores de mês/ano se as props mudarem (ex: ao carregar cache)
     if (currentMes !== null && currentAno !== null) {
       setSelectedMes(currentMes.toString());
       setSelectedAno(currentAno.toString());
     }
-    setError(null); // Limpa o erro se o mês/ano mudar ou o schedule for carregado
+    setError(null); 
   }, [currentMes, currentAno]);
 
 
@@ -91,14 +84,11 @@ export function ScheduleGenerationCard({
     }
     
     try {
-        // Chama a função passada por prop, que agora é do hook useScheduleManagement
         const result = await onScheduleGenerated(mes, ano); 
         
         if (result.error) {
             setError(result.error);
-            // O toast de erro já é tratado dentro do page.tsx ao chamar a função do hook
         }
-        // O toast de sucesso também é tratado em page.tsx
     } catch (e: any) {
         console.error("Falha crítica ao gerar cronograma:", e);
         setError("Ocorreu uma falha inesperada ao gerar o cronograma. Verifique o console para mais detalhes.");
@@ -158,7 +148,6 @@ export function ScheduleGenerationCard({
 
     setIsAVMemberSelectionOpen(false);
     setAVSelectionContext(null);
-    // Toast de sucesso será mostrado por page.tsx
   };
 
 
@@ -176,7 +165,14 @@ export function ScheduleGenerationCard({
         <div className="flex flex-col sm:flex-row gap-4 mb-6 items-end">
           <div className="flex-1">
             <Label htmlFor="selectMes">Mês</Label>
-            <Select value={selectedMes} onValueChange={setSelectedMes}>
+            <Select 
+              value={selectedMes} 
+              onValueChange={(value) => {
+                const newMes = parseInt(value, 10);
+                setSelectedMes(value);
+                onMonthYearChangeRequest(newMes, parseInt(selectedAno, 10));
+              }}
+            >
               <SelectTrigger id="selectMes">
                 <SelectValue placeholder="Selecione o mês" />
               </SelectTrigger>
@@ -189,7 +185,14 @@ export function ScheduleGenerationCard({
           </div>
           <div className="flex-1">
             <Label htmlFor="inputAno">Ano</Label>
-             <Select value={selectedAno} onValueChange={setSelectedAno}>
+             <Select 
+                value={selectedAno} 
+                onValueChange={(value) => {
+                  const newAno = parseInt(value, 10);
+                  setSelectedAno(value);
+                  onMonthYearChangeRequest(parseInt(selectedMes, 10), newAno);
+                }}
+              >
                 <SelectTrigger id="inputAno">
                     <SelectValue placeholder="Ano" />
                 </SelectTrigger>
@@ -200,7 +203,11 @@ export function ScheduleGenerationCard({
                 </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleGenerateSchedule} disabled={isLoading} className="w-full sm:w-auto">
+          <Button 
+            onClick={handleGenerateSchedule} 
+            disabled={isLoading || status === 'rascunho' || status === 'finalizado'} 
+            className="w-full sm:w-auto"
+          >
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
             {isLoading ? 'Gerando...' : 'Gerar Cronograma (Indicadores/Volantes)'}
           </Button>
@@ -212,6 +219,20 @@ export function ScheduleGenerationCard({
             <p>{error}</p>
           </div>
         )}
+
+        {status === 'rascunho' && currentSchedule && currentMes !== null && (
+          <div className="mb-4 p-3 rounded-md bg-blue-100 text-blue-700 flex items-center text-sm">
+            <Info className="h-5 w-5 mr-2" />
+            <p>Um rascunho para {NOMES_MESES[currentMes]} de {currentAno} está carregado. Você pode continuar editando ou finalizar.</p>
+          </div>
+        )}
+        {status === 'finalizado' && currentSchedule && currentMes !== null && (
+          <div className="mb-4 p-3 rounded-md bg-green-100 text-green-700 flex items-center text-sm">
+            <Info className="h-5 w-5 mr-2" />
+            <p>O cronograma finalizado para {NOMES_MESES[currentMes]} de {currentAno} está carregado. Para editar, será necessário criar um novo rascunho (gerando novamente).</p>
+          </div>
+        )}
+
 
         <div id="resultadoDesignacoes" className="mt-6">
           {isLoading && (
@@ -226,14 +247,14 @@ export function ScheduleGenerationCard({
                 Designações para {NOMES_MESES[currentMes]} de {currentAno}
               </h3>
               <ScheduleDisplay
-                status={status} // Pass status to ScheduleDisplay
+                status={status} 
                 designacoesFeitas={currentSchedule}
                 membros={membros}
                 mes={currentMes}
                 ano={currentAno}
                 onOpenSubstitutionModal={onOpenSubstitutionModal}
                 onOpenAVMemberSelectionDialog={handleOpenAVMemberSelection}
-                onLimpezaChange={onLimpezaChange} // Passa a prop adiante
+                onLimpezaChange={onLimpezaChange} 
               />
                {status === 'rascunho' && (
                  <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
@@ -252,15 +273,9 @@ export function ScheduleGenerationCard({
               </div>
             </>
           )}
-          {!isLoading && !currentSchedule && !error && (
+          {!isLoading && !currentSchedule && !error && !status && (
              <p className="text-muted-foreground text-center py-4">
-              {status === 'finalizado' ? (
-                `O cronograma para ${NOMES_MESES[currentMes]} de ${currentAno} foi finalizado.`
-              ) : (
-                 "Nenhum cronograma carregado. "
-              )}
-              Selecione o mês e ano e clique em "Gerar Cronograma" para ver as designações de Indicadores/Volantes.
-              As designações de AV e Limpeza são preenchidas manualmente.
+              Nenhum cronograma carregado. Selecione o mês e ano e clique em "Gerar Cronograma" para iniciar.
             </p>
           )}
         </div>
@@ -283,3 +298,4 @@ export function ScheduleGenerationCard({
     </Card>
   );
 }
+
