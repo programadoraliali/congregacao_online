@@ -13,14 +13,23 @@ interface ScheduleTableProps {
   title: string;
   data: Designacao[];
   columns: { key: string; label: string }[];
-  allMembers: Membro[]; 
+  allMembers: Membro[];
   onCellClick?: (date: string, columnKey: string, originalMemberId: string | null, originalMemberName: string | null, tableTitle: string) => void;
   currentFullDateStrings: string[];
   isAVTable?: boolean;
- isReadOnly: boolean;
+  isReadOnly: boolean;
 }
 
-export function ScheduleTable({ title, data, columns, allMembers, onCellClick, currentFullDateStrings, isAVTable = false }: ScheduleTableProps) {
+export function ScheduleTable({
+  title,
+  data,
+  columns,
+  allMembers,
+  onCellClick,
+  currentFullDateStrings,
+  isAVTable = false,
+  isReadOnly, // Adicionado aqui
+}: ScheduleTableProps) {
   
   const getMemberName = (memberId: string | null): string | null => {
     if (!memberId) return null;
