@@ -4,7 +4,7 @@ import type { Membro, DesignacoesFeitas, PublicMeetingAssignment, Omit } from '.
 import { NOMES_MESES, DIAS_REUNIAO, NOMES_DIAS_SEMANA_COMPLETOS, APP_NAME, FUNCOES_DESIGNADAS, GRUPOS_LIMPEZA_APOS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, NONE_GROUP_ID } from './constants';
 import { formatarDataCompleta as formatarDataParaChaveOriginal } from './utils';
 
-// --- Constantes de Layout (sem alterações) ---
+// --- Constantes de Layout ---
 const RP_MARGIN_TOP = 40;
 const RP_MARGIN_BOTTOM = 40;
 const RP_MARGIN_LEFT = 40;
@@ -12,18 +12,24 @@ const RP_MARGIN_RIGHT = 40;
 
 const RP_MAIN_TITLE_FONT_SIZE = 18;
 const RP_DATE_FONT_SIZE = 11;
+const RP_THEME_FONT_SIZE = 11;
 const RP_DETAIL_FONT_SIZE = 10;
 const RP_LINE_HEIGHT_FACTOR = 1.3;
 
 const RP_SPACE_AFTER_MAIN_TITLE = 30;
 const RP_SPACE_AFTER_DATE_AND_THEME = 25;
 const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 1.5;
-const RP_SECTION_VERTICAL_SPACING = 50; 
+const RP_SECTION_VERTICAL_SPACING = 20; // Espaço entre os boxes
+
+// NOVO: Constantes para o layout em Box
+const RP_BOX_PADDING = 15;
+const RP_BOX_CORNER_RADIUS = 5;
+const RP_BOX_BORDER_COLOR_R = 220;
+const RP_BOX_BORDER_COLOR_G = 220;
+const RP_BOX_BORDER_COLOR_B = 220;
 
 const RP_COLOR_TEXT_DEFAULT_R = 30;
-const RP_COLOR_TEXT_DEFAULT_G = 30;
-const RP_COLOR_TEXT_DEFAULT_B = 30;
-
+// ... (outras constantes podem ser mantidas)
 
 const getMemberNamePdf = (memberId: string | null | undefined, membros: Membro[]): string => {
   if (!memberId) return 'A Ser Designado';
@@ -60,7 +66,7 @@ export function generatePublicMeetingPdf(
   // Título Principal
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
-  doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
+  doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R);
   doc.text(`REUNIÃO PÚBLICA`, pageWidth / 2, currentY, { align: 'center' });
   currentY += RP_MAIN_TITLE_FONT_SIZE * 0.7 + RP_SPACE_AFTER_MAIN_TITLE;
 
@@ -74,11 +80,16 @@ export function generatePublicMeetingPdf(
         currentY += RP_SECTION_VERTICAL_SPACING;
     }
 
+    // --- NOVO: Lógica de Box ---
+    // Guarda a posição Y inicial do conteúdo do box
+    const boxContentStartY = currentY;
+    let contentY = boxContentStartY; // Usaremos uma variável local para desenhar dentro do box
+
     const dateStr = formatarDataParaChaveOriginal(sundayDate);
     const assignment = assignmentsForMonth[dateStr];
     if (!assignment) return;
-
-    // Pega os valores necessários
+    
+    // ... (lógica para pegar valores permanece a mesma)
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     let oradorBaseName: string = "A Ser Designado";
     const oradorInput = assignment.orador;
@@ -91,63 +102,70 @@ export function generatePublicMeetingPdf(
     const leitorValue = getMemberNamePdf(leitorId, allMembers);
     const temaValue = assignment.tema || 'A Ser Anunciado';
 
-    // --- LÓGICA DE DESENHO FINAL ---
-
-    // 1. Data
+    // --- LÓGICA DE DESENHO MODIFICADA ---
+    
+    // 1. Data (peso normal, como na imagem)
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(RP_DATE_FONT_SIZE);
-    doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
-    doc.text(formatDisplayDateForPublicMeetingPdf(sundayDate), RP_MARGIN_LEFT, currentY);
-    currentY += RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR;
+    doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R);
+    doc.text(formatDisplayDateForPublicMeetingPdf(sundayDate), RP_MARGIN_LEFT, contentY);
+    contentY += RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR;
 
-    // 2. Tema
+    // 2. Tema (rótulo e valor em negrito, como na imagem)
     const temaLabel = "Tema:";
     doc.setFont('helvetica', 'bold');
-    doc.text(temaLabel, RP_MARGIN_LEFT, currentY);
+    doc.setFontSize(RP_THEME_FONT_SIZE);
+    doc.text(temaLabel, RP_MARGIN_LEFT, contentY);
     const temaLabelWidth = doc.getTextWidth(temaLabel);
-    doc.setFont('helvetica', 'normal');
-    doc.text(temaValue, RP_MARGIN_LEFT + temaLabelWidth + 4, currentY, { maxWidth: contentWidth - temaLabelWidth - 4 });
+    
+    doc.setFont('helvetica', 'bold'); // Valor também em negrito para destaque
+    doc.text(temaValue, RP_MARGIN_LEFT + temaLabelWidth + 4, contentY, { maxWidth: contentWidth - temaLabelWidth - 4 });
     const temaLines = doc.splitTextToSize(temaValue, contentWidth - temaLabelWidth - 4);
-    currentY += (temaLines.length * RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR) + RP_SPACE_AFTER_DATE_AND_THEME;
+    contentY += (temaLines.length * RP_THEME_FONT_SIZE * RP_LINE_HEIGHT_FACTOR) + RP_SPACE_AFTER_DATE_AND_THEME;
 
-    // --- Bloco de Participantes com Título e Barras (MODIFICADO) ---
+    // 3. Bloco de Participantes com Título e Barras
+    // ... (lógica interna deste bloco permanece a mesma)
     const col1_X = RP_MARGIN_LEFT;
     const col2_X = RP_MARGIN_LEFT + (contentWidth / 2);
     const barSpacing = 8;
     const textX_Col1 = col1_X + barSpacing;
     const textX_Col2 = col2_X + barSpacing;
-    
-    // MODIFICADO: Desenha o título "Participantes" na coluna da ESQUERDA
-    const participantsTitleY = currentY;
+    const participantsTitleY = contentY;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_DETAIL_FONT_SIZE);
-    doc.text("Participantes", textX_Col1, participantsTitleY);
-
-    // O conteúdo das duas colunas começa abaixo do título
+    doc.text("Participantes", textX_Col2, participantsTitleY);
     const contentStartY = participantsTitleY + RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR;
-    
-    // Desenha o conteúdo
     let line1_Y = contentStartY;
     let line2_Y = line1_Y + RP_DETAIL_ITEM_VERTICAL_SPACING;
-
     doc.setFont('helvetica', 'normal');
     doc.text(`Orador: ${oradorBaseName}`, textX_Col1, line1_Y);
     doc.text(`Dirigente: ${dirigenteValue}`, textX_Col2, line1_Y);
     doc.text(`Congregação: ${congregacaoValue}`, textX_Col1, line2_Y);
     doc.text(`Leitor: ${leitorValue}`, textX_Col2, line2_Y);
-
-    // Calcula a altura do bloco para desenhar as barras
-    // O bloco agora começa acima do título "Participantes"
-    const blockStartY = participantsTitleY - (RP_DETAIL_FONT_SIZE * 0.4);
-    const blockEndY = line2_Y + (RP_DETAIL_FONT_SIZE * 0.4);
-
-    // Desenha as barras verticais
-    doc.setDrawColor(200, 200, 200);
+    const participantsBlockStartY = participantsTitleY - (RP_DETAIL_FONT_SIZE * 0.4);
+    const participantsBlockEndY = line2_Y + (RP_DETAIL_FONT_SIZE * 0.4);
+    doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.75);
-    doc.line(col1_X, blockStartY, col1_X, blockEndY);
-    doc.line(col2_X, blockStartY, col2_X, blockEndY);
+    doc.line(col1_X, participantsBlockStartY, col1_X, participantsBlockEndY);
+    doc.line(col2_X, participantsBlockStartY, col2_X, participantsBlockEndY);
+    
+    // --- NOVO: Desenha o Box ao redor de todo o conteúdo ---
+    const boxContentEndY = participantsBlockEndY;
+    const boxHeight = (boxContentEndY - boxContentStartY) + (RP_BOX_PADDING * 2);
 
-    currentY = blockEndY;
+    doc.setDrawColor(RP_BOX_BORDER_COLOR_R, RP_BOX_BORDER_COLOR_G, RP_BOX_BORDER_COLOR_B);
+    doc.setLineWidth(1);
+    doc.roundedRect(
+      RP_MARGIN_LEFT - RP_BOX_PADDING,       // X
+      boxContentStartY - RP_BOX_PADDING,    // Y
+      contentWidth + (RP_BOX_PADDING * 2),  // Largura
+      boxHeight,                            // Altura
+      RP_BOX_CORNER_RADIUS,                 // Raio do canto X
+      RP_BOX_CORNER_RADIUS                  // Raio do canto Y
+    );
+
+    // Atualiza a posição Y principal para a próxima seção
+    currentY = boxContentStartY - RP_BOX_PADDING + boxHeight;
   });
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
@@ -170,7 +188,7 @@ export function generateSchedulePdf(
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20; 
-  const contentWidth = pageWidth - 2 * margin;
+  const contentWidthMain = pageWidth - 2 * margin; // Renomeado para evitar conflito com contentWidth da outra função
 
   const monthName = NOMES_MESES[month] || 'Mês Desconhecido';
   const mainTitleText = `Cronograma Principal - ${monthName} de ${year}`;
@@ -264,4 +282,6 @@ export function generateSchedulePdf(
 
   doc.save(`cronograma_principal_${NOMES_MESES[month].toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
+    
+
     
