@@ -1,14 +1,14 @@
 
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import type { Membro, DesignacoesFeitas, PublicMeetingAssignment } from './types';
+// import autoTable from 'jspdf-autotable'; // Not used for Public Meeting PDF anymore
+import type { Membro, DesignacoesFeitas, PublicMeetingAssignment, Omit } from './types';
 import { NOMES_MESES, GRUPOS_LIMPEZA_APOS_REUNIAO, NONE_GROUP_ID, DIAS_REUNIAO, NOMES_DIAS_SEMANA_ABREV, NOMES_DIAS_SEMANA_COMPLETOS, APP_NAME } from './constants';
 import { formatarDataCompleta as formatarDataParaChaveOriginal } from './utils';
 import { prepararDadosTabela as prepararDadosTabelaOriginal } from '@/components/congregacao/ScheduleDisplay';
 
 
 const getMemberNamePdf = (memberId: string | null | undefined, membros: Membro[]): string => {
-  if (!memberId) return 'A Ser Designado'; // Default to this if no memberId
+  if (!memberId) return 'A Ser Designado';
   const member = membros.find(m => m.id === memberId);
   return member ? member.nome : 'Desconhecido';
 };
@@ -78,8 +78,8 @@ export function generateSchedulePdf(
       font: "helvetica",
     },
     headStyles: {
-      fillColor: [34, 63, 49],
-      textColor: [245, 241, 232],
+      fillColor: [34, 63, 49], // Ochre from theme (approx)
+      textColor: [245, 241, 232], // Light cream from theme (approx)
       fontStyle: 'bold',
       halign: 'center',
       fontSize: 9,
@@ -146,12 +146,12 @@ export function generateSchedulePdf(
     }
 
     doc.setFontSize(SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE);
-    doc.setTextColor(52, 73, 94);
+    doc.setTextColor(52, 73, 94); // Dark grey
     doc.text(title, pageMarginMain, yPos);
 
     yPos += TABLE_START_MARGIN_AFTER_TITLE_MAIN_SCHEDULE;
 
-    autoTable(doc, {
+    (doc as any).autoTable({ // Using jsPDF-AutoTable
       ...options,
       head: head,
       body: body,
@@ -173,14 +173,14 @@ export function generateSchedulePdf(
 
   const { head: headAV, body: bodyAV } = prepararDadosParaPdfTabela('AV');
   const allMeetingDatesForMonthAV = getMeetingDatesForMonth(mes, ano);
-  if (allMeetingDatesForMonthAV.length > 0) { // Ensure AV table structure is shown if there are meeting dates
+  if (allMeetingDatesForMonthAV.length > 0) {
     currentPdfY = addSectionWithTable("Áudio/Vídeo (AV)", headAV, bodyAV, currentPdfY);
   }
 
   const limpezaAposReuniaoData: string[][] = [];
   const limpezaSemanalData: string[][] = [];
 
-  const allMeetingDatesForMonthCleaning = getMeetingDatesForMonth(mes, ano); // Re-fetch for cleaning
+  const allMeetingDatesForMonthCleaning = getMeetingDatesForMonth(mes, ano);
 
   allMeetingDatesForMonthCleaning.forEach(dateObj => {
     const dateStr = formatarDataParaChaveOriginal(dateObj);
@@ -227,7 +227,7 @@ export function generateSchedulePdf(
 
     if (cleaningTitleY + SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE > pageHeight - commonTableOptions.margin.bottom) {
         doc.addPage();
-        drawMainScheduleTitle(); // Redraw title
+        drawMainScheduleTitle();
         currentPdfY = commonTableOptions.margin.top + 10;
     }
     doc.setFontSize(SECTION_TITLE_FONT_SIZE_MAIN_SCHEDULE);
@@ -247,7 +247,7 @@ export function generateSchedulePdf(
     let lastTableOnPage = doc.internal.getNumberOfPages();
 
     if (limpezaAposReuniaoData.length > 0) {
-        autoTable(doc, {
+        (doc as any).autoTable({ // Using jsPDF-AutoTable
             ...cleaningTableOptions,
             head: [['Data', 'Grupo Pós Reunião']],
             body: limpezaAposReuniaoData,
@@ -271,27 +271,27 @@ export function generateSchedulePdf(
             if (lastTableOnPage < doc.internal.getNumberOfPages() || (currentPdfY + estimativaAlturaSemanal > pageHeight - cleaningTableOptions.margin.bottom) ) {
                  if (lastTableOnPage < doc.internal.getNumberOfPages()) {
                     startYParaSemanal = cleaningTableOptions.margin.top + 10;
-                    drawMainScheduleTitle();
+                    // drawMainScheduleTitle(); // Title is already drawn by didDrawPage of outer table if new page
                  } else {
                     doc.addPage();
-                    drawMainScheduleTitle();
+                    // drawMainScheduleTitle(); // Title is drawn by didDrawPage
                     startYParaSemanal = cleaningTableOptions.margin.top + 10;
                  }
                 marginParaSemanal.left = pageMarginMain;
                 marginParaSemanal.right = pageMarginMain;
                 tableWidthSemanal = contentWidth;
 
-            } else {
+            } else { // Place side-by-side on the same page if space allows
                 marginParaSemanal.left = pageMarginMain + tableWidth + 10;
                 marginParaSemanal.right = pageMarginMain;
                 tableWidthSemanal = tableWidth;
             }
-        } else {
+        } else { // No "Limpeza Após Reunião" table, so "Limpeza Semanal" takes full width
             marginParaSemanal.left = pageMarginMain;
             marginParaSemanal.right = pageMarginMain;
         }
 
-        autoTable(doc, {
+        (doc as any).autoTable({ // Using jsPDF-AutoTable
             ...cleaningTableOptions,
             head: [['Semana', 'Responsáveis (Semanal)']],
             body: limpezaSemanalData,
@@ -332,31 +332,106 @@ export function generatePublicMeetingPdf(
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 40; // Increased margin for better spacing
+  
+  // Constants for styling
+  const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
+  const mainTitleFontSize = 18;
+  const dateFontSize = 12;
+  const detailFontSize = 10;
+  const textColor = [40, 40, 40]; // Dark Gray
+  const lineColor = [150, 150, 150]; // Light Gray for separator line
+  const lineSpacingFactor = 1.15; // Multiplier for line height
+  const bullet = "\u2022"; // Bullet point character
+  const bulletPointIndent = 0; // Indent for the bullet point itself from the left margin of the text block
+  const bulletPointSizeAndSpace = doc.getTextWidth(bullet + " ") + 2; // Width of bullet plus a small space
+
+  const detailItemSpacing = 7; // Space between lines of detail (Tema, Orador, etc.)
+  const sectionSpacing = 22; // Space after each Sunday block, adjusted for better page fill
+
+  const regularFont = 'helvetica';
+  const boldFont = 'helvetica'; // jsPDF uses 'helvetica-bold' internally or simulates bold
+
   let currentY = margin;
 
   // Main Title
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(18); // Slightly larger for main title
-  doc.setTextColor(40, 40, 40);
+  doc.setFont(regularFont, 'normal');
+  doc.setFontSize(mainTitleFontSize);
+  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
   doc.text("REUNIÃO PÚBLICA", margin, currentY, { align: 'left' });
-  currentY += doc.getLineHeight() * 1.8; // Increased spacing after main title
+  currentY += mainTitleFontSize * lineSpacingFactor + 10; // Space after title
 
   const sundays = Object.keys(assignmentsForMonth)
-    .map(dateStr => new Date(dateStr + "T00:00:00Z"))
+    .map(dateStr => new Date(dateStr + "T00:00:00Z")) // Use 'Z' for UTC
     .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica)
     .sort((a, b) => a.getTime() - b.getTime());
 
-  const bullet = "\u2022"; // Bullet point character
-  const detailFontSize = 10;
-  const dateFontSize = 12;
-  const labelIndent = margin + 10; // Indent for bulleted items
-  const valueIndent = labelIndent + 15; // Indent for the text after the label
-  const lineHeight = doc.getLineHeight() * 0.45; // Adjusted line height factor for 10pt font
-  const sectionSpacing = 20; // Space between Sunday sections
-  const lineBelowDateYOffset = 3;
-  const lineLength = contentWidth * 0.85; // Line slightly shorter than content width
+  // Helper function to add a detail row (label + value)
+  function addDetailRow(
+    docInstance: jsPDF, 
+    yPos: number, 
+    label: string, 
+    value: string
+  ): number {
+    let localY = yPos;
+    docInstance.setFont(boldFont, 'bold');
+    docInstance.setFontSize(detailFontSize);
+    docInstance.setTextColor(textColor[0], textColor[1], textColor[2]);
+    
+    const fullLabelText = `${bullet} ${label}`;
+    docInstance.text(fullLabelText, margin + bulletPointIndent, localY);
+
+    docInstance.setFont(regularFont, 'normal');
+    const labelWidth = docInstance.getTextWidth(fullLabelText);
+    const valueX = margin + bulletPointIndent + labelWidth + 3; // Small space after label
+    
+    const availableWidthForValue = contentWidth - (valueX - margin);
+    const valueLines = docInstance.splitTextToSize(value, availableWidthForValue > 0 ? availableWidthForValue : 1); // Ensure width > 0
+    
+    docInstance.text(valueLines, valueX, localY);
+    
+    localY += (valueLines.length * detailFontSize * lineSpacingFactor);
+    return localY + detailItemSpacing / 2; // Add half spacing after each item
+  }
+
+  // Helper function to estimate section height
+  const estimateSectionHeight = (assignmentData: Omit<PublicMeetingAssignment, 'leitorId'>, leitorId: string | null) => {
+    let height = 0;
+    height += dateFontSize * lineSpacingFactor; // Date
+    height += 2; // Space for line under date
+    height += 5; // Space after line
+
+    const tempDoc = new jsPDF(); // Use a temporary doc for text splitting estimations
+    tempDoc.setFont(regularFont, 'normal');
+    tempDoc.setFontSize(detailFontSize);
+
+    const estimateDetailLines = (label: string, value: string) => {
+        const fullLabelText = `${bullet} ${label}`;
+        const labelWidth = tempDoc.getTextWidth(fullLabelText);
+        const valueX = margin + bulletPointIndent + labelWidth + 3;
+        const availableWidth = contentWidth - (valueX - margin);
+        return tempDoc.splitTextToSize(value, availableWidth > 0 ? availableWidth : 1).length;
+    };
+    
+    let totalLines = 0;
+    totalLines += estimateDetailLines("Tema:", assignmentData.tema || 'A Ser Anunciado');
+    
+    let oradorNameEst = getMemberNamePdf(assignmentData.orador, allMembers);
+    if (typeof assignmentData.orador === 'string' && assignmentData.orador && !allMembers.find(m => m.id === assignmentData.orador)) {
+        oradorNameEst = assignmentData.orador;
+    }
+    let oradorCongPrefixEst = "";
+    if (oradorNameEst !== 'A Ser Designado' && oradorNameEst !== 'Desconhecido') {
+        oradorCongPrefixEst = assignmentData.congregacaoOrador ? `(${assignmentData.congregacaoOrador}) ` : "(Local) ";
+    }
+    totalLines += estimateDetailLines("Orador:", `${oradorCongPrefixEst}${oradorNameEst}`);
+
+    totalLines += estimateDetailLines("Dirigente de A Sentinela:", getMemberNamePdf(assignmentData.dirigenteId, allMembers));
+    totalLines += estimateDetailLines("Leitor de A Sentinela:", getMemberNamePdf(leitorId, allMembers));
+    
+    height += (totalLines * detailFontSize * lineSpacingFactor) + (4 * detailItemSpacing / 2); // 4 items
+    return height + sectionSpacing; // Add spacing for after the block
+  };
 
 
   sundays.forEach((sundayDate, index) => {
@@ -365,86 +440,56 @@ export function generatePublicMeetingPdf(
     if (!assignment) return;
 
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
+    const estimatedHeight = estimateSectionHeight(assignment, leitorId);
 
-    const formattedDateDisplay = formatDisplayDateForPublicMeetingPdf(sundayDate);
-    const speechTitle = assignment.tema || 'A Ser Anunciado';
-    let oradorText = getMemberNamePdf(assignment.orador, allMembers); // Use getMemberNamePdf for consistency if orador is a member ID
-    if (typeof assignment.orador === 'string' && assignment.orador && !allMembers.find(m=>m.id === assignment.orador)) { // if orador is a string name and not an ID
-        oradorText = assignment.orador;
-    }
-    if (assignment.congregacaoOrador && oradorText !== 'A Ser Designado' && oradorText !== 'Desconhecido') {
-        oradorText += ` (${assignment.congregacaoOrador})`;
-    } else if (oradorText !== 'A Ser Designado' && oradorText !== 'Desconhecido' && !assignment.congregacaoOrador) {
-        oradorText += ` (Local)`;
-    }
-
-
-    const dirigenteName = getMemberNamePdf(assignment.dirigenteId, allMembers);
-    const leitorName = getMemberNamePdf(leitorId, allMembers);
-
-    // Calculate height of this section for page break logic
-    let sectionHeight = 0;
-    sectionHeight += doc.getLineHeight() * (dateFontSize / doc.getFontSize()); // Date height
-    sectionHeight += 5; // Space for line and after
-    const addDetailHeight = (text: string) => {
-        const lines = doc.splitTextToSize(text, contentWidth - (valueIndent - margin));
-        sectionHeight += lines.length * doc.getLineHeight() * (detailFontSize / doc.getFontSize());
-        sectionHeight += lineHeight /2; // Small spacing between detail items
-    };
-    addDetailHeight(`Tema: ${speechTitle}`);
-    addDetailHeight(`Orador: ${oradorText}`);
-    addDetailHeight(`Dirigente de A Sentinela: ${dirigenteName}`);
-    addDetailHeight(`Leitor de A Sentinela: ${leitorName}`);
-    sectionHeight += sectionSpacing;
-
-
-    if (currentY + sectionHeight > pageHeight - margin) {
+    if (currentY + estimatedHeight > pageHeight - margin) {
       doc.addPage();
       currentY = margin;
-      // No need to repeat main title on subsequent pages as per image style
+      // No main title repetition to match image style more closely if it's a simple list.
+      // If a header per page is desired, it can be re-added here.
     }
 
     // Date
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(boldFont, 'bold');
     doc.setFontSize(dateFontSize);
-    doc.setTextColor(40, 40, 40);
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    const formattedDateDisplay = formatDisplayDateForPublicMeetingPdf(sundayDate);
     doc.text(formattedDateDisplay, margin, currentY);
-    currentY += doc.getLineHeight() * (dateFontSize / doc.getFontSize()) * 0.7;
-
+    currentY += dateFontSize * lineSpacingFactor * 0.7; // Slightly less space after date
 
     // Horizontal Line
-    doc.setDrawColor(100, 100, 100); // Darker gray for the line
+    doc.setDrawColor(lineColor[0], lineColor[1], lineColor[2]);
     doc.setLineWidth(0.5);
-    doc.line(margin, currentY + lineBelowDateYOffset, margin + lineLength, currentY + lineBelowDateYOffset);
-    currentY += lineBelowDateYOffset + 7; // Space after line
+    doc.line(margin, currentY, margin + contentWidth, currentY);
+    currentY += 5; // Space after line
 
-    // Helper to draw bulleted items
-    const drawBulletedItem = (label: string, value: string) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(detailFontSize);
-      doc.setTextColor(40, 40, 40);
-
-      const fullText = `${label} ${value}`;
-      const splitText = doc.splitTextToSize(fullText, contentWidth - (labelIndent - margin + 5 /* bullet width*/));
-
-      splitText.forEach((line: string, lineIndex: number) => {
-        if (lineIndex === 0) {
-          doc.text(bullet, labelIndent, currentY);
-          doc.text(line, labelIndent + 8, currentY);
+    // Tema
+    currentY = addDetailRow(doc, currentY, "Tema:", assignment.tema || 'A Ser Anunciado');
+    
+    // Orador
+    let oradorName = getMemberNamePdf(assignment.orador, allMembers);
+    // If assignment.orador is a string and not a known member ID, use it directly
+    if (typeof assignment.orador === 'string' && assignment.orador && !allMembers.find(m => m.id === assignment.orador)) {
+        oradorName = assignment.orador;
+    }
+    let oradorCongregationPrefix = "";
+    if (oradorName !== 'A Ser Designado' && oradorName !== 'Desconhecido') {
+        if (assignment.congregacaoOrador) {
+            oradorCongregationPrefix = `(${assignment.congregacaoOrador}) `;
         } else {
-          doc.text(line, labelIndent + 8, currentY); // Indent subsequent lines of a wrapped item
+            oradorCongregationPrefix = "(Local) ";
         }
-        currentY += lineHeight;
-      });
-       currentY += lineHeight * 0.3; // Extra small space after each full item
-    };
+    }
+    const oradorFinalText = `${oradorCongregationPrefix}${oradorName}`;
+    currentY = addDetailRow(doc, currentY, "Orador:", oradorFinalText);
 
-    drawBulletedItem('Tema:', speechTitle);
-    drawBulletedItem('Orador:', oradorText);
-    drawBulletedItem('Dirigente de A Sentinela:', dirigenteName);
-    drawBulletedItem('Leitor de A Sentinela:', leitorName);
+    // Dirigente
+    currentY = addDetailRow(doc, currentY, "Dirigente de A Sentinela:", getMemberNamePdf(assignment.dirigenteId, allMembers));
+    
+    // Leitor
+    currentY = addDetailRow(doc, currentY, "Leitor de A Sentinela:", getMemberNamePdf(leitorId, allMembers));
 
-    currentY += sectionSpacing * 0.7; // Space before next Sunday's section
+    currentY += sectionSpacing; // Space before next Sunday's section
   });
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
