@@ -21,7 +21,6 @@ const RP_SPACE_AFTER_DATE = 2.5;
 const RP_LINE_THICKNESS = 0.5;
 const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2;
 const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.7;
-// MODIFICADO: Reduzido o espaçamento entre as seções para evitar quebra de página.
 const RP_SECTION_VERTICAL_SPACING = 35; 
 
 const RP_COLOR_TEXT_DEFAULT_R = 50;
@@ -128,9 +127,9 @@ export function generatePublicMeetingPdf(
     const temaHeight = (temaLines.length * (RP_DETAIL_FONT_SIZE + 1) * RP_LINE_HEIGHT_FACTOR);
     currentY += temaHeight + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
-    // --- NOVO: Bloco para desenhar participantes em formato 2x2 colunas ---
+    // --- NOVO: Bloco de desenho com Agrupamento Vertical ---
     const col1_X = RP_MARGIN_LEFT;
-    const col2_X = RP_MARGIN_LEFT + (contentWidth / 2); // Segunda coluna começa na metade do espaço
+    const col2_X = RP_MARGIN_LEFT + (contentWidth / 2) + 10; // Segunda coluna com um respiro
     const labelFont = 'helvetica';
     const labelWeight = 'bold';
     const valueFont = 'helvetica';
@@ -138,37 +137,40 @@ export function generatePublicMeetingPdf(
     doc.setFontSize(RP_DETAIL_FONT_SIZE);
     doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
 
-    // Linha 1: Orador e Congregação
-    let currentLineY = currentY;
+    // Rótulos
     const labelOrador = `${RP_BULLET} Orador:`;
     const labelCongregacao = `${RP_BULLET} Congregação:`;
-    const labelOradorWidth = doc.getTextWidth(labelOrador);
-    const labelCongregacaoWidth = doc.getTextWidth(labelCongregacao);
+    const labelDirigente = `${RP_BULLET} Dirigente:`;
+    const labelLeitor = `${RP_BULLET} Leitor:`;
 
+    // NOVO: Calcula a largura máxima do rótulo em cada coluna para alinhar os valores
+    const maxLabelWidthCol1 = Math.max(doc.getTextWidth(labelOrador), doc.getTextWidth(labelCongregacao));
+    const maxLabelWidthCol2 = Math.max(doc.getTextWidth(labelDirigente), doc.getTextWidth(labelLeitor));
+
+    const valueX_Col1 = col1_X + maxLabelWidthCol1 + 5; // Posição X para os valores da Coluna 1
+    const valueX_Col2 = col2_X + maxLabelWidthCol2 + 5; // Posição X para os valores da Coluna 2
+    
+    // Linha 1: Orador e Dirigente
+    let currentLineY = currentY;
     doc.setFont(labelFont, labelWeight);
     doc.text(labelOrador, col1_X, currentLineY);
-    doc.text(labelCongregacao, col2_X, currentLineY);
-
+    doc.text(labelDirigente, col2_X, currentLineY);
+    
     doc.setFont(valueFont, valueWeight);
-    doc.text(oradorBaseName, col1_X + labelOradorWidth + 5, currentLineY);
-    doc.text(congregacaoValue, col2_X + labelCongregacaoWidth + 5, currentLineY);
+    doc.text(oradorBaseName, valueX_Col1, currentLineY);
+    doc.text(dirigenteValue, valueX_Col2, currentLineY);
     
     currentY += RP_DETAIL_FONT_SIZE + RP_DETAIL_ITEM_VERTICAL_SPACING;
 
-    // Linha 2: Dirigente e Leitor
+    // Linha 2: Congregação e Leitor
     currentLineY = currentY;
-    const labelDirigente = `${RP_BULLET} Dirigente:`;
-    const labelLeitor = `${RP_BULLET} Leitor:`;
-    const labelDirigenteWidth = doc.getTextWidth(labelDirigente);
-    const labelLeitorWidth = doc.getTextWidth(labelLeitor);
-
     doc.setFont(labelFont, labelWeight);
-    doc.text(labelDirigente, col1_X, currentLineY);
+    doc.text(labelCongregacao, col1_X, currentLineY);
     doc.text(labelLeitor, col2_X, currentLineY);
 
     doc.setFont(valueFont, valueWeight);
-    doc.text(dirigenteValue, col1_X + labelDirigenteWidth + 5, currentLineY);
-    doc.text(leitorValue, col2_X + labelLeitorWidth + 5, currentLineY);
+    doc.text(congregacaoValue, valueX_Col1, currentLineY);
+    doc.text(leitorValue, valueX_Col2, currentLineY);
     
     currentY += RP_DETAIL_FONT_SIZE;
     // --- FIM DO NOVO BLOCO ---
@@ -180,6 +182,7 @@ export function generatePublicMeetingPdf(
 }
 
 // --- Função para Cronograma Principal (Indicadores, Volantes, AV, Limpeza) ---
+// (Esta função permanece como estava antes, pois não foi fornecida uma nova versão para ela)
 export function generateSchedulePdf(
   schedule: DesignacoesFeitas,
   members: Membro[],
@@ -277,7 +280,6 @@ export function generateSchedulePdf(
     else currentY -= (10 * 0.7 + 3); // Volta se nada foi impresso para esta data
   }
   
-  // Adiciona numeração de página se houver mais de uma
   const pageCount = doc.internal.getNumberOfPages();
   if (pageCount > 1) {
     for (let i = 1; i <= pageCount; i++) {
@@ -288,6 +290,5 @@ export function generateSchedulePdf(
     }
   }
 
-  doc.save(`cronograma_principal_${monthName.toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
+  doc.save(`cronograma_principal_${NOMES_MESES[month].toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
-    
