@@ -331,18 +331,27 @@ export function generateSchedulePdf(
 
 // --- PDF para Reunião Pública ---
 
+// Constantes de Estilo para Reunião Pública
+const RP_MARGIN = 40;
+const RP_CONTENT_WIDTH_OFFSET = 2 * RP_MARGIN;
+const RP_TEXT_COLOR_DARK_GRAY = [40, 40, 40];
+const RP_LINE_COLOR_MEDIUM_GRAY = [150, 150, 150];
+
 const RP_MAIN_TITLE_FONT_SIZE = 18;
-const RP_DATE_FONT_SIZE = 12;
+const RP_APP_NAME_FONT_SIZE = 9;
+const RP_MAIN_TITLE_Y_OFFSET = 20;
+const RP_APP_NAME_Y_OFFSET = 5;
+
+const RP_DATE_FONT_SIZE = 11; // Um pouco menor que o título, mas maior que detalhes
 const RP_DETAIL_FONT_SIZE = 10;
-const RP_LINE_SPACING_FACTOR = 1.4; // Para multilinhas
+const RP_LINE_SPACING_FACTOR = 1.4; // Para multilinhas nos detalhes
 const RP_BULLET = "\u2022"; // •
 
-const RP_MARGIN = 40;
-const RP_SPACE_AFTER_MAIN_TITLE = 20;
-const RP_SPACE_AFTER_DATE_TEXT = RP_DATE_FONT_SIZE * 0.3;
-const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2; // Aumentado de 0.7
-const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.5; // Espaço entre os itens (Tema, Orador etc.)
-const RP_SECTION_VERTICAL_SPACING = 20; // Espaço entre blocos de domingos
+const RP_SPACE_AFTER_MAIN_TITLE_BLOCK = 25;
+const RP_SPACE_AFTER_DATE = RP_DATE_FONT_SIZE * 0.4;
+const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2; 
+const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.5;
+const RP_SECTION_VERTICAL_SPACING = 35; // Aumentado para ocupar mais a página
 
 function formatDisplayDateForPublicMeetingPdf(date: Date): string {
     const dayName = NOMES_DIAS_SEMANA_COMPLETOS[date.getUTCDay()];
@@ -367,25 +376,38 @@ export function generatePublicMeetingPdf(
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const contentWidth = pageWidth - 2 * RP_MARGIN;
+  const contentWidth = pageWidth - RP_CONTENT_WIDTH_OFFSET;
 
-  const regularFont = 'helvetica';
-  const boldFont = 'helvetica'; 
-
-  const textColor = [40, 40, 40]; 
-  const lineColor = [150, 150, 150]; 
+  const regularFont = 'helvetica'; // ou 'times'
+  const boldFont = 'helvetica';    // ou 'times'
   
   let currentY = RP_MARGIN;
 
-  // Título Principal
-  doc.setFont(regularFont, 'normal');
-  doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.text("REUNIÃO PÚBLICA", RP_MARGIN, currentY);
-  currentY += RP_MAIN_TITLE_FONT_SIZE + RP_SPACE_AFTER_MAIN_TITLE;
+  const drawHeader = (isFirstPage: boolean) => {
+    if (isFirstPage) {
+        // Nome da Congregação (APP_NAME)
+        doc.setFont(regularFont, 'normal');
+        doc.setFontSize(RP_APP_NAME_FONT_SIZE);
+        doc.setTextColor(128, 128, 128); // Cinza
+        doc.text(APP_NAME, RP_MARGIN, currentY + RP_APP_NAME_Y_OFFSET);
+    }
+
+    // Título Principal
+    doc.setFont(boldFont, 'bold'); // Em negrito
+    doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
+    doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
+    const mainTitleText = `REUNIÃO PÚBLICA - ${NOMES_MESES[mes].toUpperCase()} DE ${ano}`;
+    const mainTitleWidth = doc.getTextWidth(mainTitleText);
+    doc.text(mainTitleText, (pageWidth - mainTitleWidth) / 2, currentY + RP_MAIN_TITLE_Y_OFFSET);
+    
+    currentY += RP_MAIN_TITLE_Y_OFFSET + RP_MAIN_TITLE_FONT_SIZE - (isFirstPage ? 0 : RP_APP_NAME_FONT_SIZE + RP_APP_NAME_Y_OFFSET); // Ajusta se não for a primeira página
+    currentY += RP_SPACE_AFTER_MAIN_TITLE_BLOCK;
+  };
+
+  drawHeader(true);
 
   const sundays = Object.keys(assignmentsForMonth)
-    .map(dateStr => new Date(dateStr + "T00:00:00Z")) // Use T00:00:00Z para consistência UTC
+    .map(dateStr => new Date(dateStr + "T00:00:00Z"))
     .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica)
     .sort((a, b) => a.getTime() - b.getTime());
 
@@ -396,92 +418,88 @@ export function generatePublicMeetingPdf(
 
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     
+    let oradorText = getMemberNamePdf(assignment.orador, allMembers);
+    if (typeof assignment.orador === 'string' && assignment.orador && !allMembers.find(m => m.id === assignment.orador)) {
+        oradorText = assignment.orador; // Usa o nome digitado se não for um ID de membro
+    }
+    const congregacaoOradorText = assignment.congregacaoOrador ? `(${assignment.congregacaoOrador})` : (oradorText !== 'A Ser Designado' && oradorText !== 'Desconhecido' ? '(Local)' : '');
+    const oradorDisplay = `${congregacaoOradorText} ${oradorText}`.trim();
+
     const detailItems = [
       { label: "Tema:", value: assignment.tema || 'A Ser Anunciado' },
-      { 
-        label: "Orador:", 
-        value: (() => {
-          let oradorName = getMemberNamePdf(assignment.orador, allMembers);
-          let oradorCongregation = assignment.congregacaoOrador ? `(${assignment.congregacaoOrador})` : "(Local)";
-          // Se orador não é um ID de membro conhecido, mas uma string (nome direto), usar o que foi digitado.
-          if (typeof assignment.orador === 'string' && assignment.orador && !allMembers.find(m => m.id === assignment.orador)) {
-              oradorName = assignment.orador;
-              // Se foi digitado um nome, não mostrar "(Local)" a menos que a congregação também tenha sido digitada
-              if (!assignment.congregacaoOrador && oradorName !== 'A Ser Designado' && oradorName !== 'Desconhecido') {
-                oradorCongregation = ""; // Evita (Local) se o nome foi apenas digitado
-              }
-          } else if (oradorName === 'A Ser Designado' || oradorName === 'Desconhecido') {
-             oradorCongregation = ""; // Não mostrar (Local) para "A Ser Designado"
-          }
-          return `${oradorCongregation} ${oradorName}`.trim();
-        })()
-      },
+      { label: "Orador:", value: oradorDisplay },
       { label: "Dirigente de A Sentinela:", value: getMemberNamePdf(assignment.dirigenteId, allMembers) },
       { label: "Leitor de A Sentinela:", value: getMemberNamePdf(leitorId, allMembers) }
     ];
-
+    
     // Estimar altura da seção
-    let estimatedSectionHeight = RP_DATE_FONT_SIZE * RP_LINE_SPACING_FACTOR + RP_SPACE_AFTER_DATE_TEXT + 1 + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
-    doc.setFontSize(RP_DETAIL_FONT_SIZE);
+    let estimatedSectionHeight = RP_DATE_FONT_SIZE * RP_LINE_SPACING_FACTOR + RP_SPACE_AFTER_DATE + 1 + RP_SPACE_AFTER_LINE_BEFORE_DETAILS; // +1 for line
     let maxLabelWidth = 0;
+    doc.setFont(boldFont, 'bold');
+    doc.setFontSize(RP_DETAIL_FONT_SIZE);
     detailItems.forEach(item => {
-        const labelTextWithBullet = `${RP_BULLET} ${item.label}`;
-        const currentLabelWidth = doc.getTextWidth(labelTextWithBullet);
+        const currentLabelWidth = doc.getTextWidth(`${RP_BULLET} ${item.label} `);
         if (currentLabelWidth > maxLabelWidth) {
             maxLabelWidth = currentLabelWidth;
         }
     });
-    const valueStartX = RP_MARGIN + maxLabelWidth + 5; // 5pt de espaço entre label e valor
-    const availableWidthForValue = contentWidth - (valueStartX - RP_MARGIN);
+    const valueStartX = RP_MARGIN + maxLabelWidth;
+    const availableWidthForValue = contentWidth - maxLabelWidth;
 
+    doc.setFont(regularFont, 'normal');
+    doc.setFontSize(RP_DETAIL_FONT_SIZE);
     detailItems.forEach(item => {
       const valueLines = doc.splitTextToSize(item.value, availableWidthForValue > 0 ? availableWidthForValue : 1);
       estimatedSectionHeight += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_SPACING_FACTOR);
       estimatedSectionHeight += RP_DETAIL_ITEM_VERTICAL_SPACING;
     });
-    estimatedSectionHeight += RP_SECTION_VERTICAL_SPACING - RP_DETAIL_ITEM_VERTICAL_SPACING;
+    estimatedSectionHeight -= RP_DETAIL_ITEM_VERTICAL_SPACING; // Remove o último espaçamento extra
+    
+    if (index > 0) { // Adicionar espaçamento ANTES de verificar quebra de página para o próximo bloco
+        currentY += RP_SECTION_VERTICAL_SPACING;
+    }
 
-
-    if (index > 0 && currentY + estimatedSectionHeight > pageHeight - RP_MARGIN) {
+    if (currentY + estimatedSectionHeight > pageHeight - RP_MARGIN) {
       doc.addPage();
       currentY = RP_MARGIN;
-      // Não repetir o título principal em novas páginas para este layout
-    } else if (index > 0) {
-        currentY += RP_SECTION_VERTICAL_SPACING * 0.5; // Espaço menor entre seções na mesma página
+      drawHeader(false); // Não é a primeira página, não desenha APP_NAME
     }
     
     // Data
     doc.setFont(boldFont, 'bold');
     doc.setFontSize(RP_DATE_FONT_SIZE);
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
     const formattedDateDisplay = formatDisplayDateForPublicMeetingPdf(sundayDate);
     doc.text(formattedDateDisplay, RP_MARGIN, currentY);
-    currentY += RP_DATE_FONT_SIZE * RP_LINE_SPACING_FACTOR * 0.8; // Ajustar para a linha não sobrepor
-    currentY += RP_SPACE_AFTER_DATE_TEXT;
+    currentY += RP_DATE_FONT_SIZE * RP_LINE_SPACING_FACTOR * 0.8; // Ajuste para a linha não sobrepor
+    currentY += RP_SPACE_AFTER_DATE;
 
     // Linha Horizontal
-    doc.setDrawColor(lineColor[0], lineColor[1], lineColor[2]);
+    doc.setDrawColor(RP_LINE_COLOR_MEDIUM_GRAY[0], RP_LINE_COLOR_MEDIUM_GRAY[1], RP_LINE_COLOR_MEDIUM_GRAY[2]);
     doc.setLineWidth(0.5);
     doc.line(RP_MARGIN, currentY, RP_MARGIN + contentWidth, currentY);
     currentY += RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
     // Detalhes
-    detailItems.forEach(item => {
-      doc.setFont(regularFont, 'normal'); // Rótulo não mais em negrito, como na imagem
+    detailItems.forEach((item, itemIndex) => {
+      const labelTextWithBullet = `${RP_BULLET} ${item.label} `;
+      doc.setFont(boldFont, 'bold');
       doc.setFontSize(RP_DETAIL_FONT_SIZE);
-      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      
-      const labelTextWithBullet = `${RP_BULLET} ${item.label}`;
+      doc.setTextColor(RP_TEXT_COLOR_DARK_GRAY[0], RP_TEXT_COLOR_DARK_GRAY[1], RP_TEXT_COLOR_DARK_GRAY[2]);
       doc.text(labelTextWithBullet, RP_MARGIN, currentY);
       
+      doc.setFont(regularFont, 'normal'); // Valor em fonte normal
       const valueLines = doc.splitTextToSize(item.value, availableWidthForValue > 0 ? availableWidthForValue : 1);
       doc.text(valueLines, valueStartX, currentY);
       
       currentY += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_SPACING_FACTOR);
-      currentY += RP_DETAIL_ITEM_VERTICAL_SPACING;
+      if (itemIndex < detailItems.length - 1) {
+          currentY += RP_DETAIL_ITEM_VERTICAL_SPACING;
+      }
     });
-     currentY += RP_SECTION_VERTICAL_SPACING * 0.5; // Espaço final da seção
   });
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
+
+
