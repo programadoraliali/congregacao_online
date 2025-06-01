@@ -11,16 +11,17 @@ const RP_MARGIN_LEFT = 40;
 const RP_MARGIN_RIGHT = 40;
 
 const RP_MAIN_TITLE_FONT_SIZE = 18;
-// MODIFICADO: Ajuste nos tamanhos de fonte para hierarquia visual
-const RP_DATE_FONT_SIZE = 10;
-const RP_THEME_FONT_SIZE = 12; 
+// MODIFICADO: Ajuste nos tamanhos de fonte conforme solicitado.
+const RP_DATE_FONT_SIZE = 11;
+const RP_THEME_FONT_SIZE = 13; 
 const RP_DETAIL_FONT_SIZE = 10;
 const RP_LINE_HEIGHT_FACTOR = 1.3;
 
 const RP_SPACE_AFTER_MAIN_TITLE = 30;
 const RP_SPACE_AFTER_DATE_AND_THEME = 25;
 const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 1.5;
-const RP_SECTION_VERTICAL_SPACING = 20;
+// MODIFICADO: Distância entre os boxes dobrada.
+const RP_SECTION_VERTICAL_SPACING = 40; 
 
 const RP_BOX_PADDING = 15;
 const RP_BOX_CORNER_RADIUS = 5;
@@ -96,58 +97,50 @@ export function generatePublicMeetingPdf(
     const dirigenteValue = getMemberNamePdf(assignment.dirigenteId, allMembers);
     const leitorValue = getMemberNamePdf(leitorId, allMembers);
     const temaValue = assignment.tema || 'A Ser Anunciado';
-
-    // --- LÓGICA DE DESENHO MODIFICADA ---
     
-    // 1. Data (fonte normal e menor)
+    // Data
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(RP_DATE_FONT_SIZE);
     doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_R);
     doc.text(formatDisplayDateForPublicMeetingPdf(sundayDate), RP_MARGIN_LEFT, contentY);
-    contentY += RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR * 1.5; // Mais espaço após a data
+    contentY += RP_DATE_FONT_SIZE * RP_LINE_HEIGHT_FACTOR * 1.5;
 
-    // 2. Tema (sem rótulo, fonte maior e em negrito)
+    // Tema
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_THEME_FONT_SIZE);
     const temaLines = doc.splitTextToSize(temaValue, contentWidth);
     doc.text(temaLines, RP_MARGIN_LEFT, contentY);
     contentY += (temaLines.length * RP_THEME_FONT_SIZE * RP_LINE_HEIGHT_FACTOR) + RP_SPACE_AFTER_DATE_AND_THEME;
 
-    // 3. Bloco de Participantes
+    // Bloco de Participantes
     const col1_X = RP_MARGIN_LEFT;
     const col2_X = RP_MARGIN_LEFT + (contentWidth / 2);
     const barSpacing = 8;
     const textX_Col1 = col1_X + barSpacing;
     const textX_Col2 = col2_X + barSpacing;
-    
-    // MODIFICADO: Título "Participantes" desenhado acima da coluna da esquerda
     const participantsTitleY = contentY;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_DETAIL_FONT_SIZE);
-    doc.text("Participantes", textX_Col1, participantsTitleY);
-
+    doc.text("Participantes", textX_Col1, participantsTitleY); // Título na primeira coluna
     const contentStartY = participantsTitleY + RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR;
-    
     let line1_Y = contentStartY;
     let line2_Y = line1_Y + RP_DETAIL_ITEM_VERTICAL_SPACING;
-
     doc.setFont('helvetica', 'normal');
     doc.text(`Orador: ${oradorBaseName}`, textX_Col1, line1_Y);
     doc.text(`Dirigente: ${dirigenteValue}`, textX_Col2, line1_Y);
     doc.text(`Congregação: ${congregacaoValue}`, textX_Col1, line2_Y);
     doc.text(`Leitor: ${leitorValue}`, textX_Col2, line2_Y);
-
     const participantsBlockStartY = participantsTitleY - (RP_DETAIL_FONT_SIZE * 0.4);
     const participantsBlockEndY = line2_Y + (RP_DETAIL_FONT_SIZE * 0.4);
     
-    doc.setDrawColor(220, 220, 220);
+    // MODIFICADO: Cor das barras verticais alterada para preto.
+    doc.setDrawColor(0, 0, 0); 
     doc.setLineWidth(0.75);
     doc.line(col1_X, participantsBlockStartY, col1_X, participantsBlockEndY);
     doc.line(col2_X, participantsBlockStartY, col2_X, participantsBlockEndY);
     
     const boxContentEndY = participantsBlockEndY;
     const boxHeight = (boxContentEndY - boxContentStartY) + (RP_BOX_PADDING * 2);
-
     doc.setDrawColor(RP_BOX_BORDER_COLOR_R, RP_BOX_BORDER_COLOR_G, RP_BOX_BORDER_COLOR_B);
     doc.setLineWidth(1);
     doc.roundedRect(
@@ -164,6 +157,7 @@ export function generatePublicMeetingPdf(
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
+
 
 // --- Função para Cronograma Principal (Indicadores, Volantes, AV, Limpeza) ---
 // (Esta função permanece como estava antes, pois não foi fornecida uma nova versão para ela)
@@ -276,6 +270,8 @@ export function generateSchedulePdf(
 
   doc.save(`cronograma_principal_${NOMES_MESES[month].toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
+    
+
     
 
     
