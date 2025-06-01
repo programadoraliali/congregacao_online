@@ -125,7 +125,7 @@ export function generatePublicMeetingPdf(
     const formattedDateDisplay = formatDisplayDateForPublicMeetingPdf(sundayDate);
     // Calcula Y para centralizar texto da data verticalmente no retângulo
     const dateTextDimensions = doc.getTextDimensions(formattedDateDisplay, { fontSize: RP_DATE_FONT_SIZE });
-    const dateTextY = dateHeaderY + (RP_DATE_HEADER_RECT_HEIGHT / 2) + (dateTextDimensions.h / 2) - (doc.getLineHeightFactor() * doc.getFontSize() / (2 * doc.getK()) * 0.35); // Ajuste fino para baseline
+    const dateTextY = dateHeaderY + (RP_DATE_HEADER_RECT_HEIGHT / 2) + (dateTextDimensions.h / 2) - (doc.getLineHeightFactor() * doc.getFontSize() / (2 * doc.internal.scaleFactor) * 0.35); // Ajuste fino para baseline
     doc.text(formattedDateDisplay, RP_MARGIN_LEFT + 10, dateTextY); // Adiciona um pequeno padding esquerdo
     
     currentY += RP_DATE_HEADER_RECT_HEIGHT; 
@@ -222,12 +222,12 @@ export function generateSchedulePdf(
   const monthName = NOMES_MESES[month] || 'Mês Desconhecido';
   const mainTitleText = `Cronograma Principal - ${monthName} de ${year}`;
   
-  let currentY = margin;
+  let currentY_schedule = margin; // Renomeado para evitar conflito com currentY da outra função
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text(mainTitleText, pageWidth / 2, currentY, { align: 'center' });
-  currentY += 16 * 0.7 + 15;
+  doc.text(mainTitleText, pageWidth / 2, currentY_schedule, { align: 'center' });
+  currentY_schedule += 16 * 0.7 + 15;
 
 
   const sortedDates = Object.keys(schedule).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
@@ -254,21 +254,21 @@ export function generateSchedulePdf(
     if (!hasContentForDay) continue;
 
 
-    if (currentY > pageHeight - margin - 30) { 
+    if (currentY_schedule > pageHeight - margin - 30) { 
       doc.addPage();
-      currentY = margin;
+      currentY_schedule = margin;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.text(mainTitleText, pageWidth / 2, currentY, { align: 'center' });
-      currentY += 16 * 0.7 + 15;
+      doc.text(mainTitleText, pageWidth / 2, currentY_schedule, { align: 'center' });
+      currentY_schedule += 16 * 0.7 + 15;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
     }
 
-    const formattedDateDisplay = `${NOMES_DIAS_SEMANA_ABREV[dayOfWeek]} ${dateObj.getUTCDate()}/${dateObj.getUTCMonth() + 1}/${dateObj.getUTCFullYear()}`;
+    const formattedDateDisplay_schedule = `${NOMES_DIAS_SEMANA_ABREV[dayOfWeek]} ${dateObj.getUTCDate()}/${dateObj.getUTCMonth() + 1}/${dateObj.getUTCFullYear()}`; // Renomeado
     doc.setFont('helvetica', 'bold');
-    doc.text(formattedDateDisplay, margin, currentY);
-    currentY += 10 * 0.7 + 3; 
+    doc.text(formattedDateDisplay_schedule, margin, currentY_schedule);
+    currentY_schedule += 10 * 0.7 + 3; 
     doc.setFont('helvetica', 'normal');
 
     let detailPrintedForDate = false;
@@ -279,24 +279,24 @@ export function generateSchedulePdf(
       const member = members.find(m => m.id === memberId);
 
       if (funcDef && member) {
-        doc.text(`  • ${funcDef.nome}: ${member.nome}`, margin + 5, currentY);
-        currentY += 10 * 0.7 + 2;
+        doc.text(`  • ${funcDef.nome}: ${member.nome}`, margin + 5, currentY_schedule);
+        currentY_schedule += 10 * 0.7 + 2;
         detailPrintedForDate = true;
       } else if (funcId === 'limpezaAposReuniaoGrupoId' && memberId) {
         const grupo = GRUPOS_LIMPEZA_APOS_REUNIAO.find(g => g.id === memberId);
         if (grupo && grupo.id !== NONE_GROUP_ID) {
-             doc.text(`  • Limpeza Pós-Reunião: ${grupo.nome}`, margin + 5, currentY);
-             currentY += 10 * 0.7 + 2;
+             doc.text(`  • Limpeza Pós-Reunião: ${grupo.nome}`, margin + 5, currentY_schedule);
+             currentY_schedule += 10 * 0.7 + 2;
              detailPrintedForDate = true;
         }
       } else if (funcId === 'limpezaSemanalResponsavel' && memberId && typeof memberId === 'string' && memberId.trim() !== '') {
-         doc.text(`  • Limpeza Semanal: ${memberId}`, margin + 5, currentY);
-         currentY += 10 * 0.7 + 2;
+         doc.text(`  • Limpeza Semanal: ${memberId}`, margin + 5, currentY_schedule);
+         currentY_schedule += 10 * 0.7 + 2;
          detailPrintedForDate = true;
       }
     }
-    if(detailPrintedForDate) currentY += 5; 
-    else currentY -= (10 * 0.7 + 3); // Volta se nada foi impresso para esta data
+    if(detailPrintedForDate) currentY_schedule += 5; 
+    else currentY_schedule -= (10 * 0.7 + 3); // Volta se nada foi impresso para esta data
   }
   
   const pageCount = doc.internal.getNumberOfPages();
@@ -311,5 +311,3 @@ export function generateSchedulePdf(
 
   doc.save(`cronograma_principal_${NOMES_MESES[month].toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
-
-    
