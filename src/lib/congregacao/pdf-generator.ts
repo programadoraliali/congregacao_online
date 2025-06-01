@@ -327,18 +327,18 @@ export function generatePublicMeetingPdf(
 
   const drawPageHeader = (pageNumber: number) => {
     doc.setFontSize(10);
-    doc.setTextColor(150);
+    doc.setTextColor(150, 150, 150); // Cinza para APP_NAME
     doc.text(APP_NAME, margin, margin - 20);
     
     doc.setFontSize(16);
-    doc.setTextColor(0);
+    doc.setTextColor(0, 0, 0); // Preto para o título principal
     const mainTitle = `Programação da Reunião Pública - ${NOMES_MESES[mes]} de ${ano}`;
     doc.text(mainTitle, pageWidth / 2, margin, { align: 'center' });
-    currentY = margin + 10; // Reset Y after header
+    currentY = margin + 20; // Ajustar Y inicial após cabeçalho
 
-    if (pageNumber > 1) { // Add page number if not the first page
+    if (pageNumber > 1) { 
         doc.setFontSize(8);
-        doc.setTextColor(100);
+        doc.setTextColor(100, 100, 100);
         doc.text(`Página ${pageNumber}`, pageWidth - margin, pageHeight - 20, { align: 'right'});
     }
   };
@@ -346,7 +346,7 @@ export function generatePublicMeetingPdf(
   drawPageHeader(doc.internal.getNumberOfPages());
 
   const sundays = Object.keys(assignmentsForMonth)
-    .map(dateStr => new Date(dateStr + "T00:00:00Z")) // Ensure UTC context for dates from keys
+    .map(dateStr => new Date(dateStr + "T00:00:00Z")) 
     .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica)
     .sort((a, b) => a.getTime() - b.getTime());
 
@@ -363,56 +363,63 @@ export function generatePublicMeetingPdf(
     const dirigenteName = getMemberNamePdf(assignment.dirigenteId, allMembers);
     const leitorName = getMemberNamePdf(leitorId, allMembers);
 
-    const blockHeightEstimate = 80; // Rough estimate for text block height
-    if (currentY + blockHeightEstimate > pageHeight - margin - 20) { // -20 for potential footer
+    const lineHeight = 10; // Base line height for 10pt font
+    const detailLineSpacing = 5; // Space between "Tema:", "Orador:", etc.
+    const blockTopMargin = 10;
+    const blockSeparatorHeight = 15;
+
+    // Estimar altura do bloco de informações para este domingo
+    let estimatedBlockHeight = blockTopMargin;
+    doc.setFontSize(12); // Para data
+    estimatedBlockHeight += lineHeight * 1.2; // Altura da data
+    doc.setFontSize(10); // Para detalhes
+    estimatedBlockHeight += (lineHeight + detailLineSpacing) * 4; // 4 linhas de detalhes
+
+    if (currentY + estimatedBlockHeight > pageHeight - margin - 20) { 
       doc.addPage();
-      currentY = margin;
       drawPageHeader(doc.internal.getNumberOfPages());
     }
 
-    if (index > 0) { // Add separator line if not the first Sunday
-      currentY += 10; // Space before separator
-      doc.setDrawColor(200); // Light gray line
+    if (index > 0) { 
+      currentY += blockSeparatorHeight / 2; 
+      doc.setDrawColor(200, 200, 200); 
       doc.line(margin, currentY, pageWidth - margin, currentY);
-      currentY += 15; // Space after separator
+      currentY += blockSeparatorHeight / 2; 
+    } else {
+      currentY += blockTopMargin; // Espaço antes do primeiro bloco se não for o primeiro da página
     }
 
     doc.setFontSize(12);
     doc.setTextColor(0,0,0);
     doc.setFont('helvetica', 'bold');
     doc.text(formattedDate, margin, currentY);
-    currentY += 18;
+    currentY += lineHeight * 1.2 + 5; // Espaço após data
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
     const addDetail = (label: string, value: string) => {
-      if (currentY + 12 > pageHeight - margin - 20) { // Check space for this line
-          doc.addPage();
-          currentY = margin;
-          drawPageHeader(doc.internal.getNumberOfPages());
-          // Redraw date header for context if new page started mid-block (optional, but good for long blocks)
-          doc.setFontSize(12);
-          doc.setTextColor(0,0,0);
-          doc.setFont('helvetica', 'bold');
-          doc.text(formattedDate, margin, currentY);
-          currentY += 18;
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
-      }
+      doc.setFontSize(10);
+      doc.setTextColor(0,0,0); // Garantir cor preta para o texto
+      
+      const labelText = `${label}:`;
       doc.setFont('helvetica', 'bold');
-      doc.text(`${label}:`, margin + 10, currentY);
+      doc.text(labelText, margin + 10, currentY);
+      
       doc.setFont('helvetica', 'normal');
-      doc.text(value || '--', margin + 10 + (doc.getStringUnitWidth(label) * 10) + 15 , currentY, { maxWidth: contentWidth - 10 - (doc.getStringUnitWidth(label) * 10) - 15 });
-      currentY += 15; // Line height
+      const valueToDisplay = value || '--';
+      const labelWidth = doc.getTextWidth(labelText);
+      const xPosValue = margin + 10 + labelWidth + 5; // 5pt de espaço
+      const availableWidthForValue = contentWidth - (xPosValue - (margin + 10)); // Ajustar cálculo da largura disponível
+      
+      const textLines = doc.splitTextToSize(valueToDisplay, availableWidthForValue);
+      doc.text(textLines, xPosValue, currentY);
+      currentY += (textLines.length * lineHeight) + detailLineSpacing; 
     };
 
     addDetail("Tema do Discurso", assignment.tema || 'A Ser Anunciado');
     addDetail("Orador", oradorDisplay);
     addDetail("Dirigente de A Sentinela", dirigenteName);
     addDetail("Leitor de A Sentinela", leitorName);
-
   });
 
   doc.save(`reuniao_publica_${NOMES_MESES[mes].toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a')}_${ano}.pdf`);
 }
+
