@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { NOMES_MESES, FUNCOES_DESIGNADAS, DIAS_REUNIAO } from '@/lib/congregacao/constants';
 import type { DesignacoesFeitas, FuncaoDesignada, Membro, SubstitutionDetails } from '@/lib/congregacao/types';
 import { ScheduleDisplay } from './ScheduleDisplay';
-import { MemberSelectionDialog } from './MemberSelectionDialog'; 
+import { MemberSelectionDialog } from './MemberSelectionDialog';
 import { useToast } from "@/hooks/use-toast";
 import { FileText, AlertTriangle, Loader2, UserPlus, Info } from 'lucide-react';
 import { getPermissaoRequerida, formatarDataCompleta } from '@/lib/congregacao/utils';
@@ -22,19 +22,19 @@ interface ScheduleGenerationCardProps {
   currentSchedule: DesignacoesFeitas | null;
   currentMes: number | null;
   currentAno: number | null;
-  status: string | null; 
-  onFinalizeSchedule: () => Promise<{ success: boolean; error?: string }>; 
-  onSaveProgress: () => void; 
+  status: string | null;
+  onFinalizeSchedule: () => Promise<{ success: boolean; error?: string }>;
+  onSaveProgress: () => void;
   onOpenSubstitutionModal: (details: SubstitutionDetails) => void;
   onDirectAssignAV: (date: string, functionId: string, newMemberId: string | null, originalMemberId: string | null) => void;
   onLimpezaChange: (dateKey: string, type: 'aposReuniao' | 'semanal', value: string | null) => void;
-  onMonthYearChangeRequest: (mes: number, ano: number) => void; // Nova prop
+  onMonthYearChangeRequest: (mes: number, ano: number) => void;
 }
 
 interface AVSelectionContext {
   dateStr: string;
-  functionId: string; 
-  columnKey: string; 
+  functionId: string;
+  columnKey: string;
   currentMemberId: string | null;
   requiredPermissionId: string | null;
 }
@@ -42,16 +42,16 @@ interface AVSelectionContext {
 export function ScheduleGenerationCard({
   membros,
   onScheduleGenerated,
-  currentSchedule,  
-  currentMes,       
-  currentAno,        
-  status, 
-  onFinalizeSchedule, 
-  onSaveProgress, 
+  currentSchedule,
+  currentMes,
+  currentAno,
+  status,
+  onFinalizeSchedule,
+  onSaveProgress,
   onOpenSubstitutionModal,
   onDirectAssignAV,
   onLimpezaChange,
-  onMonthYearChangeRequest, // Nova prop
+  onMonthYearChangeRequest,
 }: ScheduleGenerationCardProps) {
   const [selectedMes, setSelectedMes] = useState<string>(currentMes !== null ? currentMes.toString() : new Date().getMonth().toString());
   const [selectedAno, setSelectedAno] = useState<string>(currentAno !== null ? currentAno.toString() : new Date().getFullYear().toString());
@@ -59,13 +59,16 @@ export function ScheduleGenerationCard({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const [isAVMemberSelectionOpen, setIsAVMemberSelectionOpen] = useState(false);
+  const [avSelectionContext, setAVSelectionContext] = useState<AVSelectionContext | null>(null);
+
 
   useEffect(() => {
     if (currentMes !== null && currentAno !== null) {
       setSelectedMes(currentMes.toString());
       setSelectedAno(currentAno.toString());
     }
-    setError(null); 
+    setError(null);
   }, [currentMes, currentAno]);
 
 
@@ -82,10 +85,10 @@ export function ScheduleGenerationCard({
       toast({ title: "Erro", description: "Adicione membros primeiro.", variant: "destructive" });
       return;
     }
-    
+
     try {
-        const result = await onScheduleGenerated(mes, ano); 
-        
+        const result = await onScheduleGenerated(mes, ano);
+
         if (result.error) {
             setError(result.error);
         }
@@ -122,16 +125,16 @@ export function ScheduleGenerationCard({
   };
 
   const handleOpenAVMemberSelection = (
-    dateStr: string, 
-    functionId: string, 
+    dateStr: string,
+    functionId: string,
     columnKey: string,
     currentMemberId: string | null
   ) => {
     const targetDate = new Date(dateStr + "T00:00:00");
     const tipoReuniao = targetDate.getUTCDay() === DIAS_REUNIAO.meioSemana ? 'meioSemana' : 'publica';
     const funcDef = FUNCOES_DESIGNADAS.find(f => f.id === functionId);
-    const requiredPermissionId = funcDef?.permissaoRequeridaBase 
-        ? getPermissaoRequerida(funcDef.id, tipoReuniao) 
+    const requiredPermissionId = funcDef?.permissaoRequeridaBase
+        ? getPermissaoRequerida(funcDef.id, tipoReuniao)
         : null;
 
     setAVSelectionContext({ dateStr, functionId, columnKey, currentMemberId, requiredPermissionId });
@@ -142,8 +145,8 @@ export function ScheduleGenerationCard({
     if (!avSelectionContext || currentMes === null || currentAno === null) return;
 
     const { dateStr, functionId } = avSelectionContext;
-    const originalMemberId = avSelectionContext.currentMemberId || null; 
-    
+    const originalMemberId = avSelectionContext.currentMemberId || null;
+
     onDirectAssignAV(dateStr, functionId, newMemberId, originalMemberId);
 
     setIsAVMemberSelectionOpen(false);
@@ -165,12 +168,14 @@ export function ScheduleGenerationCard({
         <div className="flex flex-col sm:flex-row gap-4 mb-6 items-end">
           <div className="flex-1">
             <Label htmlFor="selectMes">Mês</Label>
-            <Select 
-              value={selectedMes} 
+            <Select
+              value={selectedMes}
               onValueChange={(value) => {
                 const newMes = parseInt(value, 10);
                 setSelectedMes(value);
-                onMonthYearChangeRequest(newMes, parseInt(selectedAno, 10));
+                if (currentAno !== null) {
+                    onMonthYearChangeRequest(newMes, parseInt(selectedAno, 10));
+                }
               }}
             >
               <SelectTrigger id="selectMes">
@@ -185,12 +190,14 @@ export function ScheduleGenerationCard({
           </div>
           <div className="flex-1">
             <Label htmlFor="inputAno">Ano</Label>
-             <Select 
-                value={selectedAno} 
+             <Select
+                value={selectedAno}
                 onValueChange={(value) => {
                   const newAno = parseInt(value, 10);
                   setSelectedAno(value);
-                  onMonthYearChangeRequest(parseInt(selectedMes, 10), newAno);
+                   if (currentMes !== null) {
+                    onMonthYearChangeRequest(parseInt(selectedMes, 10), newAno);
+                  }
                 }}
               >
                 <SelectTrigger id="inputAno">
@@ -203,9 +210,9 @@ export function ScheduleGenerationCard({
                 </SelectContent>
             </Select>
           </div>
-          <Button 
-            onClick={handleGenerateSchedule} 
-            disabled={isLoading || status === 'rascunho' || status === 'finalizado'} 
+          <Button
+            onClick={handleGenerateSchedule}
+            disabled={isLoading || status === 'rascunho' || status === 'finalizado'}
             className="w-full sm:w-auto"
           >
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
@@ -247,14 +254,14 @@ export function ScheduleGenerationCard({
                 Designações para {NOMES_MESES[currentMes]} de {currentAno}
               </h3>
               <ScheduleDisplay
-                status={status} 
+                status={status}
                 designacoesFeitas={currentSchedule}
                 membros={membros}
                 mes={currentMes}
                 ano={currentAno}
                 onOpenSubstitutionModal={onOpenSubstitutionModal}
                 onOpenAVMemberSelectionDialog={handleOpenAVMemberSelection}
-                onLimpezaChange={onLimpezaChange} 
+                onLimpezaChange={onLimpezaChange}
               />
                {status === 'rascunho' && (
                  <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
@@ -285,7 +292,7 @@ export function ScheduleGenerationCard({
           isOpen={isAVMemberSelectionOpen}
           onOpenChange={setIsAVMemberSelectionOpen}
           allMembers={membros}
-          targetRole={null} 
+          targetRole={null}
           requiredPermissionId={avSelectionContext.requiredPermissionId}
           currentDate={avSelectionContext.dateStr}
           onSelectMember={(memberId) => handleConfirmAVSelection(memberId)}
@@ -298,4 +305,3 @@ export function ScheduleGenerationCard({
     </Card>
   );
 }
-
