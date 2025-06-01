@@ -7,15 +7,15 @@ export function gerarIdMembro(): string {
 }
 
 export function formatarDataParaChave(data: Date): string {
-  const ano = data.getFullYear();
-  const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+  const ano = data.getUTCFullYear();
+  const mes = (data.getUTCMonth() + 1).toString().padStart(2, '0');
   return `${ano}-${mes}`; // YYYY-MM
 }
 
 export function formatarDataCompleta(data: Date): string {
-  const ano = data.getFullYear();
-  const mes = (data.getMonth() + 1).toString().padStart(2, '0');
-  const dia = data.getDate().toString().padStart(2, '0');
+  const ano = data.getUTCFullYear();
+  const mes = (data.getUTCMonth() + 1).toString().padStart(2, '0');
+  const dia = data.getUTCDate().toString().padStart(2, '0');
   return `${ano}-${mes}-${dia}`; // YYYY-MM-DD
 }
 
@@ -101,7 +101,7 @@ export function getPermissaoRequerida(funcaoId: string, tipoReuniao: 'meioSemana
 
 
 export function getRealFunctionId(columnKey: string, dateStr: string, tipoTabela: string): string {
-    const dataObj = new Date(dateStr + "T00:00:00");
+    const dataObj = new Date(dateStr + "T00:00:00Z"); // Use UTC for this date object to be consistent
     const diaSemanaIndex = dataObj.getUTCDay();
     const isMeioSemana = diaSemanaIndex === DIAS_REUNIAO.meioSemana;
 
@@ -293,3 +293,4 @@ export function parseNvmcProgramText(text: string): ParsedNvmcProgram {
   }
   return result;
 }
+

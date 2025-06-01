@@ -14,7 +14,7 @@ const getMemberNamePdf = (memberId: string | null | undefined, membros: Membro[]
 };
 
 function getISOWeekPdf(date: Date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
@@ -180,7 +180,7 @@ export function generateSchedulePdf(
   const limpezaSemanalData: string[][] = [];
   
   allMeetingDatesForMonth.forEach(dateObj => {
-    const dateStr = formatarDataCompleta(dateObj);
+    const dateStr = formatarDataCompleta(dateObj); // Uses UTC by default now
     const dia = dateObj.getUTCDate();
     const diaAbrev = NOMES_DIAS_SEMANA_ABREV[dateObj.getUTCDay()];
     const designacaoDia = scheduleData[dateStr];
@@ -195,12 +195,12 @@ export function generateSchedulePdf(
   const processedWeeksPdf = new Set<string>();
 
   allMeetingDatesForMonth.forEach(date => { 
-    const sunday = new Date(date);
+    const sunday = new Date(date); // date is already UTC
     sunday.setUTCDate(date.getUTCDate() - date.getUTCDay()); 
     const year = sunday.getUTCFullYear();
     const monthAbr = NOMES_MESES[sunday.getUTCMonth()]?.substring(0, 3).toLowerCase() || '';
     const day = sunday.getUTCDate();
-    const dateKey = formatarDataCompleta(sunday); 
+    const dateKey = formatarDataCompleta(sunday); // Uses UTC
     const weekIdForSet = `${year}-${getISOWeekPdf(sunday)}`;
 
     if (!processedWeeksPdf.has(weekIdForSet)) {
@@ -346,18 +346,23 @@ export function generatePublicMeetingPdf(
   drawPageHeader(doc.internal.getNumberOfPages());
 
   const sundays = Object.keys(assignmentsForMonth)
-    .map(dateStr => new Date(dateStr + "T00:00:00Z")) 
-    .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica)
+    .map(dateStr => new Date(dateStr + "T00:00:00Z")) // Interpretar chaves como UTC
+    .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica) // DIAS_REUNIAO.publica é 0 (domingo)
     .sort((a, b) => a.getTime() - b.getTime());
 
   sundays.forEach((sundayDate, index) => {
-    const dateStr = formatarDataCompleta(sundayDate);
+    // sundayDate já é um objeto Date UTC
+    const dateStr = formatarDataCompleta(sundayDate); // formatarDataCompleta agora usa UTC
     const assignment = assignmentsForMonth[dateStr];
-    if (!assignment) return;
+    if (!assignment) {
+        console.warn(`generatePublicMeetingPdf: Nenhuma designação encontrada para a chave UTC ${dateStr}. Designações disponíveis:`, Object.keys(assignmentsForMonth));
+        return; 
+    }
 
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
 
-    const formattedDate = `${NOMES_DIAS_SEMANA_ABREV[sundayDate.getUTCDay()]} ${sundayDate.getUTCDate().toString().padStart(2, '0')} de ${NOMES_MESES[sundayDate.getUTCMonth()]} de ${sundayDate.getUTCFullYear()}`;
+    // Para exibição, usar métodos UTC para consistência, mas formatar para o visual local desejado.
+    const formattedDateDisplay = `${NOMES_DIAS_SEMANA_ABREV[sundayDate.getUTCDay()]} ${sundayDate.getUTCDate().toString().padStart(2, '0')} de ${NOMES_MESES[sundayDate.getUTCMonth()]} de ${sundayDate.getUTCFullYear()}`;
     
     const oradorDisplay = `${assignment.orador || 'A Ser Anunciado'}${assignment.congregacaoOrador ? ` (${assignment.congregacaoOrador})` : ''}`;
     const dirigenteName = getMemberNamePdf(assignment.dirigenteId, allMembers);
@@ -368,36 +373,35 @@ export function generatePublicMeetingPdf(
     const blockTopMargin = 10;
     const blockSeparatorHeight = 15;
 
-    // Estimar altura do bloco de informações para este domingo
     let estimatedBlockHeight = blockTopMargin;
-    doc.setFontSize(12); // Para data
-    estimatedBlockHeight += lineHeight * 1.2; // Altura da data
-    doc.setFontSize(10); // Para detalhes
-    estimatedBlockHeight += (lineHeight + detailLineSpacing) * 4; // 4 linhas de detalhes
+    doc.setFontSize(12); 
+    estimatedBlockHeight += lineHeight * 1.2; 
+    doc.setFontSize(10); 
+    estimatedBlockHeight += (lineHeight + detailLineSpacing) * 4; 
 
     if (currentY + estimatedBlockHeight > pageHeight - margin - 20) { 
       doc.addPage();
       drawPageHeader(doc.internal.getNumberOfPages());
     }
 
-    if (index > 0) { 
+    if (index > 0 || (doc.internal.getNumberOfPages() > 1 && currentY === margin + 20) ) { 
       currentY += blockSeparatorHeight / 2; 
       doc.setDrawColor(200, 200, 200); 
       doc.line(margin, currentY, pageWidth - margin, currentY);
       currentY += blockSeparatorHeight / 2; 
     } else {
-      currentY += blockTopMargin; // Espaço antes do primeiro bloco se não for o primeiro da página
+      currentY += blockTopMargin; 
     }
 
     doc.setFontSize(12);
     doc.setTextColor(0,0,0);
     doc.setFont('helvetica', 'bold');
-    doc.text(formattedDate, margin, currentY);
-    currentY += lineHeight * 1.2 + 5; // Espaço após data
+    doc.text(formattedDateDisplay, margin, currentY);
+    currentY += lineHeight * 1.2 + 5; 
 
     const addDetail = (label: string, value: string) => {
       doc.setFontSize(10);
-      doc.setTextColor(0,0,0); // Garantir cor preta para o texto
+      doc.setTextColor(0,0,0); 
       
       const labelText = `${label}:`;
       doc.setFont('helvetica', 'bold');
@@ -406,10 +410,12 @@ export function generatePublicMeetingPdf(
       doc.setFont('helvetica', 'normal');
       const valueToDisplay = value || '--';
       const labelWidth = doc.getTextWidth(labelText);
-      const xPosValue = margin + 10 + labelWidth + 5; // 5pt de espaço
-      const availableWidthForValue = contentWidth - (xPosValue - (margin + 10)); // Ajustar cálculo da largura disponível
+      const xPosValue = margin + 10 + labelWidth + 5; 
       
-      const textLines = doc.splitTextToSize(valueToDisplay, availableWidthForValue);
+      // Melhorar cálculo de largura para o valor do detalhe
+      const contentWidthForDetails = contentWidth - (10 + labelWidth + 5); // subtrai a margem esquerda do detalhe, a largura do label, e o espaçamento
+      
+      const textLines = doc.splitTextToSize(valueToDisplay, contentWidthForDetails);
       doc.text(textLines, xPosValue, currentY);
       currentY += (textLines.length * lineHeight) + detailLineSpacing; 
     };
