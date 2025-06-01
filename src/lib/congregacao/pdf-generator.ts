@@ -14,15 +14,14 @@ const RP_APP_NAME_FONT_SIZE = 9;
 const RP_MAIN_TITLE_FONT_SIZE = 18;
 const RP_DATE_FONT_SIZE = 12;
 const RP_DETAIL_FONT_SIZE = 10;
-const RP_LINE_HEIGHT_FACTOR = 1.3;
+const RP_LINE_HEIGHT_FACTOR = 1.3; // Usado para estimar altura de texto multilinhas
 
-const RP_SPACE_AFTER_MAIN_TITLE = 40; 
-const RP_SPACE_BEFORE_DATE = 0; 
-const RP_SPACE_AFTER_DATE = 2.5; 
+const RP_SPACE_AFTER_MAIN_TITLE = 40;
+const RP_SPACE_AFTER_DATE = 2.5;
 const RP_LINE_THICKNESS = 0.5;
-const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2; 
-const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.7; 
-const RP_SECTION_VERTICAL_SPACING = 45; 
+const RP_SPACE_AFTER_LINE_BEFORE_DETAILS = RP_DETAIL_FONT_SIZE * 1.2;
+const RP_DETAIL_ITEM_VERTICAL_SPACING = RP_DETAIL_FONT_SIZE * 0.7;
+const RP_SECTION_VERTICAL_SPACING = 45;
 
 const RP_COLOR_TEXT_DEFAULT_R = 50;
 const RP_COLOR_TEXT_DEFAULT_G = 50;
@@ -78,47 +77,48 @@ export function generatePublicMeetingPdf(
   doc.setTextColor(RP_COLOR_TEXT_MUTED_R, RP_COLOR_TEXT_MUTED_G, RP_COLOR_TEXT_MUTED_B);
   doc.text(APP_NAME.toUpperCase(), RP_MARGIN_LEFT, currentY - RP_APP_NAME_FONT_SIZE - 5);
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('helvetica', 'bold'); // Imagem do usuário não parece ser negrito, usando normal
   doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
   doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
   const mainTitleText = `REUNIÃO PÚBLICA`;
-  doc.text(mainTitleText, RP_MARGIN_LEFT, currentY);
+  doc.text(mainTitleText, RP_MARGIN_LEFT, currentY); // Alinhado à esquerda como na imagem
   currentY += RP_MAIN_TITLE_FONT_SIZE * 0.7 + RP_SPACE_AFTER_MAIN_TITLE;
 
+
   const sundays = Object.keys(assignmentsForMonth)
-    .map(dateStr => new Date(dateStr + "T00:00:00Z"))
+    .map(dateStr => new Date(dateStr + "T00:00:00Z")) // Usar Z para UTC
     .filter(dateObj => dateObj.getUTCDay() === DIAS_REUNIAO.publica && assignmentsForMonth[formatarDataParaChaveOriginal(dateObj)])
     .sort((a, b) => a.getTime() - b.getTime());
 
-  sundays.forEach((sundayDate) => {
+  sundays.forEach((sundayDate, sundayIndex) => {
     const dateStr = formatarDataParaChaveOriginal(sundayDate);
     const assignment = assignmentsForMonth[dateStr];
     if (!assignment) return;
 
     const leitorId = mainScheduleForMonth?.[dateStr]?.['leitorDom'] || null;
     
-    let oradorDisplayValue = "A Ser Designado";
-    const oradorInput = assignment.orador; 
+    let oradorBaseName: string = "A Ser Designado";
+    const oradorInput = assignment.orador;
     const congregacaoInput = assignment.congregacaoOrador;
 
     if (oradorInput && oradorInput.trim() !== '') {
         const localMemberMatch = allMembers.find(m => m.id === oradorInput);
-        let speakerName: string;
-
         if (localMemberMatch) {
-            // Speaker is a local member (oradorInput was their ID)
-            speakerName = localMemberMatch.nome;
+            oradorBaseName = localMemberMatch.nome;
         } else {
-            // Speaker is a visitor (oradorInput is their name as a string)
-            speakerName = oradorInput;
-        }
-
-        if (congregacaoInput && congregacaoInput.trim() !== '') {
-            oradorDisplayValue = `${speakerName} ø ${congregacaoInput}`;
-        } else {
-            oradorDisplayValue = speakerName; // Just the name if no congregation is specified
+            oradorBaseName = oradorInput;
         }
     }
+
+    let oradorDisplayValue = oradorBaseName;
+    if (congregacaoInput && congregacaoInput.trim() !== '') {
+        oradorDisplayValue = `${oradorBaseName} ø ${congregacaoInput}`;
+    } else if (oradorBaseName !== "A Ser Designado") {
+        // Se orador foi designado mas não há congregação, não adicionamos "Local" aqui, 
+        // apenas o nome. A ideia de "(Local)" pode ser adicionada se for um membro local sem congregação especificada.
+        // Para manter simples, só adicionamos a congregação se ela estiver explicitamente informada.
+    }
+
 
     const detailItemsConfig: { label: string; value: string }[] = [
       { label: `Tema:`, value: assignment.tema || 'A Ser Anunciado' },
@@ -148,33 +148,33 @@ export function generatePublicMeetingPdf(
       estimatedSectionHeight += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR);
       estimatedSectionHeight += RP_DETAIL_ITEM_VERTICAL_SPACING;
     });
-    estimatedSectionHeight -= RP_DETAIL_ITEM_VERTICAL_SPACING; 
+    estimatedSectionHeight -= RP_DETAIL_ITEM_VERTICAL_SPACING; // Remover o último espaçamento
 
+    // Se não for o primeiro bloco na página, adiciona o espaçamento da seção
     if (!isFirstBlockOnPage) {
       estimatedSectionHeight += RP_SECTION_VERTICAL_SPACING;
     }
 
+    // Verifica se precisa de nova página
     if (currentY + estimatedSectionHeight > pageHeight - RP_MARGIN_BOTTOM) {
       doc.addPage();
       currentY = RP_MARGIN_TOP;
       isFirstBlockOnPage = true;
       
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(RP_APP_NAME_FONT_SIZE);
-      doc.setTextColor(RP_COLOR_TEXT_MUTED_R, RP_COLOR_TEXT_MUTED_G, RP_COLOR_TEXT_MUTED_B);
-      doc.text(APP_NAME.toUpperCase(), RP_MARGIN_LEFT, currentY - RP_APP_NAME_FONT_SIZE - 5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
-      doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
-      doc.text(mainTitleText, RP_MARGIN_LEFT, currentY);
-      currentY += RP_MAIN_TITLE_FONT_SIZE * 0.7 + RP_SPACE_AFTER_MAIN_TITLE;
+      // Se precisar repetir o título principal em novas páginas (descomente se necessário)
+      // doc.setFont('helvetica', 'normal');
+      // doc.setFontSize(RP_MAIN_TITLE_FONT_SIZE);
+      // doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
+      // doc.text(mainTitleText, RP_MARGIN_LEFT, currentY);
+      // currentY += RP_MAIN_TITLE_FONT_SIZE * 0.7 + RP_SPACE_AFTER_MAIN_TITLE;
     }
 
+    // Adiciona espaçamento antes do bloco da data, se não for o primeiro da página
     if (!isFirstBlockOnPage) {
         currentY += RP_SECTION_VERTICAL_SPACING;
     }
     
+    // Desenha a data
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(RP_DATE_FONT_SIZE);
     doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
@@ -182,32 +182,35 @@ export function generatePublicMeetingPdf(
     doc.text(formattedDateDisplay, RP_MARGIN_LEFT, currentY);
     currentY += RP_DATE_FONT_SIZE + RP_SPACE_AFTER_DATE;
 
+    // Desenha a linha horizontal
     doc.setDrawColor(RP_COLOR_LINE_R, RP_COLOR_LINE_G, RP_COLOR_LINE_B);
     doc.setLineWidth(RP_LINE_THICKNESS);
     doc.line(RP_MARGIN_LEFT, currentY, RP_MARGIN_LEFT + contentWidth, currentY);
     currentY += RP_LINE_THICKNESS + RP_SPACE_AFTER_LINE_BEFORE_DETAILS;
 
+    // Desenha os itens de detalhe
     detailItemsConfig.forEach((itemConf, itemIndex) => {
       doc.setTextColor(RP_COLOR_TEXT_DEFAULT_R, RP_COLOR_TEXT_DEFAULT_G, RP_COLOR_TEXT_DEFAULT_B);
       
-      doc.setFont('helvetica', 'bold'); 
+      doc.setFont('helvetica', 'bold'); // Rótulo em negrito
       doc.setFontSize(RP_DETAIL_FONT_SIZE);
       const labelText = RP_BULLET + " " + itemConf.label;
       doc.text(labelText, RP_MARGIN_LEFT, currentY);
       
-      doc.setFont('helvetica', 'normal'); 
+      doc.setFont('helvetica', 'normal'); // Valor normal
       doc.setFontSize(RP_DETAIL_FONT_SIZE);
       const valueLines = doc.splitTextToSize(itemConf.value, availableWidthForValue);
       doc.text(valueLines, valueStartX, currentY);
       
       currentY += (valueLines.length * RP_DETAIL_FONT_SIZE * RP_LINE_HEIGHT_FACTOR);
-      if (itemIndex < detailItemsConfig.length - 1) {
+      if (itemIndex < detailItemsConfig.length - 1) { // Adiciona espaçamento apenas entre os itens
           currentY += RP_DETAIL_ITEM_VERTICAL_SPACING;
       }
     });
-    isFirstBlockOnPage = false;
+    isFirstBlockOnPage = false; // Após o primeiro bloco, os próximos terão espaçamento de seção
   });
   
+  // Adiciona numeração de página se houver mais de uma
   const pageCount = doc.internal.getNumberOfPages();
   if (pageCount > 1) {
     for (let i = 1; i <= pageCount; i++) {
@@ -222,7 +225,7 @@ export function generatePublicMeetingPdf(
 }
 
 
-// --- Função para Cronograma Principal ---
+// --- Função para Cronograma Principal (Indicadores, Volantes, AV, Limpeza) ---
 export function generateSchedulePdf(
   schedule: DesignacoesFeitas,
   members: Membro[],
@@ -317,9 +320,10 @@ export function generateSchedulePdf(
       }
     }
     if(detailPrintedForDate) currentY += 5; 
-    else currentY -= (10 * 0.7 + 3); 
+    else currentY -= (10 * 0.7 + 3); // Volta se nada foi impresso para esta data
   }
   
+  // Adiciona numeração de página se houver mais de uma
   const pageCount = doc.internal.getNumberOfPages();
   if (pageCount > 1) {
     for (let i = 1; i <= pageCount; i++) {
@@ -332,3 +336,4 @@ export function generateSchedulePdf(
 
   doc.save(`cronograma_principal_${monthName.toLowerCase().replace(/ /g, '_')}_${year}.pdf`);
 }
+
